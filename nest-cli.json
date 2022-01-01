@@ -2,7 +2,7 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "assets": [{"include": "**/*.yml", "outDir": "./dist/"}],
+    "assets": [{"include": "**/resources/*.yml", "outDir": "./dist/"}],
     "watchAssets": true
   }
 }

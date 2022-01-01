@@ -1,0 +1,14 @@
+http:
+  host: 'localhost'
+  port: 3000
+
+db:
+  postgres:
+    url: 'localhost'
+    port: 5432
+    profile: postgres
+    password: 123456
+    database: nodetypeorm
+    entities: "dist/**/**.entity{.ts,.js}"
+    synchronize: true
+
