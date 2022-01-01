@@ -8,6 +8,7 @@ export class UserViewDto {
       userDto.id = user.id;
       userDto.username = user.username;
       userDto.email = user.email;
+      userDto.group = user.group.name;
       userDto.firstname = user.firstname;
       userDto.lastname = user.lastname;
       userDto.walletAddress = user.walletAddress;
@@ -23,6 +24,9 @@ export class UserViewDto {
 
   @ApiProperty()
   public username: string;
+
+  @ApiProperty()
+  public group: string;
 
   @ApiProperty()
   public email: string;

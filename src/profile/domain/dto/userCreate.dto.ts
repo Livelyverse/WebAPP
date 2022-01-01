@@ -27,6 +27,13 @@ export class UserCreateDto {
   @ApiProperty()
   public password: string;
 
+  @Length(4, 128, { message: 'Group length at least 4 characters' })
+  @IsNotEmpty({ message: 'Group must not empty' })
+  @IsDefined({ message: 'Group must be defined' })
+  @IsString({ message: 'Group must be string' })
+  @ApiProperty()
+  public group: string;
+
   @IsOptional()
   @IsString({ message: 'firstname must be string' })
   @ApiPropertyOptional()

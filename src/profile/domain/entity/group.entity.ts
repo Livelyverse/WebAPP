@@ -1,5 +1,5 @@
 import { BaseEntity } from './base.entity';
-import { Column, Entity, ManyToOne, OneToMany } from "typeorm";
+import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
 import { RoleEntity } from './role.entity';
 import { UserEntity } from './user.entity';
 
@@ -26,5 +26,5 @@ export class GroupEntity extends BaseEntity {
     lazy: true,
     nullable: true,
   })
-  users: Promise<UserEntity[]>;
+  users: Promise<Array<UserEntity>>;
 }

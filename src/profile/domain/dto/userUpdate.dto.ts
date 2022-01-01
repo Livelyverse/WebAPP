@@ -13,33 +13,40 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserCreateDto } from './userCreate.dto';
 
 export class UserUpdateDto {
-  @IsUUID()
+  @IsNotEmpty({ message: 'Username must not empty' })
+  @IsDefined({ message: 'Username must be defined' })
+  @IsString({ message: 'Username must be string' })
   @ApiProperty()
-  public id: string;
+  public username: string;
 
   @IsEmail({ message: 'Email must be valid' })
+  @IsNotEmpty({ message: 'Email must not empty' })
+  @IsDefined({ message: 'Email must be defined' })
+  @IsString({ message: 'Email must be string' })
   @ApiProperty()
   public email: string;
 
+  @Length(4, 128, { message: 'Group length at least 4 characters' })
+  @IsNotEmpty({ message: 'Group must not empty' })
+  @IsDefined({ message: 'Group must be defined' })
+  @IsString({ message: 'Group must be string' })
+  @ApiProperty()
+  public group: string;
+
   @IsOptional()
-  @IsString()
   @ApiPropertyOptional()
   public imageUrl: string;
 
   @IsOptional()
-  @Matches(/^0x.*$/)
+  // @Matches(/^0x.*$/)
   @ApiPropertyOptional()
   public walletAddress: string;
 
-  @IsNotEmpty()
   @IsOptional()
-  @IsString()
   @ApiPropertyOptional()
-  public firstname: string;
+  public firstname?: string;
 
-  @IsNotEmpty()
   @IsOptional()
-  @IsString()
   @ApiPropertyOptional()
-  public lastname: string;
+  public lastname?: string;
 }
