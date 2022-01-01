@@ -1,17 +1,34 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import yamlReader from './config/yamlReader';
-import { AppConfigService } from './config/appConfig.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       load: [yamlReader],
     }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres',
+        host: configService.get<string>('db.postgres.host'),
+        port: parseInt(configService.get<string>('db.postgres.port')),
+        username: configService.get<string>('db.postgres.profile'),
+        password: configService.get<string>('db.postgres.password'),
+        database: configService.get<string>('db.postgres.database'),
+        entities: [configService.get<string>('db.postgres.entities')],
+        logging: configService.get<boolean>('db.postgres.logging'),
+        migrationsRun: configService.get<boolean>('db.postgres.migrationsRun'),
+        synchronize: configService.get<boolean>('db.postgres.synchronize'),
+      }),
+      inject: [ConfigService],
+    }),
   ],
   controllers: [AppController],
-  providers: [AppService, AppConfigService],
+  providers: [AppService, ConfigService],
+  exports: [],
 })
 export class AppModule {}

@@ -4,11 +4,13 @@ http:
 
 db:
   postgres:
-    url: 'localhost'
+    host: 'localhost'
     port: 5432
-    profile: postgres
-    password: 123456
-    database: nodetypeorm
+    profile: 'postgres'
+    password: '123456'
+    database: 'livelydb'
     entities: "dist/**/**.entity{.ts,.js}"
+    logging: true
+    migrationsRun: false
     synchronize: true
 
