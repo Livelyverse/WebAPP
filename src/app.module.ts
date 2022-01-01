@@ -4,9 +4,11 @@ import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import yamlReader from './config/yamlReader';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ProfileModule } from './profile/profile.module';
 
 @Module({
   imports: [
+    ProfileModule,
     ConfigModule.forRoot({
       load: [yamlReader],
     }),

@@ -3,11 +3,15 @@ import {
   IsOptional,
   IsNotEmpty,
   IsDefined,
-  Length,
-} from 'class-validator';
+  Length, IsUUID
+} from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RoleUpdateDto {
+  @IsUUID()
+  @ApiProperty()
+  public id: string;
+
   @Length(4, 128, { message: 'Name length at least 4 characters' })
   @IsNotEmpty({ message: 'Name must not empty' })
   @IsDefined({ message: 'Name must be defined' })

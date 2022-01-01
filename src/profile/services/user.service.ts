@@ -36,14 +36,18 @@ export class UserService implements IService<UserEntity> {
       );
     }
 
-    const groupEntity = await this.groupService.findByName(userDto.group);
+    const groupEntity = await this.groupService.findByName(
+      userDto.group.toUpperCase(),
+    );
     if (!groupEntity) {
       this.logger.log(
-        `groupService.findByName failed, group not found: ${userDto.group}`,
+        `groupService.findByName failed, group not found: ${userDto.group.toUpperCase()}`,
       );
       throw new HttpException(
         {
-          message: `Create user ${userDto.username} failed, group ${userDto.group} not found`,
+          message: `Create user ${
+            userDto.username
+          } failed, group ${userDto.group.toUpperCase()} not found`,
         },
         HttpStatus.NOT_FOUND,
       );
@@ -139,9 +143,10 @@ export class UserService implements IService<UserEntity> {
     }
   }
 
-  async findById(id: string): Promise<UserEntity | null> {
+  async findById(id: string): Promise<UserEntity> {
+    let user;
     try {
-      return await this.userRepository.findOne({ where: { id: id } });
+      user = await this.userRepository.findOne({ where: { id: id } });
     } catch (err) {
       this.logger.error(`userRepository.findOne failed. id: ${id}`, err);
       throw new HttpException(
@@ -149,9 +154,19 @@ export class UserService implements IService<UserEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+
+    if (!user) {
+      throw new HttpException(
+        { message: `User ${id} Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return user;
   }
 
-  async findByName(name: string): Promise<UserEntity | null> {
+  async findByName(name: string): Promise<UserEntity> {
+    let user;
     try {
       return await this.userRepository.findOne({ where: { username: name } });
     } catch (err) {
@@ -161,11 +176,21 @@ export class UserService implements IService<UserEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+
+    if (!user) {
+      throw new HttpException(
+        { message: `User ${name} Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return user;
   }
 
-  async findOne(options: object): Promise<UserEntity | null> {
+  async findOne(options: object): Promise<UserEntity> {
+    let user;
     try {
-      return await this.userRepository.findOne(options);
+      user = await this.userRepository.findOne(options);
     } catch (err) {
       this.logger.error(
         `userRepository.findOne failed, options: ${JSON.stringify(options)}`,
@@ -176,6 +201,15 @@ export class UserService implements IService<UserEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+
+    if (!user) {
+      throw new HttpException(
+        { message: `User Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return user;
   }
 
   async update(userDto: UserUpdateDto): Promise<UserEntity> {
@@ -206,14 +240,18 @@ export class UserService implements IService<UserEntity> {
       );
     }
 
-    const groupEntity = await this.groupService.findByName(userDto.group);
+    const groupEntity = await this.groupService.findByName(
+      userDto.group.toUpperCase(),
+    );
     if (!groupEntity) {
       this.logger.log(
-        `groupService.findByName failed, group '${userDto.group}' not found`,
+        `groupService.findByName failed, group '${userDto.group.toUpperCase()}' not found`,
       );
       throw new HttpException(
         {
-          message: `update user ${userDto.username} failed, group ${userDto.group} not found`,
+          message: `update user ${
+            userDto.username
+          } failed, group ${userDto.group.toUpperCase()} not found`,
         },
         HttpStatus.NOT_FOUND,
       );
