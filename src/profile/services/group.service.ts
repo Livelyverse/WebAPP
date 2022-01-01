@@ -58,7 +58,7 @@ export class GroupService implements IService<GroupEntity> {
     }
 
     let group = new GroupEntity();
-    group.name = groupDto.name;
+    group.name = groupDto.name.toUpperCase();
     group.description = groupDto.description;
     group.role = roleEntity;
 
@@ -81,6 +81,7 @@ export class GroupService implements IService<GroupEntity> {
   }
 
   async deleteByName(name: string): Promise<void> {
+    name = name.toUpperCase();
     let deleteResult;
     try {
       deleteResult = await this.groupRepository.softDelete({ name: name });
@@ -132,9 +133,10 @@ export class GroupService implements IService<GroupEntity> {
     }
   }
 
-  async findById(id: string): Promise<GroupEntity | null> {
+  async findById(id: string): Promise<GroupEntity> {
+    let group;
     try {
-      return await this.groupRepository.findOne({ where: { id: id } });
+      group = await this.groupRepository.findOne({ where: { id: id } });
     } catch (err) {
       this.logger.error(`groupRepository.findOne failed. id: ${id}`, err);
       throw new HttpException(
@@ -142,11 +144,22 @@ export class GroupService implements IService<GroupEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+
+    if (!group) {
+      throw new HttpException(
+        { message: `Group ${id} Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return group;
   }
 
-  async findByName(name: string): Promise<GroupEntity | null> {
+  async findByName(name: string): Promise<GroupEntity> {
+    name = name.toUpperCase();
+    let group;
     try {
-      return await this.groupRepository.findOne({ where: { name: name } });
+      group = await this.groupRepository.findOne({ where: { name: name } });
     } catch (err) {
       this.logger.error(`groupRepository.findOne failed, name: ${name}`, err);
       throw new HttpException(
@@ -154,11 +167,21 @@ export class GroupService implements IService<GroupEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+
+    if (!group) {
+      throw new HttpException(
+        { message: `Group ${name} Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return group;
   }
 
-  async findOne(options: object): Promise<GroupEntity | null> {
+  async findOne(options: object): Promise<GroupEntity> {
+    let group;
     try {
-      return await this.groupRepository.findOne(options);
+      group = await this.groupRepository.findOne(options);
     } catch (err) {
       this.logger.error(
         `groupRepository.findOne failed, options: ${JSON.stringify(options)}`,
@@ -169,6 +192,15 @@ export class GroupService implements IService<GroupEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+
+    if (!group) {
+      throw new HttpException(
+        { message: `Group Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return group;
   }
 
   async update(groupDto: GroupUpdateDto): Promise<GroupEntity> {
@@ -187,14 +219,16 @@ export class GroupService implements IService<GroupEntity> {
     }
 
     const group = await this.groupRepository.findOne({
-      where: { name: groupDto.name },
+      where: { name: groupDto.name.toUpperCase() },
     });
     if (!group) {
       this.logger.log(
-        `groupRepository.findOne failed, group not found: ${groupDto.name}`,
+        `groupRepository.findOne failed, group not found: ${groupDto.name.toUpperCase()}`,
       );
       throw new HttpException(
-        { message: `Update group failed, ${groupDto.name} not found` },
+        {
+          message: `Update group failed, ${groupDto.name.toUpperCase()} not found`,
+        },
         HttpStatus.NOT_FOUND,
       );
     }

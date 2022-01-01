@@ -34,7 +34,7 @@ export class RoleService implements IService<RoleEntity> {
     }
 
     let role = new RoleEntity();
-    role.name = roleDto.name;
+    role.name = roleDto.name.toUpperCase();
     role.description = roleDto.description;
 
     try {
@@ -56,6 +56,7 @@ export class RoleService implements IService<RoleEntity> {
   }
 
   async deleteByName(name: string): Promise<void> {
+    name = name.toUpperCase();
     let deleteResult;
     try {
       deleteResult = await this.roleRepository.softDelete({ name: name });
@@ -107,9 +108,10 @@ export class RoleService implements IService<RoleEntity> {
     }
   }
 
-  async findById(id: string): Promise<RoleEntity | null> {
+  async findById(id: string): Promise<RoleEntity> {
+    let role;
     try {
-      return await this.roleRepository.findOne({ where: { id: id } });
+      role = await this.roleRepository.findOne({ where: { id: id } });
     } catch (err) {
       this.logger.error(`roleRepository.findOne failed. id: ${id}`, err);
       throw new HttpException(
@@ -117,11 +119,22 @@ export class RoleService implements IService<RoleEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+
+    if (!role) {
+      throw new HttpException(
+        { message: `Role ${id} Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return role;
   }
 
-  async findByName(name: string): Promise<RoleEntity | null> {
+  async findByName(name: string): Promise<RoleEntity> {
+    name = name.toUpperCase();
+    let role;
     try {
-      return await this.roleRepository.findOne({ where: { name: name } });
+      role = await this.roleRepository.findOne({ where: { name: name } });
     } catch (err) {
       this.logger.error(`roleRepository.findOne failed, name: ${name}`, err);
       throw new HttpException(
@@ -129,11 +142,21 @@ export class RoleService implements IService<RoleEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+
+    if (!role) {
+      throw new HttpException(
+        { message: `Role ${name} Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return role;
   }
 
-  async findOne(options: object): Promise<RoleEntity | null> {
+  async findOne(options: object): Promise<RoleEntity> {
+    let role;
     try {
-      return await this.roleRepository.findOne(options);
+      role = await this.roleRepository.findOne(options);
     } catch (err) {
       this.logger.error(
         `roleRepository.findOne failed, options: ${JSON.stringify(options)}`,
@@ -144,6 +167,15 @@ export class RoleService implements IService<RoleEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+
+    if (!role) {
+      throw new HttpException(
+        { message: `Role Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return role;
   }
 
   async update(roleDto: RoleUpdateDto): Promise<RoleEntity> {
@@ -163,11 +195,11 @@ export class RoleService implements IService<RoleEntity> {
     }
 
     const role = await this.roleRepository.findOne({
-      where: { name: roleDto.name },
+      where: { name: roleDto.name.toUpperCase() },
     });
     if (!role) {
       this.logger.log(
-        `roleRepository.findOne failed, role not found: ${roleDto.name}`,
+        `roleRepository.findOne failed, role not found: ${roleDto.name.toUpperCase()}`,
       );
       const errors = { id: 'id not found.' };
       throw new HttpException(
