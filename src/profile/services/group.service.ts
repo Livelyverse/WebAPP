@@ -6,6 +6,7 @@ import { validate } from 'class-validator';
 import { IService } from './IService';
 import { GroupEntity } from '../domain/entity/group.entity';
 import { RoleService } from './role.service';
+import { PostgresErrorCode } from './postgresErrorCode.enum';
 
 @Injectable()
 export class GroupService implements IService<GroupEntity> {

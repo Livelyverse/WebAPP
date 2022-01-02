@@ -30,11 +30,12 @@ export class UserEntity extends BaseEntity {
   walletAddress: string;
 
   @ManyToOne((type) => GroupEntity, (group) => group.users, {
-    cascade: false,
+    cascade: ['soft-remove'],
+    onDelete: 'NO ACTION',
     nullable: false,
     lazy: false,
     eager: true,
-    orphanedRowAction: 'delete',
+    orphanedRowAction: 'nullify',
   })
   group: GroupEntity;
 }

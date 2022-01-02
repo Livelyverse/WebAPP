@@ -3,8 +3,9 @@ import {
   IsOptional,
   IsNotEmpty,
   IsDefined,
-  Length, IsUUID
-} from "class-validator";
+  Length,
+  IsUUID,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RoleUpdateDto {
@@ -16,12 +17,12 @@ export class RoleUpdateDto {
   @IsNotEmpty({ message: 'Name must not empty' })
   @IsDefined({ message: 'Name must be defined' })
   @IsString({ message: 'Name must be string' })
-  @ApiProperty()
+  @ApiPropertyOptional()
   public name: string;
 
   @IsString({ message: 'Description must be string' })
   @IsNotEmpty({ message: 'Description must not empty' })
   @IsDefined({ message: 'Description must be defined' })
-  @ApiProperty()
+  @ApiPropertyOptional()
   public description: string;
 }

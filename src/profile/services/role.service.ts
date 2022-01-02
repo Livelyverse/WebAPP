@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { RoleCreateDto, RoleUpdateDto } from '../domain/dto/index.dto';
 import { validate } from 'class-validator';
 import { IService } from './IService';
+import { PostgresErrorCode } from './postgresErrorCode.enum';
 
 @Injectable()
 export class RoleService implements IService<RoleEntity> {
