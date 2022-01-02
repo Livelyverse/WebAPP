@@ -10,9 +10,12 @@ import {
   IsUUID,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserCreateDto } from './userCreate.dto';
 
 export class UserUpdateDto {
+  @IsUUID()
+  @ApiProperty()
+  public id: string;
+
   @IsNotEmpty({ message: 'Username must not empty' })
   @IsDefined({ message: 'Username must be defined' })
   @IsString({ message: 'Username must be string' })
@@ -23,14 +26,14 @@ export class UserUpdateDto {
   @IsNotEmpty({ message: 'Email must not empty' })
   @IsDefined({ message: 'Email must be defined' })
   @IsString({ message: 'Email must be string' })
-  @ApiProperty()
+  @ApiPropertyOptional()
   public email: string;
 
   @Length(4, 128, { message: 'Group length at least 4 characters' })
   @IsNotEmpty({ message: 'Group must not empty' })
   @IsDefined({ message: 'Group must be defined' })
   @IsString({ message: 'Group must be string' })
-  @ApiProperty()
+  @ApiPropertyOptional()
   public group: string;
 
   @IsOptional()

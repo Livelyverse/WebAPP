@@ -1,6 +1,7 @@
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
@@ -24,6 +25,7 @@ import { RoleCreateDto } from '../domain/dto/roleCreate.dto';
 import { RoleUpdateDto } from '../domain/dto/roleUpdate.dto';
 import { RoleViewDto } from '../domain/dto/roleView.dto';
 import { RoleEntity } from '../domain/entity/role.entity';
+import { isUUID } from './uuid.validate';
 
 @ApiBearerAuth()
 @ApiTags('/profile/role')
@@ -71,31 +73,42 @@ export class RoleController {
     return RoleViewDto.from(role);
   }
 
-  @Get('find')
+  @Get('/get/:param')
   @HttpCode(HttpStatus.OK)
-  // @ApiQuery({ name: 'id', type: 'string' })
-  @ApiQuery({ name: 'name', type: 'string' })
+  @ApiParam({
+    name: 'param',
+    required: true,
+    description: 'either an uuid for the role id or a string for the role name',
+    schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
+  })
   @ApiResponse({ status: 200, description: 'The record is found.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async findByFilter(@Query() query): Promise<RoleViewDto> {
+  async getRole(@Param() params): Promise<RoleViewDto> {
     let role: RoleEntity;
-    if (query['id']) {
-      role = await this.roleService.findById(query['id']);
-    } else if (query['name']) {
-      role = await this.roleService.findByName(query['name']);
+    if (isUUID(params.param)) {
+      role = await this.roleService.findById(params.param);
+    } else if (typeof params.param === 'string') {
+      role = await this.roleService.findByName(params.param);
     } else {
       throw new HttpException(
-        { message: 'Query string invalid' },
+        { message: 'Input Data Invalid' },
         HttpStatus.BAD_REQUEST,
       );
     }
     return RoleViewDto.from(role);
   }
 
-  @Post('/delete/:id')
+  @Post('/delete/:param')
   @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'param',
+    required: true,
+    description:
+      'either an uuid for the group id or a string for the group name',
+    schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
+  })
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully deleted.',
@@ -103,6 +116,15 @@ export class RoleController {
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {
-    return await this.roleService.delete(params.id);
+    if (isUUID(params.param)) {
+      return await this.roleService.delete(params.param);
+    } else if (typeof params.param === 'string') {
+      return await this.roleService.deleteByName(params.param);
+    } else {
+      throw new HttpException(
+        { message: 'Input Data invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }

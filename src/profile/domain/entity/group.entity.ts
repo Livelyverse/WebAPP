@@ -12,17 +12,16 @@ export class GroupEntity extends BaseEntity {
   description: string;
 
   @ManyToOne((type) => RoleEntity, (role) => role.groups, {
-    cascade: false,
+    cascade: ['soft-remove'],
+    onDelete: 'NO ACTION',
     nullable: false,
     lazy: false,
     eager: true,
-    orphanedRowAction: 'delete',
+    orphanedRowAction: 'nullify',
   })
   role: RoleEntity;
 
   @OneToMany((type) => UserEntity, (user) => user.group, {
-    cascade: ['insert', 'update', 'soft-remove'],
-    onDelete: 'CASCADE',
     lazy: true,
     nullable: true,
   })

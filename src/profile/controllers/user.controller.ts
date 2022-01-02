@@ -1,6 +1,7 @@
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
@@ -24,6 +25,7 @@ import { UserCreateDto } from '../domain/dto/userCreate.dto';
 import { UserUpdateDto } from '../domain/dto/userUpdate.dto';
 import { UserViewDto } from '../domain/dto/userView.dto';
 import { UserEntity } from '../domain/entity/user.entity';
+import { isUUID } from './uuid.validate';
 
 @ApiBearerAuth()
 @ApiTags('/profile/user')
@@ -71,31 +73,42 @@ export class UserController {
     return UserViewDto.from(user);
   }
 
-  @Get('find')
+  @Get('/get/:param')
   @HttpCode(HttpStatus.OK)
-  // @ApiQuery({ name: 'id', type: 'string' })
-  @ApiQuery({ name: 'username', type: 'string' })
+  @ApiParam({
+    name: 'param',
+    required: true,
+    description: 'either an uuid for the user id or a string for the user name',
+    schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
+  })
   @ApiResponse({ status: 200, description: 'The record is found.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async findByFilter(@Query() query): Promise<UserViewDto> {
+  async getUser(@Param() params): Promise<UserViewDto> {
     let user: UserEntity;
-    if (query['id']) {
-      user = await this.userService.findById(query['id']);
-    } else if (query['username']) {
-      user = await this.userService.findByName(query['username']);
+    if (isUUID(params.param)) {
+      user = await this.userService.findById(params.param);
+    } else if (typeof params.param === 'string') {
+      user = await this.userService.findByName(params.param);
     } else {
       throw new HttpException(
-        { message: 'Query string invalid' },
+        { message: 'Input Data Invalid' },
         HttpStatus.BAD_REQUEST,
       );
     }
     return UserViewDto.from(user);
   }
 
-  @Post('/delete/:id')
+  @Post('/delete/:param')
   @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'param',
+    required: true,
+    description:
+      'either an uuid for the group id or a string for the group name',
+    schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
+  })
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully deleted.',
@@ -103,6 +116,15 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {
-    return await this.userService.delete(params.id);
+    if (isUUID(params.param)) {
+      return await this.userService.delete(params.param);
+    } else if (typeof params.param === 'string') {
+      return await this.userService.deleteByName(params.param);
+    } else {
+      throw new HttpException(
+        { message: 'Input Data invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }

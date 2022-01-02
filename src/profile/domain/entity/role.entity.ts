@@ -11,8 +11,6 @@ export class RoleEntity extends BaseEntity {
   description: string;
 
   @OneToMany((type) => GroupEntity, (group) => group.role, {
-    cascade: ['insert', 'update', 'soft-remove'],
-    onDelete: 'CASCADE',
     lazy: true,
     nullable: true,
   })

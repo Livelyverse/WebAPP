@@ -1,6 +1,7 @@
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
@@ -24,6 +25,8 @@ import { GroupCreateDto } from '../domain/dto/groupCreate.dto';
 import { GroupViewDto } from '../domain/dto/groupView.dto';
 import { GroupUpdateDto } from '../domain/dto/groupUpdate.dto';
 import { GroupEntity } from '../domain/entity/group.entity';
+import { isUUID } from './uuid.validate';
+
 
 @ApiBearerAuth()
 @ApiTags('/profile/group')
@@ -73,31 +76,43 @@ export class GroupController {
     return GroupViewDto.from(role);
   }
 
-  @Get('find')
+  @Get('/get/:param')
   @HttpCode(HttpStatus.OK)
-  // @ApiQuery({ name: 'id', type: 'string' })
-  @ApiQuery({ name: 'name', type: 'string' })
+  @ApiParam({
+    name: 'param',
+    required: true,
+    description:
+      'either an uuid for the group id or a string for the group name',
+    schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
+  })
   @ApiResponse({ status: 200, description: 'The record is found.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async findByFilter(@Query() query): Promise<GroupViewDto> {
+  async getGroup(@Param() params): Promise<GroupViewDto> {
     let group: GroupEntity;
-    if (query['id']) {
-      group = await this.groupService.findById(query['id']);
-    } else if (query['name']) {
-      group = await this.groupService.findByName(query['name']);
+    if (isUUID(params.param)) {
+      group = await this.groupService.findById(params.param);
+    } else if (typeof params.param === 'string') {
+      group = await this.groupService.findByName(params.param);
     } else {
       throw new HttpException(
-        { message: 'Query string invalid' },
+        { message: 'Input Data Invalid' },
         HttpStatus.BAD_REQUEST,
       );
     }
     return GroupViewDto.from(group);
   }
 
-  @Post('/delete/:id')
+  @Post('/delete/:param')
   @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'param',
+    required: true,
+    description:
+      'either an uuid for the group id or a string for the group name',
+    schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
+  })
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully deleted.',
@@ -105,6 +120,15 @@ export class GroupController {
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {
-    return await this.groupService.delete(params.id);
+    if (isUUID(params.param)) {
+      return await this.groupService.delete(params.param);
+    } else if (typeof params.param === 'string') {
+      return await this.groupService.deleteByName(params.param);
+    } else {
+      throw new HttpException(
+        { message: 'Input Data invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }

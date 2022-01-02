@@ -7,6 +7,7 @@ import { IService } from './IService';
 import { UserEntity } from '../domain/entity/user.entity';
 import { GroupService } from './group.service';
 import * as argon2 from 'argon2';
+import { PostgresErrorCode } from "./postgresErrorCode.enum";
 
 @Injectable()
 export class UserService implements IService<UserEntity> {
@@ -168,7 +169,7 @@ export class UserService implements IService<UserEntity> {
   async findByName(name: string): Promise<UserEntity> {
     let user;
     try {
-      return await this.userRepository.findOne({ where: { username: name } });
+      user = await this.userRepository.findOne({ where: { username: name } });
     } catch (err) {
       this.logger.error(`userRepository.findOne failed, name: ${name}`, err);
       throw new HttpException(
