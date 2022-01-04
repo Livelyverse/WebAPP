@@ -26,20 +26,26 @@ import { RoleUpdateDto } from '../domain/dto/roleUpdate.dto';
 import { RoleViewDto } from '../domain/dto/roleView.dto';
 import { RoleEntity } from '../domain/entity/role.entity';
 import { isUUID } from './uuid.validate';
+import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
+import RoleGuard from '../../authentication/domain/gurads/role.guard';
 
 @ApiBearerAuth()
-@ApiTags('/profile/role')
-@Controller('/profile/role')
+@ApiTags('/api/profile/role')
+@Controller('/api/profile/role')
 export class RoleController {
   private readonly logger = new Logger(RoleController.name);
   constructor(private readonly roleService: RoleService) {}
 
   @Post('create')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully created.',
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() roleDto: RoleCreateDto): Promise<string> {
@@ -55,11 +61,15 @@ export class RoleController {
 
   @Post('update')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully updated.',
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() roleDto: RoleUpdateDto): Promise<RoleViewDto> {
@@ -75,6 +85,7 @@ export class RoleController {
 
   @Get('/get/:param')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'param',
     required: true,
@@ -83,6 +94,7 @@ export class RoleController {
   })
   @ApiResponse({ status: 200, description: 'The record is found.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async getRole(@Param() params): Promise<RoleViewDto> {
@@ -102,17 +114,20 @@ export class RoleController {
 
   @Post('/delete/:param')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'param',
     required: true,
-    description:
-      'either an uuid for the group id or a string for the group name',
+    description: 'either an uuid for the roleId or a string for the group name',
     schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
   })
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully deleted.',
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {

@@ -26,23 +26,27 @@ import { GroupViewDto } from '../domain/dto/groupView.dto';
 import { GroupUpdateDto } from '../domain/dto/groupUpdate.dto';
 import { GroupEntity } from '../domain/entity/group.entity';
 import { isUUID } from './uuid.validate';
-
+import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
+import RoleGuard from '../../authentication/domain/gurads/role.guard';
 
 @ApiBearerAuth()
-@ApiTags('/profile/group')
-@Controller('/profile/group')
+@ApiTags('/api/profile/group')
+@Controller('/api/profile/group')
 export class GroupController {
   private readonly logger = new Logger(GroupController.name);
   constructor(private readonly groupService: GroupService) {}
 
   @Post('create')
   @HttpCode(HttpStatus.OK)
-  // @ApiBody({ type: GroupCreateDto })
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully created.',
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() groupDto: GroupCreateDto): Promise<string> {
     if (groupDto instanceof Array) {
@@ -57,12 +61,15 @@ export class GroupController {
 
   @Post('update')
   @HttpCode(HttpStatus.OK)
-  // @ApiBody({ type: [GroupUpdateDto] })
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully updated.',
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() groupDto: GroupUpdateDto): Promise<GroupViewDto> {
@@ -78,6 +85,7 @@ export class GroupController {
 
   @Get('/get/:param')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'param',
     required: true,
@@ -87,6 +95,7 @@ export class GroupController {
   })
   @ApiResponse({ status: 200, description: 'The record is found.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async getGroup(@Param() params): Promise<GroupViewDto> {
@@ -106,17 +115,21 @@ export class GroupController {
 
   @Post('/delete/:param')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'param',
     required: true,
     description:
-      'either an uuid for the group id or a string for the group name',
+      'either an uuid for the groupId or a string for the group name',
     schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
   })
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully deleted.',
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {

@@ -226,5 +226,9 @@ typechain
 cache
 artifacts
 
+# censetive data
+*.sql
+*.pem
+config.yml
 
 # End of https://www.gitignore.io/api/osx,node,linux,windows
