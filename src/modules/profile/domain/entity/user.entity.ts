@@ -8,10 +8,10 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 128, unique: true, nullable: false })
   username: string;
 
-  @Column({ type: 'varchar', length: 128 })
+  @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
   firstname: string;
 
-  @Column({ type: 'varchar', length: 128 })
+  @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
   lastname: string;
 
   @Column({ type: 'varchar', length: 256, unique: true, nullable: false })

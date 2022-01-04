@@ -4,10 +4,12 @@ import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import yamlReader from './config/yamlReader';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ProfileModule } from './profile/profile.module';
+import { ProfileModule } from './modules/profile/profile.module';
+import { AuthenticationModule } from './modules/authentication/authentication.module';
 
 @Module({
   imports: [
+    AuthenticationModule.forRoot('jwt'),
     ProfileModule,
     ConfigModule.forRoot({
       load: [yamlReader],

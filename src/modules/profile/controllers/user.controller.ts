@@ -26,21 +26,27 @@ import { UserUpdateDto } from '../domain/dto/userUpdate.dto';
 import { UserViewDto } from '../domain/dto/userView.dto';
 import { UserEntity } from '../domain/entity/user.entity';
 import { isUUID } from './uuid.validate';
+import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
+import RoleGuard from '../../authentication/domain/gurads/role.guard';
 
 @ApiBearerAuth()
-@ApiTags('/profile/user')
-@Controller('/profile/user')
+@ApiTags('/api/profile/user')
+@Controller('/api/profile/user')
 export class UserController {
   private readonly logger = new Logger(UserController.name);
   constructor(private readonly userService: UserService) {}
 
   @Post('create')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully created.',
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() userDto: UserCreateDto): Promise<string> {
     if (userDto instanceof Array) {
@@ -55,11 +61,13 @@ export class UserController {
 
   @Post('update')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully updated.',
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() userDto: UserUpdateDto): Promise<UserViewDto> {
@@ -75,6 +83,7 @@ export class UserController {
 
   @Get('/get/:param')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'param',
     required: true,
@@ -83,6 +92,7 @@ export class UserController {
   })
   @ApiResponse({ status: 200, description: 'The record is found.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async getUser(@Param() params): Promise<UserViewDto> {
@@ -102,17 +112,20 @@ export class UserController {
 
   @Post('/delete/:param')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'param',
     required: true,
-    description:
-      'either an uuid for the group id or a string for the group name',
+    description: 'either an uuid for the userId or a string for the username',
     schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
   })
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully deleted.',
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {
