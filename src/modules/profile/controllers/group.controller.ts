@@ -110,6 +110,14 @@ export class GroupController {
         HttpStatus.BAD_REQUEST,
       );
     }
+
+    if (!group) {
+      throw new HttpException(
+        { message: `Group Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
     return GroupViewDto.from(group);
   }
 

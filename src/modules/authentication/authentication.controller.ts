@@ -1,4 +1,4 @@
-import { AuthenticationService } from './authentication.service';
+import { AuthenticationService, TokenPayload } from './authentication.service';
 import {
   Controller,
   Post,
@@ -19,7 +19,10 @@ import { Request } from 'express';
 import * as argon2 from 'argon2';
 import { UserCreateDto } from '../profile/domain/dto/userCreate.dto';
 import { JwtAuthGuard } from './domain/gurads/jwt-auth.guard';
-import { SigninDto } from './domain/dto/singin.dto';
+import { SignupDto } from './domain/dto/signup.dto';
+import { MailService } from '../mail/mail.service';
+import { AuthMailDto } from './domain/dto/verification.dto';
+import { PasswordDto } from './domain/dto/password.dto';
 
 export interface TokenResponse {
   access_token: string;
@@ -34,6 +37,7 @@ export class AuthenticationController {
   constructor(
     private readonly authenticationService: AuthenticationService,
     private readonly userService: UserService,
+    private readonly mailService: MailService,
   ) {}
 
   @Post('/signin')
@@ -43,63 +47,32 @@ export class AuthenticationController {
   @ApiResponse({ status: 404, description: 'User Not Found' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async login(@Body() body: LoginDto, @Res() res): Promise<any> {
-    if (!body.username || !body.password) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .send('Missing username or password.');
-    }
-
-    const user = await this.userService.findByName(body.username);
-
-    if (!user) {
-      this.logger.log(`user not found, username: ${body.username}`);
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .send('Username Or Password Invalid');
-    }
-
-    if (!user.isActive || !user.isEmailConfirmed) {
-      this.logger.log(
-        `user deactivated or not confirmed, username: ${body.username}`,
-      );
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .send('Username Or Password Not Found');
-    }
-
-    let isPassVerify;
-    try {
-      isPassVerify = await argon2.verify(user.password, body.password);
-    } catch (err) {
-      this.logger.error(
-        `argon2.hash failed, username: ${body.username}, password: ${body.password}`,
-        err,
-      );
-      return res
-        .status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .send('Something went wrong');
-    }
-
-    if (!isPassVerify) {
-      this.logger.log(
-        `user password verification failed, username: ${body.username}, password: ${body.password}`,
-      );
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .send('Username Or Password Not Found');
-    }
-
-    const { refreshToken, tokenEntity } =
-      await this.authenticationService.generateRefreshToken(user);
-    const accessToken = await this.authenticationService.generateAccessToken(
-      user,
-      tokenEntity,
+    const tokenResponse = await this.authenticationService.userAuthentication(
+      body,
     );
 
-    return res.status(HttpStatus.OK).send({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    return res.status(HttpStatus.OK).send(tokenResponse);
+  }
+
+  @Post('/changepass')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: 200, description: 'The user sign out successfully.' })
+  @ApiResponse({ status: 400, description: 'Request Invalid' })
+  @ApiResponse({ status: 404, description: 'User Not Found' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  public async changePassword(
+    @Body() body: PasswordDto,
+    @Req() req,
+    @Res() res,
+  ): Promise<any> {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(HttpStatus.UNAUTHORIZED).send('Illegal Auth Token');
+    }
+    await this.authenticationService.changeUserPassword(token, body);
+    return res.status(HttpStatus.OK);
   }
 
   @Post('/signup')
@@ -110,32 +83,35 @@ export class AuthenticationController {
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async signup(@Body() signinDto: SigninDto): Promise<TokenResponse> {
-    if (signinDto instanceof Array) {
-      this.logger.log(
-        `create user failed, request ${JSON.stringify(signinDto)} invalid`,
-      );
+  async signup(@Body() signupDto: SignupDto, @Res() res): Promise<any> {
+    if (signupDto instanceof Array) {
+      this.logger.log(`signup failed, dto: ${signupDto.username}`);
       throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
     }
 
     const userDto = new UserCreateDto();
-    userDto.username = signinDto.username;
-    userDto.password = signinDto.password;
-    userDto.email = signinDto.email;
+    userDto.username = signupDto.username;
+    userDto.password = signupDto.password;
+    userDto.email = signupDto.email;
     userDto.group = 'GHOST';
     const user = await this.userService.create(userDto);
 
-    const { refreshToken, tokenEntity } =
-      await this.authenticationService.generateRefreshToken(user);
-    const accessToken = await this.authenticationService.generateAccessToken(
-      user,
-      tokenEntity,
+    const authMailEntity =
+      await this.authenticationService.createAuthMailEntity(user);
+
+    await this.mailService.sendCodeConfirmation(
+      userDto.username,
+      userDto.email,
+      Number(authMailEntity.verificationId),
     );
 
-    return {
+    const accessToken = await this.authenticationService.generateAuthMailToken(
+      user,
+      authMailEntity,
+    );
+    return res.status(HttpStatus.OK).send({
       access_token: accessToken,
-      refresh_token: refreshToken,
-    };
+    });
   }
 
   @Post('/signout')
@@ -146,7 +122,96 @@ export class AuthenticationController {
   @ApiResponse({ status: 404, description: 'Auth token not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async signout(@Req() request: any): Promise<void> {
-    await this.authenticationService.revokeUserToken(request.user.id);
+    await this.authenticationService.revokeAuthToken(request.user.id);
+  }
+
+  @Post('/mail/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: 200, description: 'User verification successful.' })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  public async mailVerification(
+    @Req() req: Request,
+    @Body() dto: AuthMailDto,
+    @Res() res,
+  ): Promise<void> {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(HttpStatus.UNAUTHORIZED).send('Illegal Auth Token');
+    }
+
+    const tokenPayload = await this.authenticationService.authTokenValidation(
+      token,
+      false,
+    );
+
+    if (!dto || dto?.verifyCode) {
+      return res.status(HttpStatus.BAD_REQUEST).send('Illegal Auth Token ');
+    }
+
+    const authMail = await this.authenticationService.authMailCodeConfirmation(
+      tokenPayload,
+      dto.verifyCode,
+    );
+    const { refreshToken, tokenEntity } =
+      await this.authenticationService.generateRefreshToken(authMail.user);
+    const accessToken = await this.authenticationService.generateAccessToken(
+      authMail.user,
+      tokenEntity,
+    );
+
+    return res.status(HttpStatus.OK).send({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+  }
+
+  @Post('/mail/resend')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({
+    status: 200,
+    description: 'Resend mail successful.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  public async resendMailVerification(
+    @Req() req: Request,
+    @Res() res,
+  ): Promise<void> {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(HttpStatus.UNAUTHORIZED).send('Illegal Auth Token');
+    }
+
+    const tokenPayload = await this.authenticationService.authTokenValidation(
+      token,
+      false,
+    );
+
+    const user = await this.authenticationService.getUserFromTokenPayload(
+      tokenPayload,
+    );
+    const authMailEntity =
+      await this.authenticationService.createAuthMailEntity(user);
+
+    await this.mailService.sendCodeConfirmation(
+      user.username,
+      user.email,
+      Number(authMailEntity.verificationId),
+    );
+
+    const accessToken = await this.authenticationService.generateAuthMailToken(
+      user,
+      authMailEntity,
+    );
+    return res.status(HttpStatus.OK).send({
+      access_token: accessToken,
+    });
   }
 
   @Post('/refresh')
@@ -167,9 +232,9 @@ export class AuthenticationController {
       return res.status(HttpStatus.UNAUTHORIZED).send('Illegal Auth Token');
     }
 
-    await this.authenticationService.decodeAuthToken(token, true);
+    await this.authenticationService.authTokenValidation(token, true);
 
-    if (!dto) {
+    if (!dto || dto?.refresh_token) {
       return res.status(HttpStatus.BAD_REQUEST).send('Illegal Auth Token ');
     }
 

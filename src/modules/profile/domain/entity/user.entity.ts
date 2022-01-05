@@ -1,7 +1,8 @@
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { GroupEntity } from './group.entity';
-import { RoleEntity } from './role.entity';
+import { AuthMailEntity } from '../../../authentication/domain/entity/authMailEntity';
+import { TokenEntity } from '../../../authentication/domain/entity/token.entity';
 
 @Entity({ name: 'user' })
 export class UserEntity extends BaseEntity {
@@ -38,4 +39,16 @@ export class UserEntity extends BaseEntity {
     orphanedRowAction: 'nullify',
   })
   group: GroupEntity;
+
+  @OneToMany((type) => AuthMailEntity, (mails) => mails.user, {
+    lazy: true,
+    nullable: true,
+  })
+  verifyMails: Promise<Array<AuthMailEntity>>;
+
+  @OneToOne((type) => TokenEntity, (token) => token.user, {
+    cascade: ['update', 'soft-remove'],
+    eager: true,
+  })
+  token: TokenEntity;
 }

@@ -50,9 +50,7 @@ export class UserController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() userDto: UserCreateDto): Promise<string> {
     if (userDto instanceof Array) {
-      this.logger.log(
-        `create user failed, request ${JSON.stringify(userDto)} invalid`,
-      );
+      this.logger.log(`create user failed, request: ${userDto.username}`);
       throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
     }
     const user = await this.userService.create(userDto);
@@ -73,7 +71,7 @@ export class UserController {
   async update(@Body() userDto: UserUpdateDto): Promise<UserViewDto> {
     if (userDto instanceof Array) {
       this.logger.log(
-        `update user failed, request ${JSON.stringify(userDto)} invalid`,
+        `update user failed, request: ${JSON.stringify(userDto)}`,
       );
       throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
     }
@@ -107,6 +105,14 @@ export class UserController {
         HttpStatus.BAD_REQUEST,
       );
     }
+
+    if (!user) {
+      throw new HttpException(
+        { message: `User Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
     return UserViewDto.from(user);
   }
 

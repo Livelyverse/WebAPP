@@ -51,7 +51,7 @@ export class RoleController {
   async create(@Body() roleDto: RoleCreateDto): Promise<string> {
     if (roleDto instanceof Array) {
       this.logger.log(
-        `create role failed, request ${JSON.stringify(roleDto)} invalid`,
+        `create role failed, request: ${JSON.stringify(roleDto)}`,
       );
       throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
     }
@@ -75,7 +75,7 @@ export class RoleController {
   async update(@Body() roleDto: RoleUpdateDto): Promise<RoleViewDto> {
     if (roleDto instanceof Array) {
       this.logger.log(
-        `update role failed, request ${JSON.stringify(roleDto)} invalid`,
+        `update role failed, request: ${JSON.stringify(roleDto)}`,
       );
       throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
     }
@@ -107,6 +107,13 @@ export class RoleController {
       throw new HttpException(
         { message: 'Input Data Invalid' },
         HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (!role) {
+      throw new HttpException(
+        { message: `Role Not Found` },
+        HttpStatus.NOT_FOUND,
       );
     }
     return RoleViewDto.from(role);

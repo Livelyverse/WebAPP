@@ -9,16 +9,12 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class SigninDto {
+export class SignupDto {
   @IsNotEmpty({ message: 'Username must not empty' })
   @IsDefined({ message: 'Username must be defined' })
   @IsString({ message: 'Username must be string' })
   @ApiProperty()
   public username: string;
-
-  @IsEmail({ message: 'Email must be valid' })
-  @ApiProperty()
-  public email: string;
 
   @Length(8, 128, { message: 'Password length at least 8 characters' })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)\S+$/, {
@@ -26,4 +22,9 @@ export class SigninDto {
   })
   @ApiProperty()
   public password: string;
+
+  @IsEmail({ message: 'Email must be valid' })
+  @ApiProperty()
+  public email: string;
+
 }
