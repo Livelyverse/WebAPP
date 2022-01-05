@@ -6,6 +6,8 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TokenEntity } from './domain/entity/token.entity';
 import { JwtModule } from '@nestjs/jwt';
+import { AuthMailEntity } from "./domain/entity/authMailEntity";
+import { MailModule } from "../mail/mail.module";
 
 @Module({})
 export class AuthenticationModule {
@@ -24,8 +26,9 @@ export class AuthenticationModule {
     return {
       module: AuthenticationModule,
       imports: [
-        TypeOrmModule.forFeature([TokenEntity]),
+        TypeOrmModule.forFeature([TokenEntity, AuthMailEntity]),
         JwtModule.register({ secret: '' }),
+        MailModule,
         ProfileModule,
         ConfigModule,
       ],

@@ -97,7 +97,7 @@ export class RoleService implements IService<RoleEntity> {
     }
   }
 
-  async findAll(): Promise<Array<RoleEntity>> {
+  async findAll(): Promise<Array<RoleEntity> | null> {
     try {
       return await this.roleRepository.find();
     } catch (err) {
@@ -109,10 +109,9 @@ export class RoleService implements IService<RoleEntity> {
     }
   }
 
-  async findById(id: string): Promise<RoleEntity> {
-    let role;
+  async findById(id: string): Promise<RoleEntity | null> {
     try {
-      role = await this.roleRepository.findOne({ where: { id: id } });
+      return await this.roleRepository.findOne({ where: { id: id } });
     } catch (err) {
       this.logger.error(`roleRepository.findOne failed. id: ${id}`, err);
       throw new HttpException(
@@ -120,22 +119,12 @@ export class RoleService implements IService<RoleEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    if (!role) {
-      throw new HttpException(
-        { message: `Role ${id} Not Found` },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    return role;
   }
 
-  async findByName(name: string): Promise<RoleEntity> {
+  async findByName(name: string): Promise<RoleEntity | null> {
     name = name.toUpperCase();
-    let role;
     try {
-      role = await this.roleRepository.findOne({ where: { name: name } });
+      return await this.roleRepository.findOne({ where: { name: name } });
     } catch (err) {
       this.logger.error(`roleRepository.findOne failed, name: ${name}`, err);
       throw new HttpException(
@@ -143,21 +132,11 @@ export class RoleService implements IService<RoleEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    if (!role) {
-      throw new HttpException(
-        { message: `Role ${name} Not Found` },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    return role;
   }
 
-  async findOne(options: object): Promise<RoleEntity> {
-    let role;
+  async findOne(options: object): Promise<RoleEntity | null> {
     try {
-      role = await this.roleRepository.findOne(options);
+      return await this.roleRepository.findOne(options);
     } catch (err) {
       this.logger.error(
         `roleRepository.findOne failed, options: ${JSON.stringify(options)}`,
@@ -168,15 +147,6 @@ export class RoleService implements IService<RoleEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    if (!role) {
-      throw new HttpException(
-        { message: `Role Not Found` },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    return role;
   }
 
   async update(roleDto: RoleUpdateDto): Promise<RoleEntity> {

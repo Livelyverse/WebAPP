@@ -7,7 +7,7 @@ import { IService } from './IService';
 import { UserEntity } from '../domain/entity/user.entity';
 import { GroupService } from './group.service';
 import * as argon2 from 'argon2';
-import { PostgresErrorCode } from "./postgresErrorCode.enum";
+import { PostgresErrorCode } from './postgresErrorCode.enum';
 
 @Injectable()
 export class UserService implements IService<UserEntity> {
@@ -132,7 +132,7 @@ export class UserService implements IService<UserEntity> {
     }
   }
 
-  async findAll(): Promise<Array<UserEntity>> {
+  async findAll(): Promise<Array<UserEntity> | null> {
     try {
       return await this.userRepository.find();
     } catch (err) {
@@ -144,10 +144,9 @@ export class UserService implements IService<UserEntity> {
     }
   }
 
-  async findById(id: string): Promise<UserEntity> {
-    let user;
+  async findById(id: string): Promise<UserEntity | null> {
     try {
-      user = await this.userRepository.findOne({ where: { id: id } });
+      return await this.userRepository.findOne({ where: { id: id } });
     } catch (err) {
       this.logger.error(`userRepository.findOne failed. id: ${id}`, err);
       throw new HttpException(
@@ -155,21 +154,11 @@ export class UserService implements IService<UserEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    if (!user) {
-      throw new HttpException(
-        { message: `User ${id} Not Found` },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    return user;
   }
 
   async findByName(name: string): Promise<UserEntity> {
-    let user;
     try {
-      user = await this.userRepository.findOne({ where: { username: name } });
+      return await this.userRepository.findOne({ where: { username: name } });
     } catch (err) {
       this.logger.error(`userRepository.findOne failed, name: ${name}`, err);
       throw new HttpException(
@@ -177,21 +166,11 @@ export class UserService implements IService<UserEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    if (!user) {
-      throw new HttpException(
-        { message: `User ${name} Not Found` },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    return user;
   }
 
-  async findOne(options: object): Promise<UserEntity> {
-    let user;
+  async findOne(options: object): Promise<UserEntity | null> {
     try {
-      user = await this.userRepository.findOne(options);
+      return await this.userRepository.findOne(options);
     } catch (err) {
       this.logger.error(
         `userRepository.findOne failed, options: ${JSON.stringify(options)}`,
@@ -202,15 +181,6 @@ export class UserService implements IService<UserEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    if (!user) {
-      throw new HttpException(
-        { message: `User Not Found` },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    return user;
   }
 
   async update(userDto: UserUpdateDto): Promise<UserEntity> {
@@ -270,6 +240,18 @@ export class UserService implements IService<UserEntity> {
         `userRepository.save failed: ${JSON.stringify(userDto)}`,
         err,
       );
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async updateEntity(user: UserEntity): Promise<UserEntity> {
+    try {
+      return await this.userRepository.save(user);
+    } catch (err) {
+      this.logger.error(`userRepository.save failed: ${user.username}`, err);
       throw new HttpException(
         { message: 'Something went wrong' },
         HttpStatus.INTERNAL_SERVER_ERROR,

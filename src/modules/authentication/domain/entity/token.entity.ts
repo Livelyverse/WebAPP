@@ -1,11 +1,9 @@
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, OneToOne } from 'typeorm';
 import { BaseEntity } from '../../../profile/domain/entity/base.entity';
+import { UserEntity } from '../../../profile/domain/entity/user.entity';
 
 @Entity({ name: 'token' })
 export class TokenEntity extends BaseEntity {
-  @Column({ type: 'uuid', unique: true, nullable: false })
-  userId: string;
-
   @Column({ type: 'varchar', length: 512, unique: false, nullable: false })
   refreshTokenId: string;
 
@@ -13,5 +11,8 @@ export class TokenEntity extends BaseEntity {
   isRevoked: boolean;
 
   @Column({ type: 'timestamptz', unique: false, nullable: false })
-  refreshTokenExpires: Date;
+  refreshTokenExpiredAt: Date;
+
+  @OneToOne((type) => UserEntity, (user) => user.token, {})
+  user: UserEntity;
 }
