@@ -1,7 +1,10 @@
 import { Entity, Column, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { GroupEntity } from './group.entity';
-import { AuthMailEntity, TokenEntity } from '../../../authentication/domain/entity';
+import {
+  AuthMailEntity,
+  TokenEntity,
+} from '../../../authentication/domain/entity';
 
 @Entity({ name: 'user' })
 export class UserEntity extends BaseEntity {

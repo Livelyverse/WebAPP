@@ -22,7 +22,6 @@ export class GroupEntity extends BaseEntity {
   role: RoleEntity;
 
   @OneToMany((type) => UserEntity, (user) => user.group, {
-    lazy: true,
     nullable: true,
   })
   users: Promise<Array<UserEntity>>;
