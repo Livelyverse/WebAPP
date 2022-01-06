@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import yamlReader from './config/yamlReader';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -36,8 +34,8 @@ import { MailModule } from './modules/mail/mail.module';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [],
+  providers: [],
   exports: [],
 })
 export class AppModule {}
