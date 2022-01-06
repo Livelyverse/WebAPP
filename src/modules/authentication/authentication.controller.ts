@@ -90,7 +90,7 @@ export class AuthenticationController {
     };
   }
 
-  @Get('/signout')
+  @Post('/signout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'User sign out successful.' })

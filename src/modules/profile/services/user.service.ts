@@ -200,7 +200,7 @@ export class UserService implements IService<UserEntity> {
     }
 
     const user = await this.userRepository.findOne({
-      where: { name: userDto.username },
+      where: { id: userDto.id },
     });
     if (!user) {
       this.logger.log(
@@ -212,27 +212,27 @@ export class UserService implements IService<UserEntity> {
       );
     }
 
-    const groupEntity = await this.groupService.findByName(
-      userDto.group.toUpperCase(),
-    );
-    if (!groupEntity) {
-      this.logger.log(
-        `groupService.findByName failed, group '${userDto.group.toUpperCase()}' not found`,
-      );
-      throw new HttpException(
-        {
-          message: `update user ${
-            userDto.username
-          } failed, group ${userDto.group.toUpperCase()} not found`,
-        },
-        HttpStatus.NOT_FOUND,
-      );
-    }
+    // const groupEntity = await this.groupService.findByName(
+    //   userDto.group.toUpperCase(),
+    // );
+    // if (!groupEntity) {
+    //   this.logger.log(
+    //     `groupService.findByName failed, group '${userDto.group.toUpperCase()}' not found`,
+    //   );
+    //   throw new HttpException(
+    //     {
+    //       message: `update user ${
+    //         userDto.username
+    //       } failed, group ${userDto.group.toUpperCase()} not found`,
+    //     },
+    //     HttpStatus.NOT_FOUND,
+    //   );
+    // }
 
     try {
       user.firstname = userDto.firstname;
       user.lastname = userDto.lastname;
-      user.group = groupEntity;
+      // user.group = groupEntity;
       user.imageUrl = userDto.imageUrl;
       user.walletAddress = userDto.walletAddress;
       return await this.userRepository.save(user);
