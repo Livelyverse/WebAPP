@@ -11,6 +11,7 @@ import { MailModule } from './modules/mail/mail.module';
 @Module({
   imports: [
     AuthenticationModule.forRoot('jwt'),
+    MailModule,
     ProfileModule,
     ConfigModule.forRoot({
       load: [yamlReader],
@@ -28,10 +29,12 @@ import { MailModule } from './modules/mail/mail.module';
         logging: configService.get<boolean>('db.postgres.logging'),
         migrationsRun: configService.get<boolean>('db.postgres.migrationsRun'),
         synchronize: configService.get<boolean>('db.postgres.synchronize'),
+        autoLoadEntities: configService.get<boolean>(
+          'db.postgres.autoLoadEntities',
+        ),
       }),
       inject: [ConfigService],
     }),
-    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

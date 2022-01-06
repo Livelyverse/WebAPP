@@ -1,4 +1,4 @@
-import { AuthenticationService, TokenPayload } from './authentication.service';
+import { AuthenticationService } from './authentication.service';
 import {
   Controller,
   Post,
@@ -10,18 +10,17 @@ import {
   Logger,
   UseGuards,
   Req,
+  UnauthorizedException,
+  BadRequestException,
+  Get,
 } from '@nestjs/common';
 import { LoginDto } from './domain/dto/login.dto';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { UserService } from '../profile/services/user.service';
 import { RefreshDto } from './domain/dto/refresh.dto';
-import { Request } from 'express';
-import * as argon2 from 'argon2';
-import { UserCreateDto } from '../profile/domain/dto/userCreate.dto';
+import { Request, Response } from 'express';
 import { JwtAuthGuard } from './domain/gurads/jwt-auth.guard';
 import { SignupDto } from './domain/dto/signup.dto';
-import { MailService } from '../mail/mail.service';
-import { AuthMailDto } from './domain/dto/verification.dto';
+import { AuthMailDto, ResendAuthMailDto } from './domain/dto/verification.dto';
 import { PasswordDto } from './domain/dto/password.dto';
 
 export interface TokenResponse {
@@ -34,28 +33,30 @@ export interface TokenResponse {
 @ApiTags('authentication')
 export class AuthenticationController {
   private readonly logger = new Logger(AuthenticationController.name);
-  constructor(
-    private readonly authenticationService: AuthenticationService,
-    private readonly userService: UserService,
-    private readonly mailService: MailService,
-  ) {}
+  constructor(private readonly authenticationService: AuthenticationService) {}
 
   @Post('/signin')
-  @HttpCode(HttpStatus.OK)
-  @ApiResponse({ status: 200, description: 'The user sign out successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'The verify user login successfully.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'The does not verified user login successfully.',
+  })
   @ApiResponse({ status: 400, description: 'Request Invalid' })
   @ApiResponse({ status: 404, description: 'User Not Found' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  public async login(@Body() body: LoginDto, @Res() res): Promise<any> {
-    const tokenResponse = await this.authenticationService.userAuthentication(
-      body,
-    );
-
-    return res.status(HttpStatus.OK).send(tokenResponse);
+  public async login(
+    @Body() body: LoginDto,
+    @Res() res: Response,
+  ): Promise<Response> {
+    return await this.authenticationService.userAuthentication(body, res);
   }
 
   @Post('/changepass')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'The user sign out successfully.' })
   @ApiResponse({ status: 400, description: 'Request Invalid' })
   @ApiResponse({ status: 404, description: 'User Not Found' })
@@ -63,16 +64,10 @@ export class AuthenticationController {
   public async changePassword(
     @Body() body: PasswordDto,
     @Req() req,
-    @Res() res,
-  ): Promise<any> {
+  ): Promise<void> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(HttpStatus.UNAUTHORIZED).send('Illegal Auth Token');
-    }
     await this.authenticationService.changeUserPassword(token, body);
-    return res.status(HttpStatus.OK);
   }
 
   @Post('/signup')
@@ -83,38 +78,19 @@ export class AuthenticationController {
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async signup(@Body() signupDto: SignupDto, @Res() res): Promise<any> {
-    if (signupDto instanceof Array) {
-      this.logger.log(`signup failed, dto: ${signupDto.username}`);
+  async signup(@Body() body: SignupDto): Promise<any> {
+    if (body instanceof Array) {
+      this.logger.log(`signup failed, dto: ${body.username}`);
       throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
     }
 
-    const userDto = new UserCreateDto();
-    userDto.username = signupDto.username;
-    userDto.password = signupDto.password;
-    userDto.email = signupDto.email;
-    userDto.group = 'GHOST';
-    const user = await this.userService.create(userDto);
-
-    const authMailEntity =
-      await this.authenticationService.createAuthMailEntity(user);
-
-    await this.mailService.sendCodeConfirmation(
-      userDto.username,
-      userDto.email,
-      Number(authMailEntity.verificationId),
-    );
-
-    const accessToken = await this.authenticationService.generateAuthMailToken(
-      user,
-      authMailEntity,
-    );
-    return res.status(HttpStatus.OK).send({
+    const accessToken = await this.authenticationService.userSignUp(body);
+    return {
       access_token: accessToken,
-    });
+    };
   }
 
-  @Post('/signout')
+  @Get('/signout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'User sign out successful.' })
@@ -134,13 +110,12 @@ export class AuthenticationController {
   public async mailVerification(
     @Req() req: Request,
     @Body() dto: AuthMailDto,
-    @Res() res,
-  ): Promise<void> {
+  ): Promise<TokenResponse> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-      return res.status(HttpStatus.UNAUTHORIZED).send('Illegal Auth Token');
+      throw new UnauthorizedException('Illegal Auth Token');
     }
 
     const tokenPayload = await this.authenticationService.authTokenValidation(
@@ -148,8 +123,8 @@ export class AuthenticationController {
       false,
     );
 
-    if (!dto || dto?.verifyCode) {
-      return res.status(HttpStatus.BAD_REQUEST).send('Illegal Auth Token ');
+    if (!dto || !dto.verifyCode) {
+      throw new BadRequestException('Illegal Auth Token ');
     }
 
     const authMail = await this.authenticationService.authMailCodeConfirmation(
@@ -163,10 +138,10 @@ export class AuthenticationController {
       tokenEntity,
     );
 
-    return res.status(HttpStatus.OK).send({
+    return {
       access_token: accessToken,
       refresh_token: refreshToken,
-    });
+    };
   }
 
   @Post('/mail/resend')
@@ -178,40 +153,12 @@ export class AuthenticationController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async resendMailVerification(
+    @Body() body: ResendAuthMailDto,
     @Req() req: Request,
-    @Res() res,
-  ): Promise<void> {
+  ): Promise<any> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(HttpStatus.UNAUTHORIZED).send('Illegal Auth Token');
-    }
-
-    const tokenPayload = await this.authenticationService.authTokenValidation(
-      token,
-      false,
-    );
-
-    const user = await this.authenticationService.getUserFromTokenPayload(
-      tokenPayload,
-    );
-    const authMailEntity =
-      await this.authenticationService.createAuthMailEntity(user);
-
-    await this.mailService.sendCodeConfirmation(
-      user.username,
-      user.email,
-      Number(authMailEntity.verificationId),
-    );
-
-    const accessToken = await this.authenticationService.generateAuthMailToken(
-      user,
-      authMailEntity,
-    );
-    return res.status(HttpStatus.OK).send({
-      access_token: accessToken,
-    });
+    await this.authenticationService.resendMailVerification(body, token);
   }
 
   @Post('/refresh')
@@ -223,27 +170,26 @@ export class AuthenticationController {
   public async refresh(
     @Req() req: Request,
     @Body() dto: RefreshDto,
-    @Res() res,
-  ) {
+  ): Promise<TokenResponse> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-      return res.status(HttpStatus.UNAUTHORIZED).send('Illegal Auth Token');
+      throw new UnauthorizedException('Illegal Auth Token');
     }
 
     await this.authenticationService.authTokenValidation(token, true);
 
-    if (!dto || dto?.refresh_token) {
-      return res.status(HttpStatus.BAD_REQUEST).send('Illegal Auth Token ');
+    if (!dto || !dto.refresh_token) {
+      throw new BadRequestException('Illegal Auth Token');
     }
 
     const accessToken =
       await this.authenticationService.createAccessTokenFromRefreshToken(dto);
 
-    return res.status(HttpStatus.OK).send({
+    return {
       access_token: accessToken,
       refresh_token: dto.refresh_token,
-    });
+    };
   }
 }

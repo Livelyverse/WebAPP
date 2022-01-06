@@ -1,8 +1,7 @@
 import { Entity, Column, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { GroupEntity } from './group.entity';
-import { AuthMailEntity } from '../../../authentication/domain/entity/authMailEntity';
-import { TokenEntity } from '../../../authentication/domain/entity/token.entity';
+import { AuthMailEntity, TokenEntity } from '../../../authentication/domain/entity';
 
 @Entity({ name: 'user' })
 export class UserEntity extends BaseEntity {
@@ -18,10 +17,10 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 256, unique: true, nullable: false })
   email: string;
 
-  @Column({ default: false })
+  @Column({ type: 'boolean', default: false })
   public isEmailConfirmed: boolean;
 
-  @Column({ nullable: false })
+  @Column({ type: 'varchar', length: 1024, unique: false, nullable: false })
   password: string;
 
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: true })
@@ -40,15 +39,9 @@ export class UserEntity extends BaseEntity {
   })
   group: GroupEntity;
 
-  @OneToMany((type) => AuthMailEntity, (mails) => mails.user, {
-    lazy: true,
-    nullable: true,
-  })
-  verifyMails: Promise<Array<AuthMailEntity>>;
+  @OneToMany((type) => AuthMailEntity, (authMails) => authMails.user)
+  authMails: Promise<Array<AuthMailEntity>>;
 
-  @OneToOne((type) => TokenEntity, (token) => token.user, {
-    cascade: ['update', 'soft-remove'],
-    eager: true,
-  })
+  @OneToOne((type) => TokenEntity, (token) => token.user)
   token: TokenEntity;
 }

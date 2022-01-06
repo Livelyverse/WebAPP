@@ -3,17 +3,16 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
 import { Module } from '@nestjs/common';
 import { MailService } from './mail.service';
 import { join } from 'path';
-import { ConfigService } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
     MailerModule.forRootAsync({
-      // imports: [ConfigModule], // import module if not enabled globally
+      imports: [ConfigModule],
       useFactory: async (config: ConfigService) => ({
-        // transport: config.get("MAIL_TRANSPORT"),
-        // or
         transport: {
           host: config.get<string>('mail.host'),
+          port: config.get<number>('mail.port'),
           secure: true,
           auth: {
             user: config.get<string>('mail.user'),
@@ -24,10 +23,11 @@ import { ConfigService } from '@nestjs/config';
           from: `"No Reply" <${config.get<string>('mail.from')}>`,
         },
         template: {
+          preview: true,
           dir: join(
             process.cwd(),
             '/dist/resources/',
-            config.get<string>('templateDir'),
+            config.get<string>('mail.templateDir'),
           ),
           adapter: new HandlebarsAdapter(),
           options: {
