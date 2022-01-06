@@ -1,0 +1,32 @@
+app:
+  privateKey: 'privateKey.pem'
+  publicKey: 'publicKey.pem'
+  accessTokenTTL: 7200000
+  refreshTokenTTL: 172800000
+  mailTokenTTL: 3600000
+
+http:
+  host: 'localhost'
+  port: 3000
+
+db:
+  postgres:
+    host: 'localhost'
+    port: 5432
+    profile: 'postgres'
+    password: 'xxxxxx'
+    database: 'db'
+    entities: "dist/**/*.entity{.ts,.js}"
+    logging: true
+    migrationsRun: false
+    synchronize: true
+    autoLoadEntities: true
+
+mail:
+  host: 'smtp.example.com'
+  port: 25
+  user: 'info@example.com'
+  password: 'xxxxxx'
+  from: 'support@example.com'
+  templateDir: 'templates'
+
