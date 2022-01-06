@@ -1,6 +1,5 @@
 import { Column, Entity, ManyToOne } from 'typeorm';
-import { BaseEntity } from '../../../profile/domain/entity/base.entity';
-import { UserEntity } from '../../../profile/domain/entity/user.entity';
+import { UserEntity, BaseEntity } from '../../../profile/domain/entity';
 
 @Entity({ name: 'auth_mail' })
 export class AuthMailEntity extends BaseEntity {
@@ -16,10 +15,13 @@ export class AuthMailEntity extends BaseEntity {
   @Column({ type: 'timestamptz', unique: false, nullable: false })
   expiredAt: Date;
 
-  @Column({ default: false, nullable: false })
-  public isConfirmed: boolean;
+  @Column({ type: 'boolean', default: false, nullable: false })
+  isEmailSent: boolean;
 
-  @ManyToOne((type) => UserEntity, (user) => user.verifyMails, {
+  @Column({ type: 'timestamptz', unique: false, nullable: true })
+  mailSentAt: Date;
+
+  @ManyToOne((type) => UserEntity, (user) => user.authMails, {
     cascade: ['update', 'soft-remove'],
     onDelete: 'NO ACTION',
     nullable: false,
@@ -27,5 +29,5 @@ export class AuthMailEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
-  user: UserEntity;
+  public user: UserEntity;
 }

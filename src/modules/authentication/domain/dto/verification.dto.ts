@@ -8,3 +8,11 @@ export class AuthMailDto {
   @ApiProperty()
   public readonly verifyCode: string;
 }
+
+export class ResendAuthMailDto {
+  @IsNotEmpty({ message: 'Username must not empty' })
+  @IsDefined({ message: 'Username must be defined' })
+  @IsString({ message: 'Username must be string' })
+  @ApiProperty()
+  public readonly username: string;
+}

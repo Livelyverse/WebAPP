@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { UserCreateDto, UserUpdateDto } from '../domain/dto/index.dto';
 import { validate } from 'class-validator';
 import { IService } from './IService';
-import { UserEntity } from '../domain/entity/user.entity';
+import { UserEntity } from '../domain/entity';
 import { GroupService } from './group.service';
 import * as argon2 from 'argon2';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
@@ -77,11 +77,12 @@ export class UserService implements IService<UserEntity> {
     try {
       newUser = await this.userRepository.save(newUser);
     } catch (error) {
+      this.logger.error(
+        `userRepository.save in user creation failed, username: ${newUser.username}, email: ${newUser.email}, group: ${newUser.group}`,
+        error,
+      );
       if (error?.code === PostgresErrorCode.UniqueViolation) {
-        throw new HttpException(
-          'Username already exists',
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException('User already exists', HttpStatus.BAD_REQUEST);
       }
       throw new HttpException(
         { message: 'Something went wrong' },

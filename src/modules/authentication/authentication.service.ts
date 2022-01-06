@@ -1,4 +1,3 @@
-import { TokenExpiredError } from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import {
   BadRequestException,
@@ -14,22 +13,25 @@ import {
 import { Algorithm } from 'jsonwebtoken';
 import { JwtService } from '@nestjs/jwt';
 import * as fs from 'fs';
+import { Response } from 'express';
 import { UserService } from '../profile/services/user.service';
-import { UserEntity } from '../profile/domain/entity/user.entity';
+import { UserEntity } from '../profile/domain/entity';
 import { ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { InjectRepository } from '@nestjs/typeorm';
-import { TokenEntity } from './domain/entity/token.entity';
-import { Repository } from 'typeorm';
+import { TokenEntity } from './domain/entity';
+import { MoreThan, Repository } from 'typeorm';
 import { RefreshDto } from './domain/dto/refresh.dto';
-import { AuthMailEntity } from './domain/entity/authMailEntity';
+import { AuthMailEntity } from './domain/entity';
 import { GroupService } from '../profile/services/group.service';
 import * as argon2 from 'argon2';
-import { TokenResponse } from './authentication.controller';
 import { PasswordDto } from './domain/dto/password.dto';
-import { logger } from 'handlebars';
 import { validate } from 'class-validator';
-import { LoginDto } from "./domain/dto/login.dto";
+import { LoginDto } from './domain/dto/login.dto';
+import { UserCreateDto } from '../profile/domain/dto/userCreate.dto';
+import { SignupDto } from './domain/dto/signup.dto';
+import { MailService } from '../mail/mail.service';
+import { ResendAuthMailDto } from './domain/dto/verification.dto';
 
 export interface TokenPayload {
   iss: string;
@@ -58,6 +60,7 @@ export class AuthenticationService {
     private readonly groupService: GroupService,
     private readonly configService: ConfigService,
     private readonly jwt: JwtService,
+    private readonly mailService: MailService,
   ) {
     this._privateKey = fs.readFileSync(
       join(
@@ -112,13 +115,23 @@ export class AuthenticationService {
     }
 
     const tokenPayload = await this.authTokenValidation(token, false);
-    const user = await this.getUserFromTokenPayload(tokenPayload);
-
-    if (!user) {
-      this.logger.log(`user not found, userId: ${tokenPayload.sub}`);
-      throw new ForbiddenException('User Invalid');
+    let tokenEntity;
+    try {
+      tokenEntity = await this.tokenRepository.findOne({
+        relations: ['user'],
+        where: {
+          user: { id: tokenPayload.sub },
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `tokenRepository.findOne failed, userId: ${tokenPayload.sub}`,
+        error,
+      );
+      throw new InternalServerErrorException('Something went wrong');
     }
 
+    const user = tokenEntity.user;
     if (!user.isActive) {
       this.logger.log(`user deactivated, username: ${user.username}`);
       throw new ForbiddenException('User Invalid');
@@ -159,14 +172,28 @@ export class AuthenticationService {
 
     user.password = hashPassword;
     await this.userService.updateEntity(user);
+
+    tokenEntity.isRevoked = true;
+    try {
+      return this.tokenRepository.save(tokenEntity);
+    } catch (error) {
+      this.logger.error(
+        `tokenRepository.save failed, tokenEntity Id: ${tokenEntity.id}, userId: ${user.id}`,
+        error,
+      );
+      throw new InternalServerErrorException('Something went wrong');
+    }
   }
 
-  public async userAuthentication(dto: LoginDto): Promise<TokenResponse> {
+  public async userAuthentication(
+    dto: LoginDto,
+    res: Response,
+  ): Promise<Response> {
     if (dto instanceof Array) {
       this.logger.log(
         `userAuthentication Data Invalid, username: ${dto.username}`,
       );
-      throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
+      return res.status(HttpStatus.BAD_REQUEST).send('Request Data Invalid');
     }
 
     const errors = await validate(dto, {
@@ -178,24 +205,25 @@ export class AuthenticationService {
         `userAuthentication data validation failed, username: ${dto.username}, errors: ${errors}`,
       );
 
-      throw new HttpException(
-        { message: 'Input Data Invalid', errors },
-        HttpStatus.BAD_REQUEST,
-      );
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .send(`Input Data Invalid, ${JSON.stringify(errors)}`);
     }
 
     const user = await this.userService.findByName(dto.username);
 
     if (!user) {
       this.logger.log(`user not found, username: ${dto.username}`);
-      throw new NotFoundException('Username Or Password Invalid');
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .send('Username Or Password Invalid');
     }
 
     if (!user.isActive) {
-      this.logger.log(
-        `user deactivated or not confirmed, username: ${dto.username}`,
-      );
-      throw new NotFoundException('Username Or Password Invalid');
+      this.logger.log(`user inactivated, username: ${dto.username}`);
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .send('Username Or Password Invalid');
     }
 
     let isPassVerify;
@@ -203,14 +231,16 @@ export class AuthenticationService {
       isPassVerify = await argon2.verify(user.password, dto.password);
     } catch (err) {
       this.logger.error(`argon2.hash failed, username: ${dto.username}`, err);
-      throw new InternalServerErrorException('Something went wrong');
+      return res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .send('Something went wrong');
     }
 
     if (!isPassVerify) {
       this.logger.log(
         `user password verification failed, username: ${dto.username}`,
       );
-      throw new NotFoundException('Username Or Password Invalid');
+      res.status(HttpStatus.NOT_FOUND).send('Username Or Password Invalid');
     }
 
     if (user.isEmailConfirmed) {
@@ -219,69 +249,171 @@ export class AuthenticationService {
       );
       const accessToken = await this.generateAccessToken(user, tokenEntity);
 
-      return {
+      return res.status(HttpStatus.OK).send({
         access_token: accessToken,
         refresh_token: refreshToken,
-      };
+      });
     }
 
-    const authMailEntity = await this.createAuthMailEntity(user);
+    const authMailEntity = await this.createOrGetAuthMailEntity(user);
     const authMailToken = await this.generateAuthMailToken(
       user,
       authMailEntity,
     );
-    return {
+    return res.status(201).send({
       access_token: authMailToken,
       refresh_token: null,
-    };
+    });
+  }
+
+  public async userSignUp(dto: SignupDto): Promise<string> {
+    const userDto = new UserCreateDto();
+    userDto.username = dto.username;
+    userDto.password = dto.password;
+    userDto.email = dto.email;
+    userDto.group = 'GHOST';
+    const user = await this.userService.create(userDto);
+    const authMailEntity = await this.createOrGetAuthMailEntity(user, true);
+
+    this.mailService.sendCodeConfirmation(
+      userDto.username,
+      userDto.email,
+      Number(authMailEntity.verificationId),
+    );
+
+    return await this.generateAuthMailToken(user, authMailEntity);
+  }
+
+  public async resendMailVerification(
+    dto: ResendAuthMailDto,
+    token: string,
+  ): Promise<void> {
+    if (!token) {
+      throw new UnauthorizedException('Illegal Auth Token');
+    }
+
+    const authMailToken = await this.authTokenValidation(token, false);
+    let authMail;
+    try {
+      authMail = await this.authMailRepository.findOne(authMailToken.jti);
+    } catch (error) {
+      this.logger.error(
+        `mailVerificationRepository.findOne failed, id: ${authMailToken.jti}`,
+        error,
+      );
+      throw new InternalServerErrorException('Something went wrong');
+    }
+
+    if (!authMail) {
+      this.logger.warn(
+        `authMail entity of token invalid, authMail id: ${authMailToken.jti}`,
+      );
+      throw new ForbiddenException();
+    }
+
+    if (!dto || !dto.username) {
+      throw new BadRequestException('Input Data Invalid');
+    }
+
+    const user = authMail.user;
+    if (dto.username !== user.username) {
+      throw new ForbiddenException();
+    }
+
+    if (user.isEmailConfirmed) {
+      this.logger.warn(
+        `user try again to resend mail verification, userId: ${user.id}`,
+      );
+      throw new ForbiddenException('Illegal User');
+    }
+
+    const authMailEntity = await this.createOrGetAuthMailEntity(user);
+
+    if (authMailEntity.isEmailSent) {
+      this.logger.log(
+        `mail verification already send to user, userId: ${user.id}, sendTo: ${authMailEntity.sendTo}`,
+      );
+      return;
+    }
+
+    this.mailService.sendCodeConfirmation(
+      user.username,
+      user.email,
+      Number(authMailEntity.verificationId),
+    );
+
+    authMailEntity.isEmailSent = true;
+    authMailEntity.mailSentAt = new Date();
+    try {
+      await this.authMailRepository.save(authMailEntity);
+    } catch (error) {
+      this.logger.error(
+        `authMailRepository.save of userSignUp failed, userId: ${user.id}, 
+                 authMail Id: ${authMailEntity.id}`,
+        error,
+      );
+    }
   }
 
   public async revokeAuthToken(userId: string): Promise<TokenEntity> {
-    const userEntity = await this.userService.findById(userId);
-
-    if (!userEntity) {
-      this.logger.log(`user for revoke token not found, userId: ${userId}`);
-      throw new NotFoundException('User Not Found');
+    let tokenEntity;
+    try {
+      tokenEntity = await this.tokenRepository.findOne({
+        relations: ['user'],
+        where: {
+          user: { id: userId },
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `tokenRepository.findOne failed, userId: ${userId}`,
+        error,
+      );
+      throw new InternalServerErrorException('Something went wrong');
     }
 
-    if (!userEntity.token) {
+    if (!tokenEntity) {
       this.logger.log(`user token not found, userId: ${userId}`);
       throw new NotFoundException('Token Not Found');
     }
 
-    const tokenEntity = userEntity.token;
     tokenEntity.isRevoked = true;
     try {
       return this.tokenRepository.save(tokenEntity);
     } catch (error) {
-      this.logger.log(`user token not found, userId: ${userId}`);
+      this.logger.error(`user token not found, userId: ${userId}`, error);
       throw new InternalServerErrorException('Something went wrong');
     }
   }
 
   public async authMailCodeConfirmation(
-    accessToken: TokenPayload,
+    authMailToken: TokenPayload,
     verifyCode: string,
   ): Promise<AuthMailEntity> {
-    if (!accessToken.jti || accessToken.exp * 1000 <= Date.now()) {
+    if (!authMailToken.jti || authMailToken.exp * 1000 <= Date.now()) {
       throw new UnauthorizedException('Illegal Auth Token');
     }
 
     let authMail;
     try {
-      authMail = await this.authMailRepository.findOne({ id: accessToken.jti });
+      authMail = await this.authMailRepository.findOne(authMailToken.jti);
     } catch (error) {
       this.logger.error(
-        `mailVerificationRepository.findOne failed, id: ${accessToken.jti}`,
+        `mailVerificationRepository.findOne failed, id: ${authMailToken.jti}`,
+        error,
       );
       throw new InternalServerErrorException('Something went wrong');
     }
 
-    if (authMail.verifyCode !== verifyCode) {
-      throw new UnauthorizedException('Illegal Verify Code');
+    if (authMail.verificationId !== verifyCode) {
+      this.logger.warn(
+        `verify code invalid, userId: ${authMailToken.sub}, code: ${verifyCode}`,
+      );
+      throw new UnauthorizedException();
     }
 
     if (!authMail.user.isActive) {
+      this.logger.warn(`user inactivated, userId: ${authMailToken.sub}`);
       throw new UnauthorizedException();
     }
 
@@ -290,23 +422,20 @@ export class AuthenticationService {
       memberGroup = await this.groupService.findByName('MEMBER');
     } catch (error) {
       this.logger.error(
-        `groupService.findByName for MEMBER group failed, authMail: ${JSON.stringify(
-          authMail,
-        )}`,
+        `groupService.findByName for MEMBER group failed, userId: ${authMail.user.id}`,
+        error,
       );
       throw new InternalServerErrorException('Something went wrong');
     }
 
     try {
-      authMail.isConfirmed = true;
       authMail.user.isEmailConfirmed = true;
       authMail.user.group = memberGroup;
       return await this.authMailRepository.save(authMail);
     } catch (error) {
       this.logger.error(
-        `mailVerificationRepository.save failed, authMail: ${JSON.stringify(
-          authMail,
-        )}`,
+        `mailVerificationRepository.save failed, userId: ${authMail.user.id}`,
+        error,
       );
       throw new InternalServerErrorException('Something went wrong');
     }
@@ -320,16 +449,31 @@ export class AuthenticationService {
       throw new UnauthorizedException('Illegal Auth Token');
     }
 
-    const userEntity = await this.userService.findById(payload.sub);
+    let tokenEntity;
+    try {
+      tokenEntity = await this.tokenRepository.findOne({
+        relations: ['user'],
+        where: {
+          user: { id: payload.sub },
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `tokenRepository.findOne failed, userId: ${payload.sub}`,
+        error,
+      );
+      throw new InternalServerErrorException('Something went wrong');
+    }
+
     if (
-      userEntity &&
-      userEntity.isEmailConfirmed &&
-      userEntity.isActive &&
-      userEntity.token &&
-      !userEntity.token.isRevoked &&
+      tokenEntity &&
+      !tokenEntity.isRevoked &&
+      tokenEntity.id === payload.jti &&
+      tokenEntity.user.isEmailConfirmed &&
+      tokenEntity.user.isActive &&
       payload.exp * 1000 > Date.now()
     ) {
-      return userEntity;
+      return tokenEntity.user;
     }
 
     return null;
@@ -356,9 +500,7 @@ export class AuthenticationService {
     }
   }
 
-  public async resolveRefreshToken(
-    encoded: string,
-  ): Promise<{ user: UserEntity; tokenEntity: TokenEntity }> {
+  public async resolveRefreshToken(encoded: string): Promise<TokenEntity> {
     const payload = await this.authTokenValidation(encoded, false);
     const tokenEntity = await this.getStoredTokenFromRefreshTokenPayload(
       payload,
@@ -366,7 +508,7 @@ export class AuthenticationService {
 
     if (!tokenEntity) {
       this.logger.log(
-        `tokenEntity not found, tokenEntity: ${JSON.stringify(tokenEntity)}`,
+        `tokenEntity not found, payload: ${JSON.stringify(payload)}`,
       );
       throw new UnauthorizedException('Illegal Auth token');
     }
@@ -374,28 +516,25 @@ export class AuthenticationService {
     if (
       tokenEntity.isRevoked ||
       Date.now() >= tokenEntity.refreshTokenExpiredAt.getTime() ||
-      payload.jti != tokenEntity.refreshTokenId
+      payload.jti !== tokenEntity.refreshTokenId
     ) {
       this.logger.log(
-        `tokenEntity is revoked or expired or invalid, tokenEntity: ${JSON.stringify(
-          tokenEntity,
-        )}, payload: ${JSON.stringify(payload)}`,
+        `tokenEntity is revoked or expired or invalid, token userId: ${
+          tokenEntity.user.id
+        }, payload: ${JSON.stringify(payload)}`,
       );
       throw new UnauthorizedException('Illegal Auth Token');
     }
 
-    const user = await this.getUserFromTokenPayload(payload);
-
+    const user = tokenEntity.user;
     if (!user || !user.isEmailConfirmed || !user.isActive) {
       this.logger.log(
-        `user not found or deactivated or not email confirmed, userId: ${JSON.stringify(
-          payload.sub,
-        )}`,
+        `user not found or deactivated or not email confirmed, userId: ${payload.sub}`,
       );
       throw new UnauthorizedException('Illegal Auth Token');
     }
 
-    return { user, tokenEntity };
+    return tokenEntity;
   }
 
   public async generateAuthMailToken(
@@ -479,26 +618,26 @@ export class AuthenticationService {
     let tokenEntity;
     try {
       tokenEntity = await this.tokenRepository.findOne({
-        where: { userId: user.id },
+        relations: ['user'],
+        where: {
+          user: { id: user.id },
+        },
       });
     } catch (error) {
       this.logger.error(
-        `tokenRepository.findOne failed, user: ${JSON.stringify(user)}`,
+        `tokenRepository.findOne failed, userId: ${user.id}`,
         error,
       );
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new InternalServerErrorException('Something went wrong');
     }
 
     if (!tokenEntity) {
       tokenEntity = new TokenEntity();
-      tokenEntity.userId = user.id;
+      tokenEntity.user = user;
     }
 
     tokenEntity.isRevoked = false;
-    tokenEntity.refreshTokenExpires = new Date(
+    tokenEntity.refreshTokenExpiredAt = new Date(
       Date.now() + this._refreshTokenTTL,
     );
     tokenEntity.refreshTokenId = crypto.randomUUID({
@@ -509,7 +648,7 @@ export class AuthenticationService {
       return await this.tokenRepository.save(tokenEntity);
     } catch (error) {
       this.logger.error(
-        `tokenRepository.save failed, token: ${JSON.stringify(tokenEntity)}`,
+        `tokenRepository.save failed, token userId: ${tokenEntity.user.id}`,
         error,
       );
       throw new HttpException(
@@ -522,66 +661,93 @@ export class AuthenticationService {
   public async createAccessTokenFromRefreshToken(
     dto: RefreshDto,
   ): Promise<string> {
-    const { user, tokenEntity } = await this.resolveRefreshToken(
-      dto.refresh_token,
-    );
-
-    return await this.generateAccessToken(user, tokenEntity);
+    const tokenEntity = await this.resolveRefreshToken(dto.refresh_token);
+    return await this.generateAccessToken(tokenEntity.user, tokenEntity);
   }
 
-  public async createAuthMailEntity(user: UserEntity): Promise<AuthMailEntity> {
-    const authMail = new AuthMailEntity();
-    authMail.user = user;
+  public async createOrGetAuthMailEntity(
+    userEntity: UserEntity,
+    isCreateForce = false,
+  ): Promise<AuthMailEntity> {
+    let authMail;
+    if (!isCreateForce) {
+      try {
+        authMail = await this.authMailRepository.findOne({
+          relations: ['user'],
+          where: {
+            user: { id: userEntity.id },
+            expiredAt: MoreThan(new Date()),
+          },
+        });
+      } catch (error) {
+        this.logger.error(
+          `authMailRepository.findOne failed, userId: ${userEntity.id}`,
+          error,
+        );
+        throw new InternalServerErrorException('Something went wrong');
+      }
+
+      if (authMail) {
+        return authMail;
+      }
+    }
+
+    authMail = new AuthMailEntity();
+    authMail.user = userEntity;
     authMail.from = this.configService.get<string>('mail.from');
-    authMail.sendTo = user.email;
+    authMail.sendTo = userEntity.email;
     authMail.verificationId = String(
       Math.floor(100000 + Math.random() * 900000),
     );
     authMail.expiredAt = new Date(Date.now() + this._mailTokenTTL);
-    authMail.isConfirmed = false;
+    authMail.mailSentAt = null;
+    authMail.isEmailSent = false;
     authMail.isActive = true;
     authMail.isUpdatable = true;
+
+    if (isCreateForce) {
+      authMail.mailSentAt = new Date();
+      authMail.isEmailSent = true;
+    }
 
     try {
       return await this.authMailRepository.save(authMail);
     } catch (error) {
       this.logger.error(
-        `mailVerificationRepository.save failed, entity: ${JSON.stringify(
-          authMail,
-        )}`,
+        `authMailRepository.save failed, userId: ${authMail.user.id}`,
+        error,
       );
       throw new InternalServerErrorException('Something went wrong');
     }
-  }
-
-  public async getUserFromTokenPayload(
-    payload: TokenPayload,
-  ): Promise<UserEntity> {
-    const subId = payload.sub;
-
-    if (!subId) {
-      this.logger.log(`payload.sub invalid, payload: ${payload}`);
-      throw new UnauthorizedException('Illegal Auth Token');
-    }
-
-    return this.userService.findById(subId);
   }
 
   private async getStoredTokenFromRefreshTokenPayload(
     payload: TokenPayload,
   ): Promise<TokenEntity | null> {
     const refreshTokenId = payload.jti;
-    // const userId = payload.sub;
-
-    if (!refreshTokenId) {
+    const userId = payload.sub;
+    if (!refreshTokenId || !userId) {
       this.logger.log(`payload invalid, payload: ${payload}`);
       throw new UnauthorizedException('Illegal Auth Token');
     }
 
-    const user = await this.getUserFromTokenPayload(payload);
-    if (!user.token) {
-      return null;
+    let tokenEntity;
+    try {
+      tokenEntity = await this.tokenRepository.findOne({
+        relations: ['user'],
+        where: {
+          user: { id: userId },
+          refreshTokenId: refreshTokenId,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `tokenRepository.findOne failed, refreshTokenId: ${refreshTokenId}, userId; ${userId}`,
+        error,
+      );
+      throw new InternalServerErrorException('Something went wrong');
     }
-    return user.token;
+
+    return tokenEntity;
   }
 }
