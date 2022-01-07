@@ -7,3 +7,4 @@ export { GroupViewDto } from './groupView.dto';
 export { UserCreateDto } from './userCreate.dto';
 export { UserUpdateDto } from './userUpdate.dto';
 export { UserViewDto } from './userView.dto';
+export { ContactDto } from './contact.dto';
