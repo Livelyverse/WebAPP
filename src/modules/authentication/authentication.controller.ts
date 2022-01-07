@@ -54,12 +54,13 @@ export class AuthenticationController {
     return await this.authenticationService.userAuthentication(body, res);
   }
 
-  @Post('/changepass')
+  @Post('/changepassword')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'The user sign out successfully.' })
-  @ApiResponse({ status: 400, description: 'Request Invalid' })
-  @ApiResponse({ status: 404, description: 'User Not Found' })
+  @ApiResponse({ status: 200, description: 'Change Password Success.' })
+  @ApiResponse({ status: 400, description: 'Request Invalid.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async changePassword(
     @Body() body: PasswordDto,
@@ -74,9 +75,10 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.OK)
   @ApiResponse({
     status: 200,
-    description: 'User sign up successful.',
+    description: 'User sign up success.',
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 404, description: 'Not Found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async signup(@Body() body: SignupDto): Promise<any> {
     if (body instanceof Array) {
@@ -95,7 +97,6 @@ export class AuthenticationController {
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'User sign out successful.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 404, description: 'Auth token not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async signout(@Req() request: any): Promise<void> {
     await this.authenticationService.revokeAuthToken(request.user.id);
@@ -115,7 +116,7 @@ export class AuthenticationController {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-      throw new UnauthorizedException('Illegal Auth Token');
+      throw new UnauthorizedException();
     }
 
     const tokenPayload = await this.authenticationService.authTokenValidation(
@@ -124,7 +125,7 @@ export class AuthenticationController {
     );
 
     if (!dto || !dto.verifyCode) {
-      throw new BadRequestException('Illegal Auth Token ');
+      throw new BadRequestException('Input Data Invalid');
     }
 
     const authMail = await this.authenticationService.authMailCodeConfirmation(
@@ -163,7 +164,7 @@ export class AuthenticationController {
 
   @Post('/refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiResponse({ status: 200, description: 'Generate accessToken successful.' })
+  @ApiResponse({ status: 200, description: 'Generate accessToken success.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
@@ -175,13 +176,13 @@ export class AuthenticationController {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-      throw new UnauthorizedException('Illegal Auth Token');
+      throw new UnauthorizedException();
     }
 
     await this.authenticationService.authTokenValidation(token, true);
 
     if (!dto || !dto.refresh_token) {
-      throw new BadRequestException('Illegal Auth Token');
+      throw new BadRequestException('Input Data Invalid');
     }
 
     const accessToken =
