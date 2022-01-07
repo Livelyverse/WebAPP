@@ -1,14 +1,14 @@
 import { MailerService } from '@nestjs-modules/mailer';
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  constructor(private mailerService: MailerService) {}
+  constructor(
+    private readonly mailerService: MailerService,
+    private readonly configService: ConfigService,
+  ) {}
 
   sendCodeConfirmation(username: string, sendTo: string, verifyCode: number) {
     this.mailerService
@@ -33,6 +33,29 @@ export class MailService {
       .catch((error) =>
         this.logger.error(
           `mailerService.sendMail failed, username: ${username} sendTo: ${sendTo}`,
+          error,
+        ),
+      );
+  }
+
+  sendContactUs(name: string, from: string, message: string) {
+    this.mailerService
+      .sendMail({
+        to: this.configService.get<string>('mail.from'),
+        // from: from,
+        subject: `Form ${name} ContactUs of Site`,
+        text: `${name} <${from}> \n${message}`,
+      })
+      .then((sendMessageInfo) =>
+        this.logger.log(
+          `sendContactUs done, name: ${name}, from: ${from}, result: ${JSON.stringify(
+            sendMessageInfo,
+          )}`,
+        ),
+      )
+      .catch((error) =>
+        this.logger.error(
+          `mailerService.sendMail failed, name: ${name}, from: ${from}`,
           error,
         ),
       );

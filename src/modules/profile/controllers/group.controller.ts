@@ -24,7 +24,7 @@ import { GroupService } from '../services/group.service';
 import { GroupCreateDto } from '../domain/dto/groupCreate.dto';
 import { GroupViewDto } from '../domain/dto/groupView.dto';
 import { GroupUpdateDto } from '../domain/dto/groupUpdate.dto';
-import { GroupEntity } from '../domain/entity/group.entity';
+import { GroupEntity } from '../domain/entity';
 import { isUUID } from './uuid.validate';
 import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
 import RoleGuard from '../../authentication/domain/gurads/role.guard';

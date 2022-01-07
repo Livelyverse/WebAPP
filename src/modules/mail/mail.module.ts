@@ -7,6 +7,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (config: ConfigService) => ({
@@ -22,18 +23,18 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         defaults: {
           from: `"No Reply" <${config.get<string>('mail.from')}>`,
         },
-        template: {
-          preview: true,
-          dir: join(
-            process.cwd(),
-            '/dist/resources/',
-            config.get<string>('mail.templateDir'),
-          ),
-          adapter: new HandlebarsAdapter(),
-          options: {
-            strict: true,
-          },
-        },
+        // template: {
+        //   preview: false,
+        //   dir: join(
+        //     process.cwd(),
+        //     '/dist/resources/',
+        //     config.get<string>('mail.templateDir'),
+        //   ),
+        //   adapter: new HandlebarsAdapter(),
+        //   options: {
+        //     strict: true,
+        //   },
+        // },
       }),
       inject: [ConfigService],
     }),
