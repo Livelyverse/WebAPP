@@ -139,6 +139,7 @@ export class GroupController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 422, description: 'The requested record could not deleted.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {
     if (isUUID(params.param)) {

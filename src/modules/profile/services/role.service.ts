@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { RoleEntity } from '../domain/entity/role.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -58,6 +64,20 @@ export class RoleService implements IService<RoleEntity> {
 
   async deleteByName(name: string): Promise<void> {
     name = name.toUpperCase();
+
+    const groupCount = await this.roleRepository
+      .createQueryBuilder('role')
+      .select('count(*)')
+      .innerJoin('role.groups', 'groups')
+      .where('role.name = :name', { name: name })
+      .groupBy('group.id')
+      .getCount();
+
+    if (groupCount > 0) {
+      this.logger.warn(`deleteByName role ${name} failed, role has a groups`);
+      throw new UnprocessableEntityException(`Role ${name} could not delete`);
+    }
+
     let deleteResult;
     try {
       deleteResult = await this.roleRepository.softDelete({ name: name });
@@ -78,6 +98,19 @@ export class RoleService implements IService<RoleEntity> {
   }
 
   async delete(id: string): Promise<void> {
+    const groupCount = await this.roleRepository
+      .createQueryBuilder('role')
+      .select('count(*)')
+      .innerJoin('role.groups', 'groups')
+      .where('role.id = :id', { id: id })
+      .groupBy('group.id')
+      .getCount();
+
+    if (groupCount > 0) {
+      this.logger.warn(`delete role ${id} failed, role has a groups`);
+      throw new UnprocessableEntityException(`Role ${id} could not delete`);
+    }
+
     let deleteResult;
     try {
       deleteResult = await this.roleRepository.softDelete({ id: id });

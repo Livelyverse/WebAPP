@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { GroupEntity } from '../entity/group.entity';
+import { GroupEntity } from '../entity';
 
 export class GroupViewDto {
   public static from(group: GroupEntity): GroupViewDto | null {
@@ -16,7 +16,7 @@ export class GroupViewDto {
     }
     return null;
   }
-  
+
   @ApiProperty()
   public id: string;
 

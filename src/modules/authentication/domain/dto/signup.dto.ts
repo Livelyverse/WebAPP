@@ -26,5 +26,4 @@ export class SignupDto {
   @IsEmail({ message: 'Email must be valid' })
   @ApiProperty()
   public email: string;
-
 }
