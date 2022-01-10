@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GroupCreateDto, GroupUpdateDto } from '../domain/dto/index.dto';
@@ -83,6 +89,20 @@ export class GroupService implements IService<GroupEntity> {
 
   async deleteByName(name: string): Promise<void> {
     name = name.toUpperCase();
+
+    const userCount = await this.groupRepository
+      .createQueryBuilder('group')
+      .select('count(*)')
+      .innerJoin('group.users', 'user')
+      .where('group.name = :name', { name: name })
+      .groupBy('user.id')
+      .getCount();
+
+    if (userCount > 0) {
+      this.logger.warn(`delete group ${name} failed, group has a users`);
+      throw new UnprocessableEntityException(`Group ${name} could not delete`);
+    }
+
     let deleteResult;
     try {
       deleteResult = await this.groupRepository.softDelete({ name: name });
@@ -103,6 +123,19 @@ export class GroupService implements IService<GroupEntity> {
   }
 
   async delete(id: string): Promise<void> {
+    const userCount = await this.groupRepository
+      .createQueryBuilder('group')
+      .select('count(*)')
+      .innerJoin('group.users', 'user')
+      .where('group.id = :id', { id: id })
+      .groupBy('user.id')
+      .getCount();
+
+    if (userCount > 0) {
+      this.logger.warn(`deleteByName group ${id} failed, group has a users`);
+      throw new UnprocessableEntityException(`Group ${id} could not delete`);
+    }
+
     let deleteResult;
     try {
       deleteResult = await this.groupRepository.softDelete({ id: id });
