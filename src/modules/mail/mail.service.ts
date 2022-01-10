@@ -43,8 +43,14 @@ export class MailService {
       .sendMail({
         to: this.configService.get<string>('mail.from'),
         // from: from,
-        subject: `Form ${name} ContactUs of Site`,
-        text: `${name} <${from}> \n${message}`,
+        subject: `From ${name} ContactUs of Site`,
+        template: 'contactUs', // `.hbs` extension is appended automatically
+        // text: `${name} <${from}> \n${message}`,
+        context: {
+          name: name,
+          email: from,
+          message: message,
+        },
       })
       .then((sendMessageInfo) =>
         this.logger.log(
