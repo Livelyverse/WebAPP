@@ -217,7 +217,7 @@ export class AuthenticationService {
 
       return res
         .status(HttpStatus.BAD_REQUEST)
-        .send({ message: `Input Data Invalid, ${JSON.stringify(errors)}` });
+        .send({ message: `Input Data Invalid`, errors });
     }
 
     const user = await this.userService.findByName(dto.username);
