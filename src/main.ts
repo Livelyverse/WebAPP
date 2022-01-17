@@ -16,22 +16,34 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api', app, document);
 
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.header(
-      'Access-Control-Allow-Headers',
-      'Origin, X-Requested-With, Content-Type, Accept, Authorization',
-    );
-    res.header('Access-Control-Expose-Headers', 'Authorization');
-    next();
-  });
+  // app.use((req, res, next) => {
+  //   res.header('Access-Control-Allow-Origin', '*');
+  //   res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  //   res.header(
+  //     'Access-Control-Allow-Headers',
+  //     'Origin, X-Requested-With, Content-Type, ',
+  //   );
+  //   res.header('Access-Control-Expose-Headers', 'Authorization');
+  //   next();
+  // });
 
   app.enableCors({
-    allowedHeaders: '*',
+    allowedHeaders: [
+      'DNT',
+      'User-Agent',
+      'X-Requested-With',
+      'If-Modified-Since',
+      'Cache-Control',
+      'Content-Type',
+      'Range',
+      'Accept',
+      'Authorization',
+    ],
+    exposedHeaders: 'Authorization',
     origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true,
+    maxAge: 1728000,
     preflightContinue: true,
     optionsSuccessStatus: 204,
   });
