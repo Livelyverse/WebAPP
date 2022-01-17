@@ -51,12 +51,6 @@ export class UserController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() userDto: UserCreateDto): Promise<string> {
     const dto = UserCreateDto.from(userDto);
-    if (!dto) {
-      this.logger.log(
-        `request create user invalid, ${JSON.stringify(userDto)}`,
-      );
-      throw new BadRequestException('Invalid Input Date');
-    }
     const user = await this.userService.create(dto);
     return user.id;
   }
@@ -74,12 +68,6 @@ export class UserController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() userDto: UserUpdateDto): Promise<UserViewDto> {
     const dto = UserUpdateDto.from(userDto);
-    if (!dto) {
-      this.logger.log(
-        `request update user invalid, ${JSON.stringify(userDto)}`,
-      );
-      throw new BadRequestException('Invalid Input Date');
-    }
     const user = await this.userService.update(dto);
     return UserViewDto.from(user);
   }
