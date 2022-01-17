@@ -52,10 +52,6 @@ export class AuthenticationController {
     @Res() res: Response,
   ): Promise<Response> {
     const dto = LoginDto.from(loginDto);
-    if (!dto) {
-      this.logger.log(`request login invalid, ${JSON.stringify(loginDto)}`);
-      throw new BadRequestException('Invalid Input Date');
-    }
     return await this.authenticationService.userAuthentication(dto, res);
   }
 
@@ -75,13 +71,6 @@ export class AuthenticationController {
     const token = authHeader && authHeader.split(' ')[1];
 
     const dto = PasswordDto.from(passwordDto);
-    if (!dto) {
-      this.logger.log(
-        `request change password invalid, ${JSON.stringify(passwordDto)}`,
-      );
-      throw new BadRequestException('Invalid Input Date');
-    }
-
     await this.authenticationService.changeUserPassword(token, dto);
   }
 
@@ -96,10 +85,6 @@ export class AuthenticationController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async signup(@Body() signupDto: SignupDto): Promise<any> {
     const dto = SignupDto.from(signupDto);
-    if (!dto) {
-      this.logger.log(`request signup invalid, ${JSON.stringify(signupDto)}`);
-      throw new BadRequestException('Invalid Input Date');
-    }
     const accessToken = await this.authenticationService.userSignUp(dto);
     return {
       access_token: accessToken,
@@ -130,7 +115,7 @@ export class AuthenticationController {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     const dto = AuthMailDto.from(authMailDto);
@@ -138,7 +123,7 @@ export class AuthenticationController {
       this.logger.log(
         `request mail verification invalid, ${JSON.stringify(authMailDto)}`,
       );
-      throw new BadRequestException('Invalid Input Date');
+      throw new BadRequestException({ message: 'Invalid Input Date' });
     }
 
     const tokenPayload = await this.authenticationService.authTokenValidation(
@@ -185,7 +170,7 @@ export class AuthenticationController {
           resendAuthMailDto,
         )}`,
       );
-      throw new BadRequestException('Invalid Input Date');
+      throw new BadRequestException({ message: 'Invalid Input Date' });
     }
 
     await this.authenticationService.resendMailVerification(
@@ -208,7 +193,7 @@ export class AuthenticationController {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     await this.authenticationService.authTokenValidation(token, true);
@@ -216,11 +201,9 @@ export class AuthenticationController {
     const dto = RefreshDto.from(refreshDto);
     if (!dto || !dto.refresh_token) {
       this.logger.log(
-        `request refresh token invalid, ${JSON.stringify(
-          refreshDto,
-        )}`,
+        `request refresh token invalid, ${JSON.stringify(refreshDto)}`,
       );
-      throw new BadRequestException('Invalid Input Date');
+      throw new BadRequestException({ message: 'Invalid Input Date' });
     }
 
     const accessToken =

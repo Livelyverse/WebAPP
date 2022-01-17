@@ -96,7 +96,10 @@ export class UserService implements IService<UserEntity> {
         error,
       );
       if (error?.code === PostgresErrorCode.UniqueViolation) {
-        throw new HttpException('User already exists', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          { message: 'User already exists' },
+          HttpStatus.BAD_REQUEST,
+        );
       }
       throw new HttpException(
         { message: 'Something went wrong' },
@@ -152,7 +155,7 @@ export class UserService implements IService<UserEntity> {
     const user = await this.findByName(name);
 
     if (!user) {
-      throw new NotFoundException(`Username ${name} not found`);
+      throw new NotFoundException({ message: `Username ${name} not found` });
     }
 
     const authMails = await this.authMailRepository.find({
@@ -216,7 +219,7 @@ export class UserService implements IService<UserEntity> {
     const user = await this.findById(id);
 
     if (!user) {
-      throw new NotFoundException(`Username ${name} not found`);
+      throw new NotFoundException({ message: `User Id ${id} not found` });
     }
 
     const authMails = await this.authMailRepository.find({

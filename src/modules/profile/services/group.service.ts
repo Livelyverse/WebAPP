@@ -74,7 +74,7 @@ export class GroupService implements IService<GroupEntity> {
     } catch (error) {
       if (error?.code === PostgresErrorCode.UniqueViolation) {
         throw new HttpException(
-          'Group name already exists',
+          { message: 'Group name already exists' },
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -100,7 +100,9 @@ export class GroupService implements IService<GroupEntity> {
 
     if (userCount > 0) {
       this.logger.warn(`delete group ${name} failed, group has a users`);
-      throw new UnprocessableEntityException(`Group ${name} could not delete`);
+      throw new UnprocessableEntityException({
+        message: `Group ${name} could not delete`,
+      });
     }
 
     let deleteResult;
@@ -133,7 +135,9 @@ export class GroupService implements IService<GroupEntity> {
 
     if (userCount > 0) {
       this.logger.warn(`deleteByName group ${id} failed, group has a users`);
-      throw new UnprocessableEntityException(`Group ${id} could not delete`);
+      throw new UnprocessableEntityException({
+        message: `Group ${id} could not delete`,
+      });
     }
 
     let deleteResult;

@@ -44,7 +44,7 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true,
     maxAge: 1728000,
-    preflightContinue: true,
+    preflightContinue: false,
     optionsSuccessStatus: 204,
   });
   await app.listen(
