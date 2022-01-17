@@ -48,6 +48,7 @@ export class GroupController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() groupDto: GroupCreateDto): Promise<string> {
     const dto = GroupCreateDto.from(groupDto);
@@ -67,6 +68,7 @@ export class GroupController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() groupDto: GroupUpdateDto): Promise<GroupViewDto> {
     const dto = GroupUpdateDto.from(groupDto);
@@ -88,6 +90,7 @@ export class GroupController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async getGroup(@Param() params): Promise<GroupViewDto> {
     let group: GroupEntity;
@@ -130,6 +133,7 @@ export class GroupController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({
     status: 422,
     description: 'The requested record could not deleted.',

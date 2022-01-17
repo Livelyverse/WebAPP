@@ -25,7 +25,7 @@ import { RoleService } from '../services/role.service';
 import { RoleCreateDto } from '../domain/dto/roleCreate.dto';
 import { RoleUpdateDto } from '../domain/dto/roleUpdate.dto';
 import { RoleViewDto } from '../domain/dto/roleView.dto';
-import { RoleEntity } from '../domain/entity/role.entity';
+import { RoleEntity } from '../domain/entity';
 import { isUUID } from './uuid.validate';
 import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
 import RoleGuard from '../../authentication/domain/gurads/role.guard';
@@ -45,9 +45,10 @@ export class RoleController {
     status: 200,
     description: 'The record has been successfully created.',
   })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() roleDto: RoleCreateDto): Promise<string> {
     const dto = RoleCreateDto.from(roleDto);
@@ -67,6 +68,7 @@ export class RoleController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() roleDto: RoleUpdateDto): Promise<RoleViewDto> {
     const dto = RoleUpdateDto.from(roleDto);
@@ -87,6 +89,7 @@ export class RoleController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async getRole(@Param() params): Promise<RoleViewDto> {
     let role: RoleEntity;
@@ -127,6 +130,7 @@ export class RoleController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({
     status: 422,
     description: 'The requested record could not deleted.',
