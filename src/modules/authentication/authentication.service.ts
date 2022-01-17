@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import * as crypto from "crypto";
 import {
   BadRequestException,
   ForbiddenException,
@@ -7,31 +7,29 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { Algorithm } from 'jsonwebtoken';
-import { JwtService } from '@nestjs/jwt';
-import * as fs from 'fs';
-import { Response } from 'express';
-import { UserService } from '../profile/services/user.service';
-import { UserEntity } from '../profile/domain/entity';
-import { ConfigService } from '@nestjs/config';
-import { join } from 'path';
-import { InjectRepository } from '@nestjs/typeorm';
-import { TokenEntity } from './domain/entity';
-import { MoreThan, Repository } from 'typeorm';
-import { RefreshDto } from './domain/dto/refresh.dto';
-import { AuthMailEntity } from './domain/entity';
-import { GroupService } from '../profile/services/group.service';
-import * as argon2 from 'argon2';
-import { PasswordDto } from './domain/dto/password.dto';
-import { validate } from 'class-validator';
-import { LoginDto } from './domain/dto/login.dto';
-import { UserCreateDto } from '../profile/domain/dto/userCreate.dto';
-import { SignupDto } from './domain/dto/signup.dto';
-import { MailService } from '../mail/mail.service';
-import { ResendAuthMailDto } from './domain/dto/verification.dto';
+  UnauthorizedException
+} from "@nestjs/common";
+import { Algorithm } from "jsonwebtoken";
+import { JwtService } from "@nestjs/jwt";
+import * as fs from "fs";
+import { Response } from "express";
+import { UserService } from "../profile/services/user.service";
+import { UserEntity } from "../profile/domain/entity";
+import { ConfigService } from "@nestjs/config";
+import { join } from "path";
+import { InjectRepository } from "@nestjs/typeorm";
+import { AuthMailEntity, TokenEntity } from "./domain/entity";
+import { MoreThan, Repository } from "typeorm";
+import { RefreshDto } from "./domain/dto/refresh.dto";
+import { GroupService } from "../profile/services/group.service";
+import * as argon2 from "argon2";
+import { PasswordDto } from "./domain/dto/password.dto";
+import { validate } from "class-validator";
+import { LoginDto } from "./domain/dto/login.dto";
+import { UserCreateDto } from "../profile/domain/dto/userCreate.dto";
+import { SignupDto } from "./domain/dto/signup.dto";
+import { MailService } from "../mail/mail.service";
+import { ResendAuthMailDto } from "./domain/dto/verification.dto";
 
 export interface TokenPayload {
   iss: string;
@@ -470,7 +468,7 @@ export class AuthenticationService {
 
   public async accessTokenValidation(
     payload: TokenPayload,
-  ): Promise<UserEntity | null> {
+  ): Promise<UserEntity | HttpStatus> {
     if (!payload.sub) {
       this.logger.log(`payload.sub invalid, payload: ${payload}`);
       throw new UnauthorizedException({ message: 'Illegal Auth Token' });
@@ -489,9 +487,12 @@ export class AuthenticationService {
         `tokenRepository.findOne failed, userId: ${payload.sub}`,
         error,
       );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
+
+      return HttpStatus.INTERNAL_SERVER_ERROR;
+    }
+
+    if (payload.exp * 1000 <= Date.now()) {
+      return HttpStatus.EXPECTATION_FAILED;
     }
 
     if (
@@ -499,13 +500,12 @@ export class AuthenticationService {
       !tokenEntity.isRevoked &&
       tokenEntity.accessTokenId === payload.jti &&
       tokenEntity.user.isEmailConfirmed &&
-      tokenEntity.user.isActive &&
-      payload.exp * 1000 > Date.now()
+      tokenEntity.user.isActive
     ) {
       return tokenEntity.user;
     }
 
-    return null;
+    return HttpStatus.UNAUTHORIZED;
   }
 
   public async authTokenValidation(
