@@ -51,12 +51,6 @@ export class RoleController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() roleDto: RoleCreateDto): Promise<string> {
     const dto = RoleCreateDto.from(roleDto);
-    if (!dto) {
-      this.logger.log(
-        `request create role invalid, ${JSON.stringify(roleDto)}`,
-      );
-      throw new BadRequestException('Invalid Input Date');
-    }
     const role = await this.roleService.create(dto);
     return role.id;
   }
@@ -76,12 +70,6 @@ export class RoleController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() roleDto: RoleUpdateDto): Promise<RoleViewDto> {
     const dto = RoleUpdateDto.from(roleDto);
-    if (!dto) {
-      this.logger.log(
-        `request update role invalid, ${JSON.stringify(roleDto)}`,
-      );
-      throw new BadRequestException('Invalid Input Date');
-    }
     const role = await this.roleService.update(dto);
     return RoleViewDto.from(role);
   }

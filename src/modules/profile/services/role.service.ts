@@ -49,7 +49,7 @@ export class RoleService implements IService<RoleEntity> {
     } catch (error) {
       if (error?.code === PostgresErrorCode.UniqueViolation) {
         throw new HttpException(
-          'Role name already exists',
+          { message: 'Role name already exists' },
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -75,7 +75,9 @@ export class RoleService implements IService<RoleEntity> {
 
     if (groupCount > 0) {
       this.logger.warn(`deleteByName role ${name} failed, role has a groups`);
-      throw new UnprocessableEntityException(`Role ${name} could not delete`);
+      throw new UnprocessableEntityException({
+        message: `Role ${name} could not delete`,
+      });
     }
 
     let deleteResult;
@@ -108,7 +110,9 @@ export class RoleService implements IService<RoleEntity> {
 
     if (groupCount > 0) {
       this.logger.warn(`delete role ${id} failed, role has a groups`);
-      throw new UnprocessableEntityException(`Role ${id} could not delete`);
+      throw new UnprocessableEntityException({
+        message: `Role ${id} could not delete`,
+      });
     }
 
     let deleteResult;
