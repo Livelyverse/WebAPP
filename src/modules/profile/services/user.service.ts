@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserCreateDto, UserUpdateDto } from '../domain/dto/index.dto';
@@ -8,12 +14,20 @@ import { UserEntity } from '../domain/entity';
 import { GroupService } from './group.service';
 import * as argon2 from 'argon2';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
+import {
+  AuthMailEntity,
+  TokenEntity,
+} from '../../authentication/domain/entity';
 
 @Injectable()
 export class UserService implements IService<UserEntity> {
   private readonly logger = new Logger(UserService.name);
 
   constructor(
+    @InjectRepository(TokenEntity)
+    private readonly tokenRepository: Repository<TokenEntity>,
+    @InjectRepository(AuthMailEntity)
+    private readonly authMailRepository: Repository<AuthMailEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     private readonly groupService: GroupService,
@@ -127,10 +141,138 @@ export class UserService implements IService<UserEntity> {
 
     if (!deleteResult.affected) {
       throw new HttpException(
-        { message: `Role ${id} Not Found` },
+        { message: `User Id ${id} Not Found` },
         HttpStatus.NOT_FOUND,
       );
     }
+  }
+
+  async removeByName(name: string): Promise<void> {
+    // let deleteResult;
+    const user = await this.findByName(name);
+
+    if (!user) {
+      throw new NotFoundException(`Username ${name} not found`);
+    }
+
+    const authMails = await this.authMailRepository.find({
+      relations: ['user'],
+      where: {
+        user: { id: user.id },
+      },
+    });
+
+    if (authMails && authMails.length > 0) {
+      for (let i = 0; i < authMails.length; i++) {
+        try {
+          await this.authMailRepository.remove(authMails[i]);
+        } catch (error) {
+          this.logger.error(
+            `authMailRepository.remove failed: authMail id ${authMails[i].id}`,
+            error,
+          );
+        }
+      }
+    }
+
+    const token = await this.tokenRepository.findOne({
+      relations: ['user'],
+      where: {
+        user: { id: user.id },
+      },
+    });
+
+    if (token) {
+      try {
+        await this.tokenRepository.remove(token);
+      } catch (error) {
+        this.logger.error(
+          `tokenRepository.remove failed: token id ${token.id}`,
+          error,
+        );
+      }
+    }
+
+    try {
+      await this.userRepository.remove(user);
+    } catch (err) {
+      this.logger.error(`userRepository.remove failed: ${name}`, err);
+      throw new HttpException(
+        { message: 'Internal Server Error' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    // if (!deleteResult.affected) {
+    //   throw new HttpException(
+    //     { message: `Username ${name} Not Found` },
+    //     HttpStatus.NOT_FOUND,
+    //   );
+    // }
+  }
+
+  async removeById(id: string): Promise<void> {
+    // let deleteResult;
+    const user = await this.findById(id);
+
+    if (!user) {
+      throw new NotFoundException(`Username ${name} not found`);
+    }
+
+    const authMails = await this.authMailRepository.find({
+      relations: ['user'],
+      where: {
+        user: { id: user.id },
+      },
+    });
+
+    if (authMails && authMails.length > 0) {
+      for (let i = 0; i < authMails.length; i++) {
+        try {
+          await this.authMailRepository.remove(authMails[i]);
+        } catch (error) {
+          this.logger.error(
+            `authMailRepository.remove failed: authMail id ${authMails[i].id}`,
+            error,
+          );
+        }
+      }
+    }
+
+    const token = await this.tokenRepository.findOne({
+      relations: ['user'],
+      where: {
+        user: { id: user.id },
+      },
+    });
+
+    if (token) {
+      try {
+        await this.tokenRepository.remove(token);
+      } catch (error) {
+        this.logger.error(
+          `tokenRepository.remove failed: token id ${token.id}`,
+          error,
+        );
+      }
+    }
+
+    try {
+      await this.userRepository.remove(user);
+    } catch (err) {
+      this.logger.error(`userRepository.remove failed: ${id}`, err);
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    // if (!deleteResult.affected) {
+    //   throw new HttpException(
+    //     { message: `User Id ${id} Not Found` },
+    //     HttpStatus.NOT_FOUND,
+    //   );
+    // }
   }
 
   async findAll(): Promise<Array<UserEntity> | null> {
