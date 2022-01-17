@@ -1,7 +1,14 @@
 import * as passport from 'passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthenticationService } from '../../authentication.service';
+import { UserEntity } from '../../../profile/domain/entity';
 
 @Injectable()
 export default class JwtStrategy extends Strategy {
@@ -25,13 +32,16 @@ export default class JwtStrategy extends Strategy {
   }
 
   public async verify(req, payload, done) {
-    const user = await this.authenticationService.accessTokenValidation(
-      payload,
-    );
-    if (!user) {
-      return done(new UnauthorizedException(), null, null);
+    const obj = await this.authenticationService.accessTokenValidation(payload);
+
+    if (obj instanceof UserEntity) {
+      return done(null, obj, payload);
     } else {
-      return done(null, user, payload);
+      return done(
+        new HttpException({ message: '' }, obj as HttpStatus),
+        null,
+        null,
+      );
     }
   }
 }
