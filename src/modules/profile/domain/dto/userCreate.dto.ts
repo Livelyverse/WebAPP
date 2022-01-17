@@ -10,6 +10,20 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UserCreateDto {
+  public static from(dto: UserCreateDto): UserCreateDto | null {
+    if (dto) {
+      const createDto = new UserCreateDto();
+      createDto.username = dto?.username;
+      createDto.password = dto?.password;
+      createDto.email = dto?.email;
+      createDto.group = dto?.group;
+      createDto.firstname = dto?.firstname;
+      createDto.lastname = dto?.lastname;
+      return createDto;
+    }
+    return null;
+  }
+
   @IsNotEmpty({ message: 'Username must not empty' })
   @IsDefined({ message: 'Username must be defined' })
   @IsString({ message: 'Username must be string' })
