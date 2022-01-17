@@ -51,12 +51,6 @@ export class GroupController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() groupDto: GroupCreateDto): Promise<string> {
     const dto = GroupCreateDto.from(groupDto);
-    if (!dto) {
-      this.logger.log(
-        `request create group invalid: ${JSON.stringify(groupDto)}`,
-      );
-      throw new BadRequestException('Invalid Input Date');
-    }
     const group = await this.groupService.create(dto);
     return group.id;
   }
@@ -76,12 +70,6 @@ export class GroupController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() groupDto: GroupUpdateDto): Promise<GroupViewDto> {
     const dto = GroupUpdateDto.from(groupDto);
-    if (!dto) {
-      this.logger.log(
-        `request update group invalid, ${JSON.stringify(groupDto)}`,
-      );
-      throw new BadRequestException('Invalid Input Date');
-    }
     const group = await this.groupService.update(dto);
     return GroupViewDto.from(group);
   }

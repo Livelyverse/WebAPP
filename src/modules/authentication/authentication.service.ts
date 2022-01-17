@@ -96,7 +96,7 @@ export class AuthenticationService {
       this.logger.log(
         `changeUserPassword Data Invalid, username: ${dto.username}`,
       );
-      throw new BadRequestException('Request Data Invalid');
+      throw new BadRequestException({ message: 'Request Data Invalid' });
     }
 
     const errors = await validate(dto, {
@@ -128,7 +128,9 @@ export class AuthenticationService {
         `changeUserPassword tokenRepository.findOne failed, userId: ${tokenPayload.sub}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     const user = tokenEntity.user;
@@ -136,14 +138,14 @@ export class AuthenticationService {
       this.logger.log(
         `changeUserPassword failed, user inactivated, username: ${user.username}`,
       );
-      throw new ForbiddenException();
+      throw new ForbiddenException({ message: '' });
     }
 
     if (user.username !== dto.username) {
       this.logger.warn(
         `requested username doesn't match with user auth token, token user: ${user.username}, dto: ${dto.username}`,
       );
-      throw new ForbiddenException();
+      throw new ForbiddenException({ message: '' });
     }
 
     let isPassVerify;
@@ -151,14 +153,16 @@ export class AuthenticationService {
       isPassVerify = await argon2.verify(user.password, dto.oldPassword);
     } catch (err) {
       this.logger.error(`argon2.hash failed, username: ${user.username}`, err);
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     if (!isPassVerify) {
       this.logger.log(
         `user password verification failed, username: ${user.username}`,
       );
-      throw new ForbiddenException('Username Or Password Invalid');
+      throw new ForbiddenException({ message: 'Username Or Password Invalid' });
     }
 
     let hashPassword;
@@ -183,7 +187,9 @@ export class AuthenticationService {
         `tokenRepository.save failed, tokenEntity Id: ${tokenEntity.id}, userId: ${user.id}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
   }
 
@@ -195,7 +201,9 @@ export class AuthenticationService {
       this.logger.log(
         `userAuthentication Data Invalid, username: ${dto.username}`,
       );
-      return res.status(HttpStatus.BAD_REQUEST).send('Request Data Invalid');
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .send({ message: 'Request Data Invalid' });
     }
 
     const errors = await validate(dto, {
@@ -209,7 +217,7 @@ export class AuthenticationService {
 
       return res
         .status(HttpStatus.BAD_REQUEST)
-        .send(`Input Data Invalid, ${JSON.stringify(errors)}`);
+        .send({ message: `Input Data Invalid, ${JSON.stringify(errors)}` });
     }
 
     const user = await this.userService.findByName(dto.username);
@@ -218,7 +226,7 @@ export class AuthenticationService {
       this.logger.log(`user not found, username: ${dto.username}`);
       return res
         .status(HttpStatus.NOT_FOUND)
-        .send('Username Or Password Invalid');
+        .send({ message: 'Username Or Password Invalid' });
     }
 
     if (!user.isActive) {
@@ -227,7 +235,7 @@ export class AuthenticationService {
       );
       return res
         .status(HttpStatus.NOT_FOUND)
-        .send('Username Or Password Invalid');
+        .send({ message: 'Username Or Password Invalid' });
     }
 
     let isPassVerify;
@@ -237,14 +245,16 @@ export class AuthenticationService {
       this.logger.error(`argon2.hash failed, username: ${dto.username}`, err);
       return res
         .status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .send('Something went wrong');
+        .send({ message: 'Something went wrong' });
     }
 
     if (!isPassVerify) {
       this.logger.log(
         `user password verification failed, username: ${dto.username}`,
       );
-      res.status(HttpStatus.NOT_FOUND).send('Username Or Password Invalid');
+      res
+        .status(HttpStatus.NOT_FOUND)
+        .send({ message: 'Username Or Password Invalid' });
     }
 
     if (user.isEmailConfirmed) {
@@ -290,7 +300,7 @@ export class AuthenticationService {
     token: string,
   ): Promise<void> {
     if (!token) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     const authMailToken = await this.authTokenValidation(token, false);
@@ -302,30 +312,32 @@ export class AuthenticationService {
         `authMailRepository.findOne of resendMailVerification failed, id: ${authMailToken.jti}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     if (!authMail) {
       this.logger.warn(
         `authMail entity of token invalid, authMail id: ${authMailToken.jti}`,
       );
-      throw new ForbiddenException();
+      throw new ForbiddenException({ message: '' });
     }
 
     if (!dto || !dto.username) {
-      throw new BadRequestException('Input Data Invalid');
+      throw new BadRequestException({ message: 'Input Data Invalid' });
     }
 
     const user = authMail.user;
     if (dto.username !== user.username) {
-      throw new ForbiddenException();
+      throw new ForbiddenException({ message: '' });
     }
 
     if (user.isEmailConfirmed) {
       this.logger.warn(
         `user try again to resend mail verification, userId: ${user.id}`,
       );
-      throw new ForbiddenException();
+      throw new ForbiddenException({ message: '' });
     }
 
     const authMailEntity = await this.createOrGetAuthMailEntity(user);
@@ -370,14 +382,18 @@ export class AuthenticationService {
         `tokenRepository.findOne failed, userId: ${userId}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     if (!tokenEntity) {
       this.logger.error(
         `user token for revokeAuthToken not found, userId: ${userId}`,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     tokenEntity.isRevoked = true;
@@ -385,7 +401,9 @@ export class AuthenticationService {
       return this.tokenRepository.save(tokenEntity);
     } catch (error) {
       this.logger.error(`user token not found, userId: ${userId}`, error);
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
   }
 
@@ -394,7 +412,7 @@ export class AuthenticationService {
     verifyCode: string,
   ): Promise<AuthMailEntity> {
     if (!authMailToken.jti || authMailToken.exp * 1000 <= Date.now()) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     let authMail;
@@ -405,19 +423,21 @@ export class AuthenticationService {
         `authMailRepository.findOne failed, id: ${authMailToken.jti}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     if (authMail.verificationId !== verifyCode) {
       this.logger.warn(
         `verify code invalid, userId: ${authMailToken.sub}, code: ${verifyCode}`,
       );
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     if (!authMail.user.isActive) {
       this.logger.warn(`user inactivated, userId: ${authMailToken.sub}`);
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     let memberGroup;
@@ -428,7 +448,9 @@ export class AuthenticationService {
         `groupService.findByName for MEMBER group failed, userId: ${authMail.user.id}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     try {
@@ -440,7 +462,9 @@ export class AuthenticationService {
         `mailVerificationRepository.save failed, userId: ${authMail.user.id}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
   }
 
@@ -449,7 +473,7 @@ export class AuthenticationService {
   ): Promise<UserEntity | null> {
     if (!payload.sub) {
       this.logger.log(`payload.sub invalid, payload: ${payload}`);
-      throw new UnauthorizedException('Illegal Auth Token');
+      throw new UnauthorizedException({ message: 'Illegal Auth Token' });
     }
 
     let tokenEntity;
@@ -465,7 +489,9 @@ export class AuthenticationService {
         `tokenRepository.findOne failed, userId: ${payload.sub}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     if (
@@ -501,7 +527,7 @@ export class AuthenticationService {
       // if (e instanceof TokenExpiredError) {
       //   throw new UnauthorizedException('Illegal Auth Token');
       // } else {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
       // }
     }
   }
@@ -516,7 +542,7 @@ export class AuthenticationService {
       this.logger.log(
         `tokenEntity not found, payload: ${JSON.stringify(payload)}`,
       );
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     if (
@@ -529,7 +555,7 @@ export class AuthenticationService {
           tokenEntity.user.id
         }, payload: ${JSON.stringify(payload)}`,
       );
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     const user = tokenEntity.user;
@@ -537,7 +563,7 @@ export class AuthenticationService {
       this.logger.log(
         `user not found or deactivated or not email confirmed, userId: ${payload.sub}`,
       );
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     return tokenEntity;
@@ -563,7 +589,9 @@ export class AuthenticationService {
       return await this.jwt.signAsync(payload, option);
     } catch (error) {
       this.logger.error(`jwt.signAsync failed, payload: ${payload}`, error);
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
   }
 
@@ -590,7 +618,9 @@ export class AuthenticationService {
         `accessToken jwt.signAsync failed, payload: ${payload}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
   }
 
@@ -621,7 +651,9 @@ export class AuthenticationService {
         `refreshToken jwt.signAsync failed, payload: ${payload}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
     return { refreshToken, tokenEntity };
   }
@@ -640,7 +672,9 @@ export class AuthenticationService {
         `tokenRepository.findOne failed, userId: ${user.id}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     if (!tokenEntity) {
@@ -666,7 +700,9 @@ export class AuthenticationService {
         `tokenRepository.save of createTokenEntity failed, token userId: ${tokenEntity.user.id}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
   }
 
@@ -685,7 +721,9 @@ export class AuthenticationService {
         `tokenRepository.save for createAccessTokenFromRefreshToken failed, token userId: ${tokenEntity.user.id}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     return await this.generateAccessToken(tokenEntity.user, tokenEntity);
@@ -710,7 +748,9 @@ export class AuthenticationService {
           `authMailRepository.findOne failed, userId: ${userEntity.id}`,
           error,
         );
-        throw new InternalServerErrorException('Something went wrong');
+        throw new InternalServerErrorException({
+          message: 'Something went wrong',
+        });
       }
 
       if (authMail) {
@@ -743,7 +783,9 @@ export class AuthenticationService {
         `authMailRepository.save failed, userId: ${authMail.user.id}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
   }
 
@@ -754,7 +796,7 @@ export class AuthenticationService {
     const userId = payload.sub;
     if (!refreshTokenId || !userId) {
       this.logger.log(`payload invalid, payload: ${payload}`);
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({ message: '' });
     }
 
     let tokenEntity;
@@ -771,7 +813,9 @@ export class AuthenticationService {
         `tokenRepository.findOne failed, refreshTokenId: ${refreshTokenId}, userId; ${userId}`,
         error,
       );
-      throw new InternalServerErrorException('Something went wrong');
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
     }
 
     return tokenEntity;

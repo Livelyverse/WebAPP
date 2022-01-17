@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpException,
   HttpStatus,
+  InternalServerErrorException,
   Logger,
   Post,
   UseGuards,
@@ -34,13 +35,6 @@ export class ContactController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async sendMail(@Body() contactDto: ContactDto): Promise<void> {
     const dto = ContactDto.from(contactDto);
-    if (!dto) {
-      this.logger.log(
-        `request sendMail contact up invalid, ${JSON.stringify(contactDto)}`
-      );
-      throw new BadRequestException('Invalid Input Date');
-    }
-
     const errors = await validate(dto, {
       validationError: { target: false },
       forbidUnknownValues: false,
@@ -70,6 +64,9 @@ export class ContactController {
         `sendContactUs done, name: ${dto.name}, from: ${dto.email}`,
         error,
       );
+      throw new InternalServerErrorException({
+        message: 'Something was wrong',
+      });
     }
 
     this.logger.log(
