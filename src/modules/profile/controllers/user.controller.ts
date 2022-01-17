@@ -7,6 +7,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -24,7 +25,7 @@ import { UserService } from '../services/user.service';
 import { UserCreateDto } from '../domain/dto/userCreate.dto';
 import { UserUpdateDto } from '../domain/dto/userUpdate.dto';
 import { UserViewDto } from '../domain/dto/userView.dto';
-import { UserEntity } from '../domain/entity/user.entity';
+import { UserEntity } from '../domain/entity';
 import { isUUID } from './uuid.validate';
 import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
 import RoleGuard from '../../authentication/domain/gurads/role.guard';
@@ -49,11 +50,14 @@ export class UserController {
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() userDto: UserCreateDto): Promise<string> {
-    if (userDto instanceof Array) {
-      this.logger.log(`create user failed, request: ${userDto.username}`);
-      throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
+    const dto = UserCreateDto.from(userDto);
+    if (!dto) {
+      this.logger.log(
+        `request create user invalid, ${JSON.stringify(userDto)}`,
+      );
+      throw new BadRequestException('Invalid Input Date');
     }
-    const user = await this.userService.create(userDto);
+    const user = await this.userService.create(dto);
     return user.id;
   }
 
@@ -69,13 +73,14 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() userDto: UserUpdateDto): Promise<UserViewDto> {
-    if (userDto instanceof Array) {
+    const dto = UserUpdateDto.from(userDto);
+    if (!dto) {
       this.logger.log(
-        `update user failed, request: ${JSON.stringify(userDto)}`,
+        `request update user invalid, ${JSON.stringify(userDto)}`,
       );
-      throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Invalid Input Date');
     }
-    const user = await this.userService.update(userDto);
+    const user = await this.userService.update(dto);
     return UserViewDto.from(user);
   }
 
@@ -139,6 +144,37 @@ export class UserController {
       return await this.userService.delete(params.param);
     } else if (typeof params.param === 'string') {
       return await this.userService.deleteByName(params.param);
+    } else {
+      throw new HttpException(
+        { message: 'Input Data invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Post('/remove/:param')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
+  @ApiParam({
+    name: 'param',
+    required: true,
+    description: 'either an uuid for the userId or a string for the username',
+    schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The record has been successfully removed.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  async remove(@Param() params) {
+    if (isUUID(params.param)) {
+      return await this.userService.removeById(params.param);
+    } else if (typeof params.param === 'string') {
+      return await this.userService.removeByName(params.param);
     } else {
       throw new HttpException(
         { message: 'Input Data invalid' },

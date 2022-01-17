@@ -7,6 +7,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -49,13 +50,14 @@ export class RoleController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() roleDto: RoleCreateDto): Promise<string> {
-    if (roleDto instanceof Array) {
+    const dto = RoleCreateDto.from(roleDto);
+    if (!dto) {
       this.logger.log(
-        `create role failed, request: ${JSON.stringify(roleDto)}`,
+        `request create role invalid, ${JSON.stringify(roleDto)}`,
       );
-      throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Invalid Input Date');
     }
-    const role = await this.roleService.create(roleDto);
+    const role = await this.roleService.create(dto);
     return role.id;
   }
 
@@ -73,13 +75,14 @@ export class RoleController {
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() roleDto: RoleUpdateDto): Promise<RoleViewDto> {
-    if (roleDto instanceof Array) {
+    const dto = RoleUpdateDto.from(roleDto);
+    if (!dto) {
       this.logger.log(
-        `update role failed, request: ${JSON.stringify(roleDto)}`,
+        `request update role invalid, ${JSON.stringify(roleDto)}`,
       );
-      throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Invalid Input Date');
     }
-    const role = await this.roleService.update(roleDto);
+    const role = await this.roleService.update(dto);
     return RoleViewDto.from(role);
   }
 
@@ -136,7 +139,10 @@ export class RoleController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
-  @ApiResponse({ status: 422, description: 'The requested record could not deleted.' })
+  @ApiResponse({
+    status: 422,
+    description: 'The requested record could not deleted.',
+  })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {
     if (isUUID(params.param)) {

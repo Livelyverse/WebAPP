@@ -9,10 +9,17 @@ import { UserService } from './services/user.service';
 import { GroupEntity, RoleEntity, UserEntity } from './domain/entity';
 import { ContactController } from './controllers/contact.controller';
 import { MailModule } from '../mail/mail.module';
+import { AuthMailEntity, TokenEntity } from '../authentication/domain/entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RoleEntity, GroupEntity, UserEntity]),
+    TypeOrmModule.forFeature([
+      RoleEntity,
+      GroupEntity,
+      UserEntity,
+      AuthMailEntity,
+      TokenEntity,
+    ]),
     MailModule,
   ],
   controllers: [

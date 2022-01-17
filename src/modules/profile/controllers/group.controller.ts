@@ -7,6 +7,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -49,13 +50,14 @@ export class GroupController {
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async create(@Body() groupDto: GroupCreateDto): Promise<string> {
-    if (groupDto instanceof Array) {
+    const dto = GroupCreateDto.from(groupDto);
+    if (!dto) {
       this.logger.log(
-        `create group failed, request ${JSON.stringify(groupDto)} invalid`,
+        `request create group invalid: ${JSON.stringify(groupDto)}`,
       );
-      throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Invalid Input Date');
     }
-    const group = await this.groupService.create(groupDto);
+    const group = await this.groupService.create(dto);
     return group.id;
   }
 
@@ -73,14 +75,15 @@ export class GroupController {
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() groupDto: GroupUpdateDto): Promise<GroupViewDto> {
-    if (groupDto instanceof Array) {
+    const dto = GroupUpdateDto.from(groupDto);
+    if (!dto) {
       this.logger.log(
-        `update group failed, request ${JSON.stringify(groupDto)} invalid`,
+        `request update group invalid, ${JSON.stringify(groupDto)}`,
       );
-      throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Invalid Input Date');
     }
-    const role = await this.groupService.update(groupDto);
-    return GroupViewDto.from(role);
+    const group = await this.groupService.update(dto);
+    return GroupViewDto.from(group);
   }
 
   @Get('/get/:param')
@@ -139,7 +142,10 @@ export class GroupController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
-  @ApiResponse({ status: 422, description: 'The requested record could not deleted.' })
+  @ApiResponse({
+    status: 422,
+    description: 'The requested record could not deleted.',
+  })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {
     if (isUUID(params.param)) {
