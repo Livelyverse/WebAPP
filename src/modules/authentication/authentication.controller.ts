@@ -50,9 +50,9 @@ export class AuthenticationController {
   public async login(
     @Body() loginDto: LoginDto,
     @Res() res: Response,
-  ): Promise<Response> {
+  ): Promise<void> {
     const dto = LoginDto.from(loginDto);
-    return await this.authenticationService.userAuthentication(dto, res);
+    await this.authenticationService.userAuthentication(dto, res);
   }
 
   @Post('/changepassword')
@@ -62,6 +62,7 @@ export class AuthenticationController {
   @ApiResponse({ status: 400, description: 'Request Invalid.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async changePassword(
     @Body() passwordDto: PasswordDto,
@@ -96,6 +97,7 @@ export class AuthenticationController {
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'User sign out successful.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async signout(@Req() request: any): Promise<void> {
     await this.authenticationService.revokeAuthToken(request.user.id);

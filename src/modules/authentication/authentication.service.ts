@@ -1,4 +1,4 @@
-import * as crypto from "crypto";
+import * as crypto from 'crypto';
 import {
   BadRequestException,
   ForbiddenException,
@@ -7,29 +7,29 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
-  UnauthorizedException
-} from "@nestjs/common";
-import { Algorithm } from "jsonwebtoken";
-import { JwtService } from "@nestjs/jwt";
-import * as fs from "fs";
-import { Response } from "express";
-import { UserService } from "../profile/services/user.service";
-import { UserEntity } from "../profile/domain/entity";
-import { ConfigService } from "@nestjs/config";
-import { join } from "path";
-import { InjectRepository } from "@nestjs/typeorm";
-import { AuthMailEntity, TokenEntity } from "./domain/entity";
-import { MoreThan, Repository } from "typeorm";
-import { RefreshDto } from "./domain/dto/refresh.dto";
-import { GroupService } from "../profile/services/group.service";
-import * as argon2 from "argon2";
-import { PasswordDto } from "./domain/dto/password.dto";
-import { validate } from "class-validator";
-import { LoginDto } from "./domain/dto/login.dto";
-import { UserCreateDto } from "../profile/domain/dto/userCreate.dto";
-import { SignupDto } from "./domain/dto/signup.dto";
-import { MailService } from "../mail/mail.service";
-import { ResendAuthMailDto } from "./domain/dto/verification.dto";
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Algorithm } from 'jsonwebtoken';
+import { JwtService } from '@nestjs/jwt';
+import * as fs from 'fs';
+import { Response } from 'express';
+import { UserService } from '../profile/services/user.service';
+import { UserEntity } from '../profile/domain/entity';
+import { ConfigService } from '@nestjs/config';
+import { join } from 'path';
+import { InjectRepository } from '@nestjs/typeorm';
+import { AuthMailEntity, TokenEntity } from './domain/entity';
+import { MoreThan, Repository } from 'typeorm';
+import { RefreshDto } from './domain/dto/refresh.dto';
+import { GroupService } from '../profile/services/group.service';
+import * as argon2 from 'argon2';
+import { PasswordDto } from './domain/dto/password.dto';
+import { validate } from 'class-validator';
+import { LoginDto } from './domain/dto/login.dto';
+import { UserCreateDto } from '../profile/domain/dto/userCreate.dto';
+import { SignupDto } from './domain/dto/signup.dto';
+import { MailService } from '../mail/mail.service';
+import { ResendAuthMailDto } from './domain/dto/verification.dto';
 
 export interface TokenPayload {
   iss: string;
@@ -191,17 +191,15 @@ export class AuthenticationService {
     }
   }
 
-  public async userAuthentication(
-    dto: LoginDto,
-    res: Response,
-  ): Promise<Response> {
+  public async userAuthentication(dto: LoginDto, res: Response): Promise<void> {
     if (dto instanceof Array) {
       this.logger.log(
         `userAuthentication Data Invalid, username: ${dto.username}`,
       );
-      return res
+      res
         .status(HttpStatus.BAD_REQUEST)
         .send({ message: 'Request Data Invalid' });
+      return;
     }
 
     const errors = await validate(dto, {
@@ -213,27 +211,30 @@ export class AuthenticationService {
         `userAuthentication data validation failed, username: ${dto.username}, errors: ${errors}`,
       );
 
-      return res
+      res
         .status(HttpStatus.BAD_REQUEST)
         .send({ message: `Input Data Invalid`, errors });
+      return;
     }
 
     const user = await this.userService.findByName(dto.username);
 
     if (!user) {
       this.logger.log(`user not found, username: ${dto.username}`);
-      return res
+      res
         .status(HttpStatus.NOT_FOUND)
         .send({ message: 'Username Or Password Invalid' });
+      return;
     }
 
     if (!user.isActive) {
       this.logger.log(
         `userAuthentication failed, user inactivated, username: ${dto.username}`,
       );
-      return res
+      res
         .status(HttpStatus.NOT_FOUND)
         .send({ message: 'Username Or Password Invalid' });
+      return;
     }
 
     let isPassVerify;
@@ -241,9 +242,10 @@ export class AuthenticationService {
       isPassVerify = await argon2.verify(user.password, dto.password);
     } catch (err) {
       this.logger.error(`argon2.hash failed, username: ${dto.username}`, err);
-      return res
+      res
         .status(HttpStatus.INTERNAL_SERVER_ERROR)
         .send({ message: 'Something went wrong' });
+      return;
     }
 
     if (!isPassVerify) {
@@ -253,6 +255,7 @@ export class AuthenticationService {
       res
         .status(HttpStatus.NOT_FOUND)
         .send({ message: 'Username Or Password Invalid' });
+      return;
     }
 
     if (user.isEmailConfirmed) {
@@ -261,10 +264,11 @@ export class AuthenticationService {
       );
       const accessToken = await this.generateAccessToken(user, tokenEntity);
 
-      return res.status(HttpStatus.OK).send({
+      res.status(HttpStatus.OK).send({
         access_token: accessToken,
         refresh_token: refreshToken,
       });
+      return;
     }
 
     const authMailEntity = await this.createOrGetAuthMailEntity(user);
@@ -272,7 +276,7 @@ export class AuthenticationService {
       user,
       authMailEntity,
     );
-    return res.status(201).send({ access_token: authMailToken });
+    res.status(201).send({ access_token: authMailToken });
   }
 
   public async userSignUp(dto: SignupDto): Promise<string> {
