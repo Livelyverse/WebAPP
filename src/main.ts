@@ -16,16 +16,13 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api', app, document);
 
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept');
-    next();
-  });
-
   app.enableCors({
     allowedHeaders: '*',
     origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    credentials: true,
+    preflightContinue: true,
+    optionsSuccessStatus: 204,
   });
   await app.listen(
     config.get<number>('http.port'),
