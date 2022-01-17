@@ -1,5 +1,6 @@
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
+  BadRequestException,
   Body,
   Controller,
   HttpCode,
@@ -15,6 +16,7 @@ import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard'
 import { GroupCreateDto } from '../domain/dto/groupCreate.dto';
 import { ContactDto } from '../domain/dto/contact.dto';
 import { validate } from 'class-validator';
+import { SentMessageInfo } from 'nodemailer';
 
 @ApiTags('/api/profile/contact')
 @Controller('/api/profile/contact')
@@ -31,22 +33,23 @@ export class ContactController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async sendMail(@Body() contactDto: ContactDto): Promise<void> {
-    if (contactDto instanceof Array) {
+    const dto = ContactDto.from(contactDto);
+    if (!dto) {
       this.logger.log(
-        `sendMail contact up failed, request invalid: ${JSON.stringify(
-          contactDto,
-        )}`,
+        `request sendMail contact up invalid, ${JSON.stringify(contactDto)}`
       );
-      throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Invalid Input Date');
     }
 
-    const errors = await validate(contactDto, {
+    const errors = await validate(dto, {
       validationError: { target: false },
       forbidUnknownValues: false,
     });
     if (errors.length > 0) {
       this.logger.log(
-        `Contact Us validation failed, name: ${contactDto.name}, email: ${contactDto.email}, errors: ${errors}`,
+        `Contact Us validation failed, dto: ${JSON.stringify(
+          dto,
+        )}, errors: ${errors}`,
       );
 
       throw new HttpException(
@@ -55,10 +58,24 @@ export class ContactController {
       );
     }
 
-    this.mailService.sendContactUs(
-      contactDto.name,
-      contactDto.email,
-      contactDto.message,
+    let info: SentMessageInfo;
+    try {
+      info = await this.mailService.sendContactUs(
+        contactDto.name,
+        contactDto.email,
+        contactDto.message,
+      );
+    } catch (error) {
+      this.logger.error(
+        `sendContactUs done, name: ${dto.name}, from: ${dto.email}`,
+        error,
+      );
+    }
+
+    this.logger.log(
+      `sendContactUs done, name: ${dto.name}, from: ${
+        dto.email
+      }, result: ${JSON.stringify(info)}`,
     );
   }
 }

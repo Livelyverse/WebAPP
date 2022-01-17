@@ -8,6 +8,17 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ContactDto {
+  public static from(dto: ContactDto): ContactDto | null {
+    if (dto) {
+      const contractDto = new ContactDto();
+      contractDto.name = dto?.name;
+      contractDto.email = dto?.email;
+      contractDto.message = dto?.message;
+      return contractDto;
+    }
+    return null;
+  }
+
   @IsNotEmpty({ message: 'Name must not empty' })
   @IsDefined({ message: 'Name must be defined' })
   @IsString({ message: 'Name must be string' })

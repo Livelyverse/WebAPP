@@ -38,32 +38,31 @@ export class MailService {
       );
   }
 
-  sendContactUs(name: string, from: string, message: string) {
-    this.mailerService
-      .sendMail({
-        to: this.configService.get<string>('mail.from'),
-        // from: from,
-        subject: `From ${name} ContactUs of Site`,
-        template: 'contactUs', // `.hbs` extension is appended automatically
-        // text: `${name} <${from}> \n${message}`,
-        context: {
-          name: name,
-          email: from,
-          message: message,
-        },
-      })
-      .then((sendMessageInfo) =>
-        this.logger.log(
-          `sendContactUs done, name: ${name}, from: ${from}, result: ${JSON.stringify(
-            sendMessageInfo,
-          )}`,
-        ),
-      )
-      .catch((error) =>
-        this.logger.error(
-          `mailerService.sendMail failed, name: ${name}, from: ${from}`,
-          error,
-        ),
-      );
+  async sendContactUs(name: string, from: string, message: string) {
+    await this.mailerService.sendMail({
+      to: this.configService.get<string>('mail.from'),
+      // from: from,
+      subject: `From ${name} ContactUs of Site`,
+      template: 'contactUs', // `.hbs` extension is appended automatically
+      // text: `${name} <${from}> \n${message}`,
+      context: {
+        name: name,
+        email: from,
+        message: message,
+      },
+    });
+    // .then((sendMessageInfo) =>
+    //   this.logger.log(
+    //     `sendContactUs done, name: ${name}, from: ${from}, result: ${JSON.stringify(
+    //       sendMessageInfo,
+    //     )}`,
+    //   ),
+    // )
+    // .catch((error) =>
+    //   this.logger.error(
+    //     `mailerService.sendMail failed, name: ${name}, from: ${from}`,
+    //     error,
+    //   ),
+    // );
   }
 }

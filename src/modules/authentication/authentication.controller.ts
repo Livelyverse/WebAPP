@@ -48,10 +48,15 @@ export class AuthenticationController {
   @ApiResponse({ status: 404, description: 'User Not Found' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async login(
-    @Body() body: LoginDto,
+    @Body() loginDto: LoginDto,
     @Res() res: Response,
   ): Promise<Response> {
-    return await this.authenticationService.userAuthentication(body, res);
+    const dto = LoginDto.from(loginDto);
+    if (!dto) {
+      this.logger.log(`request login invalid, ${JSON.stringify(loginDto)}`);
+      throw new BadRequestException('Invalid Input Date');
+    }
+    return await this.authenticationService.userAuthentication(dto, res);
   }
 
   @Post('/changepassword')
@@ -63,12 +68,21 @@ export class AuthenticationController {
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async changePassword(
-    @Body() body: PasswordDto,
+    @Body() passwordDto: PasswordDto,
     @Req() req,
   ): Promise<void> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    await this.authenticationService.changeUserPassword(token, body);
+
+    const dto = PasswordDto.from(passwordDto);
+    if (!dto) {
+      this.logger.log(
+        `request change password invalid, ${JSON.stringify(passwordDto)}`,
+      );
+      throw new BadRequestException('Invalid Input Date');
+    }
+
+    await this.authenticationService.changeUserPassword(token, dto);
   }
 
   @Post('/signup')
@@ -80,13 +94,13 @@ export class AuthenticationController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 404, description: 'Not Found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async signup(@Body() body: SignupDto): Promise<any> {
-    if (body instanceof Array) {
-      this.logger.log(`signup failed, dto: ${body.username}`);
-      throw new HttpException('Request Data Invalid', HttpStatus.BAD_REQUEST);
+  async signup(@Body() signupDto: SignupDto): Promise<any> {
+    const dto = SignupDto.from(signupDto);
+    if (!dto) {
+      this.logger.log(`request signup invalid, ${JSON.stringify(signupDto)}`);
+      throw new BadRequestException('Invalid Input Date');
     }
-
-    const accessToken = await this.authenticationService.userSignUp(body);
+    const accessToken = await this.authenticationService.userSignUp(dto);
     return {
       access_token: accessToken,
     };
@@ -110,7 +124,7 @@ export class AuthenticationController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async mailVerification(
     @Req() req: Request,
-    @Body() dto: AuthMailDto,
+    @Body() authMailDto: AuthMailDto,
   ): Promise<TokenResponse> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -119,14 +133,18 @@ export class AuthenticationController {
       throw new UnauthorizedException();
     }
 
+    const dto = AuthMailDto.from(authMailDto);
+    if (!dto || !dto.verifyCode) {
+      this.logger.log(
+        `request mail verification invalid, ${JSON.stringify(authMailDto)}`,
+      );
+      throw new BadRequestException('Invalid Input Date');
+    }
+
     const tokenPayload = await this.authenticationService.authTokenValidation(
       token,
       false,
     );
-
-    if (!dto || !dto.verifyCode) {
-      throw new BadRequestException('Input Data Invalid');
-    }
 
     const authMail = await this.authenticationService.authMailCodeConfirmation(
       tokenPayload,
@@ -154,12 +172,26 @@ export class AuthenticationController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async resendMailVerification(
-    @Body() body: ResendAuthMailDto,
+    @Body() resendAuthMailDto: ResendAuthMailDto,
     @Req() req: Request,
   ): Promise<any> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    await this.authenticationService.resendMailVerification(body, token);
+
+    const dto = ResendAuthMailDto.from(resendAuthMailDto);
+    if (!dto || !dto.username) {
+      this.logger.log(
+        `request mail resend verification invalid, ${JSON.stringify(
+          resendAuthMailDto,
+        )}`,
+      );
+      throw new BadRequestException('Invalid Input Date');
+    }
+
+    await this.authenticationService.resendMailVerification(
+      resendAuthMailDto,
+      token,
+    );
   }
 
   @Post('/refresh')
@@ -170,7 +202,7 @@ export class AuthenticationController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async refresh(
     @Req() req: Request,
-    @Body() dto: RefreshDto,
+    @Body() refreshDto: RefreshDto,
   ): Promise<TokenResponse> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -181,8 +213,14 @@ export class AuthenticationController {
 
     await this.authenticationService.authTokenValidation(token, true);
 
+    const dto = RefreshDto.from(refreshDto);
     if (!dto || !dto.refresh_token) {
-      throw new BadRequestException('Input Data Invalid');
+      this.logger.log(
+        `request refresh token invalid, ${JSON.stringify(
+          refreshDto,
+        )}`,
+      );
+      throw new BadRequestException('Invalid Input Date');
     }
 
     const accessToken =

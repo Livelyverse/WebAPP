@@ -12,6 +12,20 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UserUpdateDto {
+  public static from(dto: UserUpdateDto): UserUpdateDto | null {
+    if (dto) {
+      const updateDto = new UserUpdateDto();
+      updateDto.id = dto?.id;
+      updateDto.username = dto?.username;
+      updateDto.email = dto?.email;
+      updateDto.imageUrl = dto?.imageUrl;
+      updateDto.firstname = dto?.firstname;
+      updateDto.lastname = dto?.lastname;
+      updateDto.walletAddress = dto?.walletAddress;
+    }
+    return null;
+  }
+
   @IsUUID()
   @ApiProperty()
   public id: string;
