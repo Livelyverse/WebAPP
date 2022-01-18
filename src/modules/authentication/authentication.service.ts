@@ -213,7 +213,7 @@ export class AuthenticationService {
 
       res
         .status(HttpStatus.BAD_REQUEST)
-        .send({ message: `Input Data Invalid`, errors });
+        .send({ message: `Username Or Password Invalid`, errors });
       return;
     }
 
