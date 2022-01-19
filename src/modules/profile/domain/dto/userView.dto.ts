@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserEntity } from '../entity/user.entity';
+import { UserEntity } from '../entity';
 
 export class UserViewDto {
   public static from(user: UserEntity): UserViewDto | null {
@@ -12,6 +12,7 @@ export class UserViewDto {
       userDto.role = user.group.role.name;
       userDto.firstname = user.firstname;
       userDto.lastname = user.lastname;
+      userDto.imageUrl = user.imageUrl;
       userDto.walletAddress = user.walletAddress;
       userDto.createdAt = user.createdAt;
       userDto.updatedAt = user.updatedAt;
@@ -34,6 +35,9 @@ export class UserViewDto {
 
   @ApiProperty()
   public email: string;
+
+  @ApiPropertyOptional()
+  public imageUrl?: string;
 
   @ApiPropertyOptional()
   public firstname?: string;

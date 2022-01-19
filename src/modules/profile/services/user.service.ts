@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  StreamableFile,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,14 +15,21 @@ import { UserEntity } from '../domain/entity';
 import { GroupService } from './group.service';
 import * as argon2 from 'argon2';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
+import { extname, join } from 'path';
+import * as fs from 'fs';
 import {
   AuthMailEntity,
   TokenEntity,
 } from '../../authentication/domain/entity';
+import { ConfigService } from '@nestjs/config';
+import { Stream } from 'stream';
+import { createReadStream, ReadStream } from 'fs';
+import * as Buffer from 'buffer';
 
 @Injectable()
 export class UserService implements IService<UserEntity> {
   private readonly logger = new Logger(UserService.name);
+  private readonly uploadPath;
 
   constructor(
     @InjectRepository(TokenEntity)
@@ -31,7 +39,14 @@ export class UserService implements IService<UserEntity> {
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     private readonly groupService: GroupService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.uploadPath =
+      process.cwd() +
+      '/' +
+      this.configService.get<string>('http.upload.path') +
+      '/';
+  }
 
   async create(userDto: UserCreateDto): Promise<UserEntity> {
     const errors = await validate(userDto, {
@@ -378,7 +393,7 @@ export class UserService implements IService<UserEntity> {
       user.firstname = userDto.firstname;
       user.lastname = userDto.lastname;
       // user.group = groupEntity;
-      user.imageUrl = userDto.imageUrl;
+      // user.imageUrl = userDto.imageUrl;
       user.walletAddress = userDto.walletAddress;
       return await this.userRepository.save(user);
     } catch (err) {
@@ -403,5 +418,86 @@ export class UserService implements IService<UserEntity> {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  async uploadImage(request: any, file: Express.Multer.File): Promise<URL> {
+    // if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+    //   return callback(new Error('Only image files are allowed!'), false);
+    // }
+    // const name = file.originalname.split('.')[0];
+    const user = request.user as UserEntity;
+    const fileExtName = extname(file.originalname);
+    // const randomName = (
+    //   Math.floor(Math.random() * 9000000000) + 1000000000
+    // ).toString(16);
+    const filename = `profilePhoto_${user.id}_${Date.now()}${fileExtName}`;
+    const tmpArray = request.url.split('/');
+    const absoluteUrl =
+      'https://' +
+      this.configService.get<string>('http.domain') +
+      tmpArray.splice(0, tmpArray.length - 1).join('/') +
+      '/get/' +
+      filename;
+
+    if (user.imageFilename) {
+      const oldImageFile = this.uploadPath + user.imageFilename;
+      if (fs.existsSync(oldImageFile)) {
+        try {
+          fs.rmSync(oldImageFile);
+        } catch (error) {
+          this.logger.error(`could not remove file ${oldImageFile}`, error);
+        }
+      }
+    }
+
+    try {
+      fs.writeFileSync(this.uploadPath + filename, file.buffer);
+    } catch (error) {
+      this.logger.error(
+        `could not write file ${this.uploadPath + filename}`,
+        error,
+      );
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    try {
+      user.imageUrl = absoluteUrl;
+      user.imageMimeType = file.mimetype;
+      user.imageFilename = filename;
+      await this.userRepository.save(user);
+    } catch (error) {
+      this.logger.error(
+        `userRepository.save of uploadImage failed: username: ${JSON.stringify(
+          user.username,
+        )}`,
+        error,
+      );
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return new URL(absoluteUrl);
+  }
+
+  public getImage(user: UserEntity, image: string): string {
+    const imageFile = this.uploadPath + image;
+    if (fs.existsSync(imageFile)) {
+      return imageFile;
+    } else {
+      this.logger.error(
+        `could not found file ${imageFile} for user: ${user.username}`,
+      );
+      throw new HttpException(
+        { message: 'file not found' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // return new StreamableFile(fileStream);
   }
 }
