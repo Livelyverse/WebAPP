@@ -2,8 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as fs from 'fs';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
+  const logger = new Logger(bootstrap.name);
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
@@ -15,17 +18,6 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api', app, document);
-
-  // app.use((req, res, next) => {
-  //   res.header('Access-Control-Allow-Origin', '*');
-  //   res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  //   res.header(
-  //     'Access-Control-Allow-Headers',
-  //     'Origin, X-Requested-With, Content-Type, ',
-  //   );
-  //   res.header('Access-Control-Expose-Headers', 'Authorization');
-  //   next();
-  // });
 
   app.enableCors({
     allowedHeaders: [
@@ -47,6 +39,14 @@ async function bootstrap() {
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
+
+  const uploadPath =
+    process.cwd() + '/' + config.get<string>('http.upload.path');
+  if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath);
+    logger.log(`create ${uploadPath} success . . .`);
+  }
+
   await app.listen(
     config.get<number>('http.port'),
     config.get<string>('http.host'),
