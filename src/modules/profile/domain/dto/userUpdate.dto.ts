@@ -17,8 +17,8 @@ export class UserUpdateDto {
       const updateDto = new UserUpdateDto();
       updateDto.id = dto?.id;
       updateDto.username = dto?.username;
-      updateDto.email = dto?.email;
-      updateDto.imageUrl = dto?.imageUrl;
+      // updateDto.email = dto?.email;
+      // updateDto.imageUrl = dto?.imageUrl;
       updateDto.firstname = dto?.firstname;
       updateDto.lastname = dto?.lastname;
       updateDto.walletAddress = dto?.walletAddress;
@@ -36,16 +36,16 @@ export class UserUpdateDto {
   @ApiPropertyOptional()
   public username?: string;
 
-  @IsEmail({ message: 'Email must be valid' })
-  @IsNotEmpty({ message: 'Email must not empty' })
-  @IsDefined({ message: 'Email must be defined' })
-  @IsString({ message: 'Email must be string' })
-  @ApiPropertyOptional()
-  public email?: string;
-
-  @IsOptional()
-  @ApiPropertyOptional()
-  public imageUrl?: string;
+  // @IsEmail({ message: 'Email must be valid' })
+  // @IsNotEmpty({ message: 'Email must not empty' })
+  // @IsDefined({ message: 'Email must be defined' })
+  // @IsString({ message: 'Email must be string' })
+  // @ApiPropertyOptional()
+  // public email?: string;
+  //
+  // @IsOptional()
+  // @ApiPropertyOptional()
+  // public imageUrl?: string;
 
   @IsOptional()
   // @Matches(/^0x.*$/)

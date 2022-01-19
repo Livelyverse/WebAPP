@@ -5,7 +5,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProfileModule } from './modules/profile/profile.module';
 import { AuthenticationModule } from './modules/authentication/authentication.module';
 import { MailModule } from './modules/mail/mail.module';
-
 @Module({
   imports: [
     AuthenticationModule.forRoot('jwt'),
