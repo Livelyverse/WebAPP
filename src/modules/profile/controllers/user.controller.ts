@@ -1,6 +1,7 @@
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
   ApiParam,
   ApiQuery,
   ApiResponse,
@@ -9,6 +10,7 @@ import {
 import {
   BadRequestException,
   Body,
+  ClassSerializerInterceptor,
   Controller,
   Get,
   HttpCode,
@@ -19,7 +21,10 @@ import {
   Post,
   Query,
   Req,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from '../services/user.service';
 import { UserCreateDto } from '../domain/dto/userCreate.dto';
@@ -29,6 +34,8 @@ import { UserEntity } from '../domain/entity';
 import { isUUID } from './uuid.validate';
 import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
 import RoleGuard from '../../authentication/domain/gurads/role.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 
 @ApiBearerAuth()
 @ApiTags('/api/profile/user')
@@ -126,6 +133,7 @@ export class UserController {
     status: 200,
     description: 'The record has been successfully deleted.',
   })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
@@ -158,6 +166,7 @@ export class UserController {
     status: 200,
     description: 'The record has been successfully removed.',
   })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
@@ -174,5 +183,66 @@ export class UserController {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  @Post('/image/upload')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Image Upload Success.' })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(
+    @Req() req,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<URL> {
+    return await this.userService.uploadImage(req, file);
+  }
+
+  @Get('/image/get/:image')
+  @UseInterceptors(ClassSerializerInterceptor)
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Get Image Success.' })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 404, description: 'Image Not Found.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  getImage(
+    @Param('image') image: string,
+    @Req() request: any,
+    @Res() response: Response,
+  ) {
+    response.sendFile(
+      this.userService.getImage(request.user, image),
+      (error) => {
+        if (error) {
+          this.logger.error(
+            `could not read file ${image} for user: ${request.user.username}`,
+            error,
+          );
+          throw new HttpException(
+            { message: 'Something went wrong' },
+            HttpStatus.INTERNAL_SERVER_ERROR,
+          );
+        }
+      },
+    );
+    // await this.userService.getImage(request.user, image);
   }
 }

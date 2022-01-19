@@ -12,10 +12,10 @@ export class UserEntity extends BaseEntity {
   username: string;
 
   @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
-  firstname: string;
+  firstname?: string;
 
   @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
-  lastname: string;
+  lastname?: string;
 
   @Column({ type: 'varchar', length: 256, unique: true, nullable: false })
   email: string;
@@ -27,10 +27,16 @@ export class UserEntity extends BaseEntity {
   password: string;
 
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: true })
-  imageUrl: string;
+  imageUrl?: string;
+
+  @Column({ type: 'varchar', length: 256, unique: false, nullable: true })
+  imageFilename?: string;
+
+  @Column({ type: 'varchar', length: 32, unique: false, nullable: true })
+  imageMimeType?: string;
 
   @Column({ type: 'varchar', length: 256, unique: true, nullable: true })
-  walletAddress: string;
+  walletAddress?: string;
 
   @ManyToOne((type) => GroupEntity, (group) => group.users, {
     cascade: ['soft-remove'],

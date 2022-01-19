@@ -21,7 +21,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
           },
         },
         defaults: {
-          from: `"No Reply" <${config.get<string>('mail.from')}>`,
+          from: `"Lively Planet" <${config.get<string>('mail.from')}>`,
         },
         template: {
           preview: false,

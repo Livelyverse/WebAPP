@@ -8,6 +8,11 @@ app:
 http:
   host: 'localhost'
   port: 3000
+  domain: 'livelyplanet.io'
+    upload:
+      path: 'uploads'
+      sizeLimit: 1048576
+      mimeFilter: 'image'
 
 db:
   postgres:
