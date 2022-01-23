@@ -216,12 +216,12 @@ export class UserController {
   @Get('/image/get/:image')
   @UseInterceptors(ClassSerializerInterceptor)
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Get Image Success.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  // @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Image Not Found.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  // @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   getImage(
     @Param('image') image: string,
