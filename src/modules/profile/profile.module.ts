@@ -29,19 +29,19 @@ import { memoryStorage } from 'multer';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         storage: memoryStorage(),
-        fileFilter: (request, file, callback) => {
-          if (
-            !file.mimetype.includes(
-              configService.get<string>('http.upload.mimeFilter'),
-            )
-          ) {
-            return callback(
-              new BadRequestException({ message: 'Upload File Invalid' }),
-              false,
-            );
-          }
-          callback(null, true);
-        },
+        // fileFilter: (request, file, callback) => {
+        //   if (
+        //     !file.mimetype.includes(
+        //       configService.get<string>('http.upload.mimeFilter'),
+        //     )
+        //   ) {
+        //     return callback(
+        //       new BadRequestException({ message: 'Upload File Invalid' }),
+        //       false,
+        //     );
+        //   }
+        //   callback(null, true);
+        // },
         limits: {
           fileSize: configService.get<number>('http.upload.sizeLimit'),
         },
