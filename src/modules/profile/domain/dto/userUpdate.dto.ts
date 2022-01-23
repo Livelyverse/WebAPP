@@ -22,6 +22,7 @@ export class UserUpdateDto {
       updateDto.firstname = dto?.firstname;
       updateDto.lastname = dto?.lastname;
       updateDto.walletAddress = dto?.walletAddress;
+      return updateDto;
     }
     return null;
   }
