@@ -36,6 +36,9 @@ import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard'
 import RoleGuard from '../../authentication/domain/gurads/role.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
+import { createReadStream } from "fs";
+import { doc } from "prettier";
+import join = doc.builders.join;
 
 @ApiBearerAuth()
 @ApiTags('/api/profile/user')
@@ -214,7 +217,7 @@ export class UserController {
   }
 
   @Get('/image/get/:image')
-  @UseInterceptors(ClassSerializerInterceptor)
+  // @UseInterceptors(ClassSerializerInterceptor)
   @HttpCode(HttpStatus.OK)
   // @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Get Image Success.' })
@@ -228,21 +231,25 @@ export class UserController {
     @Req() request: any,
     @Res() response: Response,
   ) {
-    response.sendFile(
-      this.userService.getImage(request.user, image),
-      (error) => {
-        if (error) {
-          this.logger.error(
-            `could not read file ${image} for user: ${request.user.username}`,
-            error,
-          );
-          throw new HttpException(
-            { message: 'Something went wrong' },
-            HttpStatus.INTERNAL_SERVER_ERROR,
-          );
-        }
-      },
-    );
+
+    const file = createReadStream(this.userService.getImage(request.user, image));
+    file.pipe(response);
+
+    // response.sendFile(
+    //   ,
+    //   (error) => {
+    //     if (error) {
+    //       this.logger.error(
+    //         `could not read file ${image} for user: ${request.user.username}`,
+    //         error,
+    //       );
+    //       throw new HttpException(
+    //         { message: 'Something went wrong' },
+    //         HttpStatus.INTERNAL_SERVER_ERROR,
+    //       );
+    //     }
+    //   },
+    // );
     // await this.userService.getImage(request.user, image);
   }
 }
