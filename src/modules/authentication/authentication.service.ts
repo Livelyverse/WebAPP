@@ -177,18 +177,18 @@ export class AuthenticationService {
     user.password = hashPassword;
     await this.userService.updateEntity(user);
 
-    tokenEntity.isRevoked = true;
-    try {
-      return this.tokenRepository.save(tokenEntity);
-    } catch (error) {
-      this.logger.error(
-        `tokenRepository.save failed, tokenEntity Id: ${tokenEntity.id}, userId: ${user.id}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
+    // tokenEntity.isRevoked = true;
+    // try {
+    //   return this.tokenRepository.save(tokenEntity);
+    // } catch (error) {
+    //   this.logger.error(
+    //     `tokenRepository.save failed, tokenEntity Id: ${tokenEntity.id}, userId: ${user.id}`,
+    //     error,
+    //   );
+    //   throw new InternalServerErrorException({
+    //     message: 'Something went wrong',
+    //   });
+    // }
   }
 
   public async userAuthentication(dto: LoginDto, res: Response): Promise<void> {
