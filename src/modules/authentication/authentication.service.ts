@@ -7,6 +7,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Algorithm } from 'jsonwebtoken';
@@ -23,13 +24,19 @@ import { MoreThan, Repository } from 'typeorm';
 import { RefreshDto } from './domain/dto/refresh.dto';
 import { GroupService } from '../profile/services/group.service';
 import * as argon2 from 'argon2';
-import { PasswordDto } from './domain/dto/password.dto';
+import {
+  ChangePasswordDto,
+  GetResetPasswordDto,
+  PostResetPasswordDto,
+} from './domain/dto/PasswordDto';
 import { validate } from 'class-validator';
 import { LoginDto } from './domain/dto/login.dto';
 import { UserCreateDto } from '../profile/domain/dto/userCreate.dto';
 import { SignupDto } from './domain/dto/signup.dto';
 import { MailService } from '../mail/mail.service';
 import { ResendAuthMailDto } from './domain/dto/verification.dto';
+import { AuthMailType } from './domain/entity/authMailEntity';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface TokenPayload {
   iss: string;
@@ -88,7 +95,7 @@ export class AuthenticationService {
 
   public async changeUserPassword(
     token: string,
-    dto: PasswordDto,
+    dto: ChangePasswordDto,
   ): Promise<void> {
     if (dto instanceof Array) {
       this.logger.log(
@@ -160,7 +167,7 @@ export class AuthenticationService {
       this.logger.log(
         `user password verification failed, username: ${user.username}`,
       );
-      throw new ForbiddenException({ message: 'Username Or Password Invalid' });
+      throw new ForbiddenException({ message: 'Password Invalid' });
     }
 
     let hashPassword;
@@ -308,7 +315,12 @@ export class AuthenticationService {
     const authMailToken = await this.authTokenValidation(token, false);
     let authMail;
     try {
-      authMail = await this.authMailRepository.findOne(authMailToken.jti);
+      authMail = await this.authMailRepository.findOne({
+        where: {
+          id: authMailToken.jti,
+          mailType: AuthMailType.USER_VERIFICATION,
+        },
+      });
     } catch (error) {
       this.logger.error(
         `authMailRepository.findOne of resendMailVerification failed, id: ${authMailToken.jti}`,
@@ -339,7 +351,9 @@ export class AuthenticationService {
       this.logger.warn(
         `user try again to resend mail verification, userId: ${user.id}`,
       );
-      throw new ForbiddenException({ message: '' });
+      throw new BadRequestException({
+        message: 'Resend Mail Verification Invalid',
+      });
     }
 
     const authMailEntity = await this.createOrGetAuthMailEntity(user);
@@ -350,12 +364,6 @@ export class AuthenticationService {
       );
       return;
     }
-
-    this.mailService.sendCodeConfirmation(
-      user.username,
-      user.email,
-      Number(authMailEntity.verificationId),
-    );
 
     authMailEntity.isEmailSent = true;
     authMailEntity.mailSentAt = new Date();
@@ -368,6 +376,195 @@ export class AuthenticationService {
         error,
       );
     }
+
+    this.mailService.sendCodeConfirmation(
+      user.username,
+      user.email,
+      Number(authMailEntity.verificationId),
+    );
+  }
+
+  public async sendForgetPasswordMail(email: string): Promise<any> {
+    let authMail;
+    let userEntity;
+    try {
+      userEntity = await this.userService.findByEmail(email);
+    } catch (err) {
+      this.logger.error(`userService.findByEmail failed, email: ${email}`, err);
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    if (!userEntity) {
+      this.logger.debug(
+        `forget password failed, email not found, email: ${email}`,
+      );
+      throw new NotFoundException({ message: 'Email Not Found' });
+    }
+
+    if (!userEntity.isEmailConfirmed) {
+      this.logger.warn(
+        `user try reset password mean while didn't confirmed, 
+        userId: ${userEntity.id}, email: ${userEntity.email}`,
+      );
+      throw new BadRequestException({ message: 'Reset Password Invalid' });
+    }
+
+    try {
+      authMail = await this.authMailRepository.findOne({
+        relations: ['user'],
+        where: {
+          user: { id: userEntity.id },
+          sendTo: email,
+          expiredAt: MoreThan(new Date()),
+          mailType: AuthMailType.FORGOTTEN_PASSWORD,
+        },
+      });
+    } catch (err) {
+      this.logger.error(`authMailRepository.find failed, email: ${email}`, err);
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    if (authMail) {
+      this.logger.warn(`already sent forget password email, 
+      username: ${authMail.user.username}, email: ${email}, date: ${authMail.mailSentAt} `);
+      return;
+    }
+
+    authMail = new AuthMailEntity();
+    authMail.user = userEntity;
+    authMail.from = this.configService.get<string>('mail.from');
+    authMail.sendTo = userEntity.email;
+    authMail.verificationId = uuidv4();
+    authMail.expiredAt = new Date(Date.now() + this._mailTokenTTL);
+    authMail.isActive = true;
+    authMail.isUpdatable = true;
+    authMail.mailSentAt = new Date();
+    authMail.isEmailSent = true;
+    authMail.mailType = AuthMailType.FORGOTTEN_PASSWORD;
+
+    try {
+      await this.authMailRepository.save(authMail);
+    } catch (error) {
+      this.logger.error(
+        `authMailRepository.save failed, userId: ${authMail.user.id}`,
+        error,
+      );
+      throw new InternalServerErrorException({
+        message: 'Something went wrong',
+      });
+    }
+
+    const absoluteUrl =
+      'https://' +
+      this.configService.get<string>('http.domain') +
+      '/api/auth/mail/password/reset/' +
+      userEntity.id +
+      '/' +
+      authMail.verificationId;
+
+    this.mailService.sendForgetPassword(
+      userEntity.username,
+      userEntity.email,
+      absoluteUrl,
+    );
+  }
+
+  public async postUserResetPasswordHandler(
+    userId: string,
+    resetId: string,
+    resetPasswordDto: PostResetPasswordDto,
+  ): Promise<any> {
+    let authMail;
+    try {
+      authMail = await this.authMailRepository.findOne({
+        relations: ['user'],
+        where: {
+          user: { id: userId },
+          verificationId: resetId,
+          expiredAt: MoreThan(new Date()),
+          mailType: AuthMailType.FORGOTTEN_PASSWORD,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `authMailRepository.findOne failed, userId: ${userId}`,
+        err,
+      );
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    if (!authMail) {
+      this.logger.debug(
+        `reset password failed, auth mail entity not found, userId: ${userId}, resetId: ${resetId}`,
+      );
+      throw new NotFoundException({ message: 'User Not Found' });
+    }
+
+    let hashPassword;
+    try {
+      hashPassword = await argon2.hash(resetPasswordDto.newPassword);
+    } catch (err) {
+      this.logger.error(
+        `argon2.hash failed, username: ${authMail.user.username}`,
+        err,
+      );
+      throw new HttpException(
+        { message: 'Internal Server Error' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    authMail.user.password = hashPassword;
+    await this.userService.updateEntity(authMail.user);
+  }
+
+  public async getUserResetPasswordReq(
+    userId: string,
+    resetId: string,
+  ): Promise<GetResetPasswordDto> {
+    let authMail;
+    try {
+      authMail = await this.authMailRepository.findOne({
+        relations: ['user'],
+        where: {
+          user: { id: userId },
+          verificationId: resetId,
+          expiredAt: MoreThan(new Date()),
+          mailType: AuthMailType.FORGOTTEN_PASSWORD,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `authMailRepository.findOne failed, userId: ${userId}`,
+        err,
+      );
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    if (!authMail) {
+      this.logger.debug(
+        `reset password failed, auth mail entity not found, userId: ${userId}, resetId: ${resetId}`,
+      );
+      throw new NotFoundException({ message: 'User Not Found' });
+    }
+
+    const resetPasswordDto = new GetResetPasswordDto();
+    resetPasswordDto.id = authMail.user.id;
+    resetPasswordDto.username = authMail.user.username;
+    resetPasswordDto.resetPasswordId = authMail.verificationId;
+    return resetPasswordDto;
   }
 
   public async revokeAuthToken(userId: string): Promise<TokenEntity> {
@@ -419,7 +616,12 @@ export class AuthenticationService {
 
     let authMail;
     try {
-      authMail = await this.authMailRepository.findOne(authMailToken.jti);
+      authMail = await this.authMailRepository.findOne({
+        where: {
+          id: authMailToken.jti,
+          mailType: AuthMailType.USER_VERIFICATION,
+        },
+      });
     } catch (error) {
       this.logger.error(
         `authMailRepository.findOne failed, id: ${authMailToken.jti}`,
@@ -745,6 +947,7 @@ export class AuthenticationService {
           where: {
             user: { id: userEntity.id },
             expiredAt: MoreThan(new Date()),
+            mailType: AuthMailType.USER_VERIFICATION,
           },
         });
       } catch (error) {
@@ -774,6 +977,7 @@ export class AuthenticationService {
     authMail.isEmailSent = false;
     authMail.isActive = true;
     authMail.isUpdatable = true;
+    authMail.mailType = AuthMailType.USER_VERIFICATION;
 
     if (isCreateForce) {
       authMail.mailSentAt = new Date();

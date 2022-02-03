@@ -13,15 +13,23 @@ import {
   UnauthorizedException,
   BadRequestException,
   Get,
+  Param,
 } from '@nestjs/common';
 import { LoginDto } from './domain/dto/login.dto';
-import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RefreshDto } from './domain/dto/refresh.dto';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from './domain/gurads/jwt-auth.guard';
 import { SignupDto } from './domain/dto/signup.dto';
 import { AuthMailDto, ResendAuthMailDto } from './domain/dto/verification.dto';
-import { PasswordDto } from './domain/dto/password.dto';
+import {
+  ChangePasswordDto,
+  GetResetPasswordDto,
+  PostResetPasswordDto,
+} from './domain/dto/PasswordDto';
+import * as Joi from 'joi';
+import { validate } from 'class-validator';
+import { isUUID } from '../profile/controllers/uuid.validate';
 
 export interface TokenResponse {
   access_token: string;
@@ -65,13 +73,13 @@ export class AuthenticationController {
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async changePassword(
-    @Body() passwordDto: PasswordDto,
+    @Body() passwordDto: ChangePasswordDto,
     @Req() req,
   ): Promise<void> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    const dto = PasswordDto.from(passwordDto);
+    const dto = ChangePasswordDto.from(passwordDto);
     await this.authenticationService.changeUserPassword(token, dto);
   }
 
@@ -178,6 +186,150 @@ export class AuthenticationController {
     await this.authenticationService.resendMailVerification(
       resendAuthMailDto,
       token,
+    );
+  }
+
+  @Post('/mail/password/forget/:email')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'email',
+    required: true,
+    description: 'user email address',
+    schema: { type: 'string' },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'forget password mail send successful.',
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 404, description: 'User Not Found.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  public async sendForgetPasswordMail(@Param() emailParam): Promise<any> {
+    const schema = Joi.object({
+      email: Joi.string().email(),
+    });
+    const validationResult = schema.validate(emailParam);
+    if (validationResult.error) {
+      this.logger.debug(
+        `email address invalid, email: ${emailParam}, error: ${validationResult.error.message}`,
+      );
+      throw new BadRequestException({
+        message: validationResult.error.message,
+      });
+    }
+
+    await this.authenticationService.sendForgetPasswordMail(emailParam.email);
+  }
+
+  @Post('/mail/password/reset/:userId/:resetPassId')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'userId',
+    required: true,
+    description: 'user Id of requested reset password',
+    schema: { type: 'string' },
+  })
+  @ApiParam({
+    name: 'resetPassId',
+    required: true,
+    description: 'reset password Id',
+    schema: { type: 'string' },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'reset password successful.',
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 404, description: 'User Not Found.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  public async userResetPassword(
+    @Param('userId') userId: string,
+    @Param('resetPassId') resetId: string,
+    @Body() resetPasswordDto: PostResetPasswordDto,
+  ): Promise<any> {
+    if (!isUUID(userId)) {
+      this.logger.debug(`userId invalid, userId: ${userId}`);
+      throw new BadRequestException({
+        message: 'User Id Invalid',
+      });
+    }
+
+    if (!isUUID(resetId)) {
+      this.logger.debug(`resetId invalid, resetId: ${userId}`);
+
+      throw new HttpException(
+        { message: 'Reset Password Id Invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const dto = PostResetPasswordDto.from(resetPasswordDto);
+    const errors = await validate(dto, {
+      validationError: { target: false },
+      forbidUnknownValues: false,
+    });
+    if (errors.length > 0) {
+      this.logger.log(
+        `resetPassword validation failed, userId: ${userId}, errors: ${errors}`,
+      );
+
+      throw new HttpException(
+        { message: 'New Password Invalid', errors },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.authenticationService.postUserResetPasswordHandler(
+      userId,
+      resetId,
+      resetPasswordDto,
+    );
+  }
+
+  @Get('/mail/password/reset/:userId/:resetPassId')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'userId',
+    required: true,
+    description: 'user Id of requested reset password',
+    schema: { type: 'string' },
+  })
+  @ApiParam({
+    name: 'resetPassId',
+    required: true,
+    description: 'reset password Id',
+    schema: { type: 'string' },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'get reset password success',
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 404, description: 'User Not Found.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  public async getUserResetPasswordReq(
+    @Param('userId') userId: string,
+    @Param('resetPassId') resetId: string,
+  ): Promise<GetResetPasswordDto> {
+    if (!isUUID(userId)) {
+      this.logger.debug(`userId invalid, userId: ${userId}`);
+      throw new BadRequestException({
+        message: 'User Id Invalid',
+      });
+    }
+
+    if (!isUUID(resetId)) {
+      this.logger.debug(`resetId invalid, resetId: ${userId}`);
+
+      throw new HttpException(
+        { message: 'Reset Password Id Invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return await this.authenticationService.getUserResetPasswordReq(
+      userId,
+      resetId,
     );
   }
 

@@ -25,14 +25,44 @@ export class MailService {
       })
       .then((sendMessageInfo) =>
         this.logger.log(
-          `mailerService.sendMail done, username: ${username}, sendTo: ${sendTo}, result: ${JSON.stringify(
+          `sendCodeConfirmation mailerService.sendMail done, username: ${username}, sendTo: ${sendTo}, result: ${JSON.stringify(
             sendMessageInfo,
           )}`,
         ),
       )
       .catch((error) =>
         this.logger.error(
-          `mailerService.sendMail failed, username: ${username} sendTo: ${sendTo}`,
+          `sendCodeConfirmation mailerService.sendMail failed, username: ${username} sendTo: ${sendTo}`,
+          error,
+        ),
+      );
+  }
+
+  sendForgetPassword(username: string, sendTo: string, resetPassUrl: string) {
+    this.mailerService
+      .sendMail({
+        to: sendTo,
+        // from: '"Support Team" <support@example.com>', // override default from
+        subject: 'LivelyPlanet Reset Password!',
+        template: 'forgetPassword', // `.hbs` extension is appended automatically
+        context: {
+          // ✏️ filling curly brackets with content
+          name: username,
+          url: resetPassUrl,
+        },
+      })
+      .then((sendMessageInfo) =>
+        this.logger.log(
+          `sendForgetPassword mailerService.sendMail done, 
+           username: ${username}, sendTo: ${sendTo}, url: ${resetPassUrl} result: ${JSON.stringify(
+            sendMessageInfo,
+          )}`,
+        ),
+      )
+      .catch((error) =>
+        this.logger.error(
+          `sendForgetPassword mailerService.sendMail failed, 
+          username: ${username} sendTo: ${sendTo}, url: ${resetPassUrl}`,
           error,
         ),
       );
