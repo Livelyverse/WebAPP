@@ -17,7 +17,7 @@ export class AuthMailEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
   verificationId: string;
 
-  @Column({ type: 'enum', enum: AuthMailType, unique: false, nullable: true })
+  @Column({ type: 'enum', enum: AuthMailType, unique: false, nullable: false })
   mailType: AuthMailType;
 
   @Column({ type: 'timestamptz', unique: false, nullable: false })
