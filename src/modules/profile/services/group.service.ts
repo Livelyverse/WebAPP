@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { GroupCreateDto, GroupUpdateDto } from '../domain/dto/index.dto';
 import { validate } from 'class-validator';
 import { IService } from './IService';
-import { GroupEntity } from '../domain/entity/group.entity';
+import { GroupEntity } from '../domain/entity';
 import { RoleService } from './role.service';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
 

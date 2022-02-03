@@ -3,14 +3,11 @@ import {
   ApiBody,
   ApiConsumes,
   ApiParam,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import {
-  BadRequestException,
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Get,
   HttpCode,
@@ -19,7 +16,6 @@ import {
   Logger,
   Param,
   Post,
-  Query,
   Req,
   Res,
   UploadedFile,
@@ -36,9 +32,7 @@ import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard'
 import RoleGuard from '../../authentication/domain/gurads/role.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
-import { createReadStream } from "fs";
-import { doc } from "prettier";
-import join = doc.builders.join;
+import { createReadStream } from 'fs';
 
 @ApiBearerAuth()
 @ApiTags('/api/profile/user')
@@ -217,22 +211,17 @@ export class UserController {
   }
 
   @Get('/image/get/:image')
-  // @UseInterceptors(ClassSerializerInterceptor)
   @HttpCode(HttpStatus.OK)
-  // @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Get Image Success.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
-  // @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Image Not Found.' })
-  // @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   getImage(
     @Param('image') image: string,
     @Req() request: any,
     @Res() response: Response,
   ) {
-
-    const file = createReadStream(this.userService.getImage(request.user, image));
+    const file = createReadStream(this.userService.getImage(image));
     file.pipe(response);
 
     // response.sendFile(

@@ -4,7 +4,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  StreamableFile,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,9 +21,6 @@ import {
   TokenEntity,
 } from '../../authentication/domain/entity';
 import { ConfigService } from '@nestjs/config';
-import { Stream } from 'stream';
-import { createReadStream, ReadStream } from 'fs';
-import * as Buffer from 'buffer';
 
 @Injectable()
 export class UserService implements IService<UserEntity> {
@@ -329,6 +325,18 @@ export class UserService implements IService<UserEntity> {
     }
   }
 
+  async findByEmail(email: string): Promise<UserEntity> {
+    try {
+      return await this.userRepository.findOne({ where: { email: email } });
+    } catch (err) {
+      this.logger.error(`userRepository.findOne failed, email: ${email}`, err);
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   async findOne(options: object): Promise<UserEntity | null> {
     try {
       return await this.userRepository.findOne(options);
@@ -421,15 +429,8 @@ export class UserService implements IService<UserEntity> {
   }
 
   async uploadImage(request: any, file: Express.Multer.File): Promise<URL> {
-    // if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
-    //   return callback(new Error('Only image files are allowed!'), false);
-    // }
-    // const name = file.originalname.split('.')[0];
     const user = request.user as UserEntity;
     const fileExtName = extname(file.originalname);
-    // const randomName = (
-    //   Math.floor(Math.random() * 9000000000) + 1000000000
-    // ).toString(16);
     const filename = `profilePhoto_${user.id}_${Date.now()}${fileExtName}`;
     const tmpArray = request.url.split('/');
     const absoluteUrl =
@@ -484,14 +485,12 @@ export class UserService implements IService<UserEntity> {
     return new URL(absoluteUrl);
   }
 
-  public getImage(user: UserEntity, image: string): string {
+  public getImage(image: string): string {
     const imageFile = this.uploadPath + image;
     if (fs.existsSync(imageFile)) {
       return imageFile;
     } else {
-      this.logger.error(
-        `could not found file ${imageFile} for user: ${user.username}`,
-      );
+      this.logger.error(`could not found file ${imageFile}`);
       throw new HttpException(
         { message: 'file not found' },
         HttpStatus.NOT_FOUND,
