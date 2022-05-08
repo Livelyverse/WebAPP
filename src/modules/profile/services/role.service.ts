@@ -5,7 +5,7 @@ import {
   Logger,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { RoleEntity } from '../domain/entity/role.entity';
+import { RoleEntity } from '../domain/entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RoleCreateDto, RoleUpdateDto } from '../domain/dto/index.dto';
@@ -134,9 +134,36 @@ export class RoleService implements IService<RoleEntity> {
     }
   }
 
-  async findAll(): Promise<Array<RoleEntity> | null> {
+  async findTotal(): Promise<number> {
     try {
-      return await this.roleRepository.find();
+      return await this.roleRepository.count();
+    } catch (err) {
+      this.logger.error(`userRepository.count failed`, err);
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async findAll(
+    offset,
+    limit: number,
+    sortType,
+    sortBy: string,
+  ): Promise<{ data: Array<RoleEntity>; total: number } | null> {
+    try {
+      const res = await this.roleRepository.findAndCount({
+        skip: offset,
+        take: limit,
+        order: {
+          [sortBy]: sortType.toUpperCase(),
+        },
+      });
+      return {
+        data: res[0],
+        total: res[1],
+      };
     } catch (err) {
       this.logger.error(`roleRepository.find failed`, err);
       throw new HttpException(
