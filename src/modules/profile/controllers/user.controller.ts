@@ -3,6 +3,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -16,6 +17,7 @@ import {
   Logger,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UploadedFile,
@@ -33,6 +35,7 @@ import RoleGuard from '../../authentication/domain/gurads/role.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { createReadStream } from 'fs';
+import { FindAllViewDto } from '../domain/dto/FindAllView.dto';
 
 @ApiBearerAuth()
 @ApiTags('/api/profile/user')
@@ -114,6 +117,96 @@ export class UserController {
     }
 
     return UserViewDto.from(user);
+  }
+
+  @Get('/getAll')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
+  @ApiQuery({
+    name: 'page',
+    required: true,
+    description: 'data page',
+    schema: { type: 'number' },
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: true,
+    description: 'data offset',
+    schema: { type: 'number' },
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: true,
+    description:
+      'data sort field can be one of the username or the time fields',
+    schema: { type: 'string' },
+  })
+  @ApiQuery({
+    name: 'sortType',
+    required: true,
+    description: 'data sort type can be one of ASC or DESC',
+    schema: { type: 'string' },
+  })
+  @ApiResponse({ status: 200, description: 'The record is found.' })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  async getAllUsers(
+    @Query('page') page,
+    @Query('offset') offset,
+    @Query('sortType') sortType,
+    @Query('sortBy') sortBy,
+  ): Promise<FindAllViewDto> {
+    if (page < 0) {
+      throw new HttpException(
+        { message: 'Page Data Invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (offset <= 0) {
+      throw new HttpException(
+        { message: 'Offset Data Invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (sortType.toUpperCase() !== 'DESC' && sortType.toUpperCase() !== 'ASC') {
+      throw new HttpException(
+        { message: 'SortType Data Invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    sortBy = sortBy.toLowerCase();
+    if (sortBy !== 'username' && sortBy !== 'time') {
+      throw new HttpException(
+        { message: 'sortBy Data Invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (sortBy === 'time') sortBy = 'createdAt';
+
+    const { data, total } = await this.userService.findAll(
+      page * offset,
+      offset,
+      sortType,
+      sortBy,
+    );
+    if (total === 0 || data.length === 0) {
+      throw new HttpException(
+        { message: 'Users Not Found' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const totalPage = Math.ceil(total / offset);
+    return FindAllViewDto.from(page, offset, total, totalPage, data);
   }
 
   @Post('/delete/:param')

@@ -1,7 +1,14 @@
-import { BaseEntity } from '../domain/entity/base.entity';
+import { BaseEntity } from '../domain/entity';
 
 export interface IService<T extends BaseEntity> {
-  findAll(): Promise<Array<T> | null>;
+  findAll(
+    offset,
+    limit: number,
+    sortType,
+    sortBy: string,
+  ): Promise<{ data: Array<T>; total: number } | null>;
+
+  findTotal(): Promise<number>;
 
   findById(id: string): Promise<T | null>;
 

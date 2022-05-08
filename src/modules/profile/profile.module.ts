@@ -13,6 +13,7 @@ import { AuthMailEntity, TokenEntity } from '../authentication/domain/entity';
 import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { memoryStorage } from 'multer';
+import { BackofficeController } from './controllers/dashboard.controller';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { memoryStorage } from 'multer';
     GroupController,
     UserController,
     ContactController,
+    BackofficeController,
   ],
   providers: [RoleService, GroupService, UserService],
   exports: [RoleService, GroupService, UserService],

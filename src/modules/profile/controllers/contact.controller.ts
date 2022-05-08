@@ -1,6 +1,5 @@
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
-  BadRequestException,
   Body,
   Controller,
   HttpCode,
@@ -9,12 +8,8 @@ import {
   InternalServerErrorException,
   Logger,
   Post,
-  UseGuards,
 } from '@nestjs/common';
 import { MailService } from '../../mail/mail.service';
-import RoleGuard from '../../authentication/domain/gurads/role.guard';
-import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
-import { GroupCreateDto } from '../domain/dto/groupCreate.dto';
 import { ContactDto } from '../domain/dto/contact.dto';
 import { validate } from 'class-validator';
 import { SentMessageInfo } from 'nodemailer';

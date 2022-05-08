@@ -159,13 +159,40 @@ export class GroupService implements IService<GroupEntity> {
     }
   }
 
-  async findAll(): Promise<Array<GroupEntity> | null> {
+  async findTotal(): Promise<number> {
     try {
-      return await this.groupRepository.find();
+      return await this.groupRepository.count();
+    } catch (err) {
+      this.logger.error(`userRepository.count failed`, err);
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async findAll(
+    offset,
+    limit: number,
+    sortType,
+    sortBy: string,
+  ): Promise<{ data: Array<GroupEntity>; total: number } | null> {
+    try {
+      const res = await this.groupRepository.findAndCount({
+        skip: offset,
+        take: limit,
+        order: {
+          [sortBy]: sortType.toUpperCase(),
+        },
+      });
+      return {
+        data: res[0],
+        total: res[1],
+      };
     } catch (err) {
       this.logger.error(`groupRepository.find failed`, err);
       throw new HttpException(
-        { message: 'Something went wrong' },
+        { message: 'Internal Server Error' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

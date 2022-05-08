@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { RoleEntity } from '../entity/role.entity';
+import { RoleEntity } from '../entity';
 
 export class RoleViewDto {
   public static from(role: RoleEntity): RoleViewDto | null {

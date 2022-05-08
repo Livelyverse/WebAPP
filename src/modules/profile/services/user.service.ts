@@ -289,13 +289,40 @@ export class UserService implements IService<UserEntity> {
     // }
   }
 
-  async findAll(): Promise<Array<UserEntity> | null> {
+  async findTotal(): Promise<number> {
     try {
-      return await this.userRepository.find();
+      return await this.userRepository.count();
+    } catch (err) {
+      this.logger.error(`userRepository.count failed`, err);
+      throw new HttpException(
+        { message: 'Something went wrong' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async findAll(
+    offset,
+    limit: number,
+    sortType,
+    sortBy: string,
+  ): Promise<{ data: Array<UserEntity>; total: number } | null> {
+    try {
+      const res = await this.userRepository.findAndCount({
+        skip: offset,
+        take: limit,
+        order: {
+          [sortBy]: sortType.toUpperCase(),
+        },
+      });
+      return {
+        data: res[0],
+        total: res[1],
+      };
     } catch (err) {
       this.logger.error(`userRepository.find failed`, err);
       throw new HttpException(
-        { message: 'Something went wrong' },
+        { message: 'Internal Server Error' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
