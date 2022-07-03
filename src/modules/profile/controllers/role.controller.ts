@@ -29,7 +29,7 @@ import { RoleEntity } from '../domain/entity';
 import { isUUID } from './uuid.validate';
 import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
 import RoleGuard from '../../authentication/domain/gurads/role.guard';
-import { FindAllViewDto } from '../domain/dto/FindAllView.dto';
+import { FindAllViewDto } from '../domain/dto/findAllView.dto';
 
 @ApiBearerAuth()
 @ApiTags('/api/profile/role')
