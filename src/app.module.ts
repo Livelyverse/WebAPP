@@ -5,11 +5,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProfileModule } from './modules/profile/profile.module';
 import { AuthenticationModule } from './modules/authentication/authentication.module';
 import { MailModule } from './modules/mail/mail.module';
+import { BlogModule } from './blog/blog.module';
+import { ScheduleModule } from '@nestjs/schedule';
 @Module({
   imports: [
     AuthenticationModule.forRoot('jwt'),
+    ScheduleModule.forRoot(),
     MailModule,
     ProfileModule,
+    BlogModule,
     ConfigModule.forRoot({
       load: [yamlReader],
     }),
@@ -32,6 +36,7 @@ import { MailModule } from './modules/mail/mail.module';
       }),
       inject: [ConfigService],
     }),
+    BlogModule,
   ],
   controllers: [],
   providers: [],

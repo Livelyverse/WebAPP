@@ -28,7 +28,7 @@ import {
   ChangePasswordDto,
   GetResetPasswordDto,
   PostResetPasswordDto,
-} from './domain/dto/PasswordDto';
+} from './domain/dto/password.dto';
 import { validate } from 'class-validator';
 import { LoginDto } from './domain/dto/login.dto';
 import { UserCreateDto } from '../profile/domain/dto/userCreate.dto';
