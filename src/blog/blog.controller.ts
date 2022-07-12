@@ -65,7 +65,7 @@ export class BlogController {
       );
     }
 
-    const {data, total}  = await this.blogService.findAll((page - 1) * offset, offset, sortType);
+    const {data, total}  = await this.blogService.findAll((page - 1) * offset, offset, sortType.toUpperCase());
     if (total === 0 || data.length === 0) {
       throw new HttpException('Blogs Not Found' , HttpStatus.NOT_FOUND);
     }
