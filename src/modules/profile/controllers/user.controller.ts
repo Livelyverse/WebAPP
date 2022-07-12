@@ -35,7 +35,7 @@ import RoleGuard from '../../authentication/domain/gurads/role.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { createReadStream } from 'fs';
-import { FindAllViewDto } from '../domain/dto/FindAllView.dto';
+import { FindAllViewDto } from '../domain/dto/findAllView.dto';
 
 @ApiBearerAuth()
 @ApiTags('/api/profile/user')
@@ -90,7 +90,7 @@ export class UserController {
     description: 'either an uuid for the user id or a string for the user name',
     schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.' })
+  @ApiResponse({ status: 200, description: 'The record is found.' , type: UserViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
