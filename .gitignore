@@ -161,7 +161,6 @@ $RECYCLE.BIN/
 # Config files,
 .idea/
 .vscode/
-yarn.lock
 
 # Node.js
 package-lock.json
