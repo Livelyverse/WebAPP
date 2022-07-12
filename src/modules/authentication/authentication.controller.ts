@@ -26,7 +26,7 @@ import {
   ChangePasswordDto,
   GetResetPasswordDto,
   PostResetPasswordDto,
-} from './domain/dto/PasswordDto';
+} from './domain/dto/password.dto';
 import * as Joi from 'joi';
 import { validate } from 'class-validator';
 import { isUUID } from '../profile/controllers/uuid.validate';

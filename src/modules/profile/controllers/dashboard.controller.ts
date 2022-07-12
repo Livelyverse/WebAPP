@@ -12,7 +12,7 @@ import { GroupService } from '../services/group.service';
 import { RoleService } from '../services/role.service';
 import RoleGuard from '../../authentication/domain/gurads/role.guard';
 import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
-import { DashboardStatsDto } from '../domain/dto/DashboardStats.dto';
+import { DashboardStatsDto } from '../domain/dto/dashboardStats.dto';
 
 @ApiBearerAuth()
 @ApiTags('/api/backoffice/dashboard')
