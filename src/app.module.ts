@@ -36,7 +36,6 @@ import { ScheduleModule } from '@nestjs/schedule';
       }),
       inject: [ConfigService],
     }),
-    BlogModule,
   ],
   controllers: [],
   providers: [],
