@@ -98,7 +98,7 @@ export class MediumTaskService {
               Rxjs.filter(([_, isFound]) => isFound === true),
               Rxjs.mergeMap(([blog, _]) => Rxjs.from(this._blogRepository.save(blog))))
         }),
-        retryWithDelay(60000, 21),
+        retryWithDelay(10000, 3),
         // Rxjs.catchError((error: unknown) => {
         //   this._logger.error(`fetchMediumRss fetch RSS failed: ${error}`);
         //   return Rxjs.of(null);
@@ -110,24 +110,7 @@ export class MediumTaskService {
       (value: BlogEntity) => {this._logger.log(`New BlogEntity persist successfully, id: ${value.id}, title: ${value.title}`);},
       (error) => this._logger.error(`fetchMediumRss fetch RSS failed, error: ${error}`),
       () => this._logger.log(`fetchMediumRss fetch RSS completed`));
-
-    // const parser = new Parser();
-    // (async () => {
-    //   const feed = await parser.parseURL('https://medium.com/feed/@sabesan96');
-    //   console.log(JSON.stringify(feed)); // feed will have a `foo` property, type as a string
-
-    // feed.items.forEach((item) => {
-    //   console.log(item.title + ':' + item.link); // item will have a `bar` property type as a number
-    // });
-    // })();
   }
-
-  // private dataHandler(tuple: [BlogEntity, BlogCreateDto]) : Rxjs.Observable<any> {
-  //   return Rxjs.from(tuple[1].items)
-  //     .pipe(Rxjs.mergeMap((item) => {
-  //       this._blogRepository.query('select feed -> ')
-  //     }))
-  // }
 }
 
 export function retryWithDelay<T>(delay: number, count = 1): Rxjs.MonoTypeOperatorFunction<T> {
