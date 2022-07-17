@@ -1,5 +1,5 @@
 import { Column, Entity, UpdateDateColumn } from "typeorm";
-import { BaseEntity } from '../../../modules/profile/domain/entity';
+import { BaseEntity } from '../../../profile/domain/entity';
 import { MediumRssImageDto, MediumRssItemDto } from "../dto/mediumRssCreate.dto";
 
 export enum ProtocolType {

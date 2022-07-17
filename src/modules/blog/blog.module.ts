@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BlogService } from './blog.service';
 import { BlogController } from './blog.controller';
-import { ProfileModule } from '../modules/profile/profile.module';
+import { ProfileModule } from '../profile/profile.module';
 import { MediumTaskService } from './domain/tasks/mediumRss.task';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
