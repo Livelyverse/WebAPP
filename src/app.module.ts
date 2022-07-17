@@ -5,7 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProfileModule } from './modules/profile/profile.module';
 import { AuthenticationModule } from './modules/authentication/authentication.module';
 import { MailModule } from './modules/mail/mail.module';
-import { BlogModule } from './blog/blog.module';
+import { BlogModule } from './modules/blog/blog.module';
 import { ScheduleModule } from '@nestjs/schedule';
 @Module({
   imports: [
