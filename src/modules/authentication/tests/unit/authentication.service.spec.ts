@@ -21,7 +21,7 @@
 //   });
 //
 //   it('should return a token', async () => {
-//     const result = authenticationService.createToken('tests@tests.fr');
+//     const result = authenticationService.createToken('test@test.fr');
 //
 //     expect(result).not.toBeNull();
 //     expect(result.access_token).not.toBeNull();
@@ -30,7 +30,7 @@
 //
 //   it('should validate the profile', async () => {
 //     const result = await authenticationService.validateUser({
-//       email: 'tests@tests.fr',
+//       email: 'test@test.fr',
 //       password: 'password',
 //     });
 //

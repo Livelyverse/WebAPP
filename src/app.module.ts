@@ -7,6 +7,7 @@ import { AuthenticationModule } from './modules/authentication/authentication.mo
 import { MailModule } from './modules/mail/mail.module';
 import { BlogModule } from './modules/blog/blog.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AirdropModule } from './modules/airdrop/airdrop.module';
 @Module({
   imports: [
     AuthenticationModule.forRoot('jwt'),
@@ -26,7 +27,7 @@ import { ScheduleModule } from '@nestjs/schedule';
         username: configService.get<string>('db.postgres.profile'),
         password: configService.get<string>('db.postgres.password'),
         database: configService.get<string>('db.postgres.database'),
-        entities: [configService.get<string>('db.postgres.entities')],
+        entities: [configService.get<string>('db.postgres.entity')],
         logging: configService.get<boolean>('db.postgres.logging'),
         migrationsRun: configService.get<boolean>('db.postgres.migrationsRun'),
         synchronize: configService.get<boolean>('db.postgres.synchronize'),
@@ -36,6 +37,7 @@ import { ScheduleModule } from '@nestjs/schedule';
       }),
       inject: [ConfigService],
     }),
+    AirdropModule,
   ],
   controllers: [],
   providers: [],
