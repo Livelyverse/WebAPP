@@ -48,6 +48,7 @@
     "rss-parser": "^3.12.0",
     "rxjs": "^7.2.0",
     "swagger-ui-express": "^4.3.0",
+    "twitter-api-v2": "^1.12.3",
     "typeorm": "^0.2.41",
     "uuid": "^8.3.2"
   },

@@ -13,7 +13,7 @@ export class SocialMediaEntity extends BaseEntity {
   profileName?: string
 
   @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
-  account: string
+  username: string
 
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: false })
   url: string
