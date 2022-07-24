@@ -36,34 +36,37 @@ export class MediumRssImageDto {
 
 export class MediumRssItemDto {
   @ApiProperty()
-  public link?: string;
+  public link: string;
 
   @ApiProperty()
-  public guid?: string;
+  public guid: string;
 
   @ApiProperty()
-  public title?: string;
+  public thumbnail: string;
 
   @ApiProperty()
-  public pubDate?: string;
+  public title: string;
 
   @ApiProperty()
-  public creator?: string;
+  public pubDate: string;
 
   @ApiProperty()
-  public summary?: string;
+  public creator: string;
 
   @ApiProperty()
-  public content?: string;
+  public summary: string;
 
   @ApiProperty()
-  public isoDate?: string;
+  public content: string;
 
   @ApiProperty()
-  public categories?: string[];
+  public isoDate: string;
 
   @ApiProperty()
-  public contentSnippet?: string;
+  public categories: string[];
+
+  @ApiProperty()
+  public contentSnippet: string;
 
  // @ApiProperty()
   public enclosure?: MediumRssEnclosureDto;

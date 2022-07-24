@@ -27,8 +27,8 @@ import { GroupViewDto } from '../domain/dto/groupView.dto';
 import { GroupUpdateDto } from '../domain/dto/groupUpdate.dto';
 import { GroupEntity } from '../domain/entity';
 import { isUUID } from './uuid.validate';
-import { JwtAuthGuard } from '../../authentication/domain/gurads/jwt-auth.guard';
-import RoleGuard from '../../authentication/domain/gurads/role.guard';
+import { JwtAuthGuard } from '../../authentication/domain/gurad/jwt-auth.guard';
+import RoleGuard from '../../authentication/domain/gurad/role.guard';
 import { FindAllViewDto } from '../domain/dto/findAllView.dto';
 
 @ApiBearerAuth()

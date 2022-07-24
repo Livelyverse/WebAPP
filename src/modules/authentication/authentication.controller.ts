@@ -19,7 +19,7 @@ import { LoginDto } from './domain/dto/login.dto';
 import { ApiBearerAuth, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RefreshDto } from './domain/dto/refresh.dto';
 import { Request, Response } from 'express';
-import { JwtAuthGuard } from './domain/gurads/jwt-auth.guard';
+import { JwtAuthGuard } from './domain/gurad/jwt-auth.guard';
 import { SignupDto } from './domain/dto/signup.dto';
 import { AuthMailDto, ResendAuthMailDto } from './domain/dto/verification.dto';
 import {

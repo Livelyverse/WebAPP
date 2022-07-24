@@ -35,7 +35,7 @@ import { UserCreateDto } from '../profile/domain/dto/userCreate.dto';
 import { SignupDto } from './domain/dto/signup.dto';
 import { MailService } from '../mail/mail.service';
 import { ResendAuthMailDto } from './domain/dto/verification.dto';
-import { AuthMailType } from './domain/entity/authMailEntity';
+import { AuthMailType } from './domain/entity/authMail.entity';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface TokenPayload {
