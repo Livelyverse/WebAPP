@@ -1,6 +1,6 @@
 // import * as request from 'supertest';
 // import { INestApplication } from "@nestjs/common";
-// import { BlogEntity } from "../domain/entities/blog.entity";
+// import { BlogEntity } from "../domain/entity/blog.entity";
 // import { BlogModule } from "../blog.module";
 // import { Test } from "@nestjs/testing";
 // import { BlogService } from "../blog.service";

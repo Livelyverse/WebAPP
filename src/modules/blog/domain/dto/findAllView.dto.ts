@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { BlogEntity } from "../entities/blog.entity";
+import { BlogEntity } from "../entity/blog.entity";
 import { MediumRssViewDto } from "./mediumRssView.dto";
 
 export class FindAllViewDto {

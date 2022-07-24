@@ -24,11 +24,14 @@ export class BlogEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: true })
   description: string;
 
-  @Column({ type: 'varchar', length: 2048, unique: false, nullable: false })
+  @Column({ type: 'varchar', length: 4096, unique: false, nullable: false })
   feedUrl: string;
 
-  @Column({ type: 'varchar', length: 2048, unique: false, nullable: false })
+  @Column({ type: 'varchar', length: 4096, unique: false, nullable: false })
   link: string;
+
+  @Column({ type: 'varchar', length: 4096, unique: false, nullable: false })
+  thumbnail: string;
 
   @Column({ type: 'enum', enum: ProtocolType, unique: false, nullable: false })
   protocol: ProtocolType;

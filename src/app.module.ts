@@ -26,7 +26,7 @@ import { ScheduleModule } from '@nestjs/schedule';
         username: configService.get<string>('db.postgres.profile'),
         password: configService.get<string>('db.postgres.password'),
         database: configService.get<string>('db.postgres.database'),
-        entities: [configService.get<string>('db.postgres.entities')],
+        entities: [configService.get<string>('db.postgres.entity')],
         logging: configService.get<boolean>('db.postgres.logging'),
         migrationsRun: configService.get<boolean>('db.postgres.migrationsRun'),
         synchronize: configService.get<boolean>('db.postgres.synchronize'),

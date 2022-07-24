@@ -2,7 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { MediumRssCreateDto } from './domain/dto/mediumRssCreate.dto';
 import { MediumRssViewDto } from './domain/dto/mediumRssView.dto';
 import { InjectRepository } from "@nestjs/typeorm";
-import { BlogEntity } from "./domain/entities/blog.entity";
+import { BlogEntity } from "./domain/entity/blog.entity";
 import { Repository } from "typeorm";
 
 @Injectable()

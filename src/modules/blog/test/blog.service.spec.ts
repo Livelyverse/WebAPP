@@ -1,7 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { BlogService } from "../blog.service";
 import { getRepositoryToken } from "@nestjs/typeorm";
-import { BlogEntity, ProtocolType } from "../domain/entities/blog.entity";
+import { BlogEntity, ProtocolType } from "../domain/entity/blog.entity";
 import { Repository } from "typeorm";
 
 export class BlogRepositoryMock {
