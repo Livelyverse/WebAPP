@@ -130,7 +130,7 @@ export class MediumTaskService {
             if (newBlog.title === fetchedBlog.title &&
                 newBlog.feed.link === fetchedBlog.feed.link &&
                 newBlog.thumbnail === fetchedBlog.thumbnail) {
-              return Rxjs.of(newBlog);
+              return Rxjs.of(null);
             }
             return Rxjs.from(this._blogRepository.update({ id: fetchedBlog.id }, { title: newBlog.title, thumbnail: newBlog.thumbnail, feed: newBlog.feed }))
               .pipe(
@@ -148,12 +148,13 @@ export class MediumTaskService {
     // await lastValueFrom(observer);
     observer.subscribe(
       (value: BlogEntity) => {
-          if(value.id) {
+        if(value) {
+          if (value.id) {
             this._logger.log(`New BlogEntity persist successfully, guid: ${value.feed.guid}, title: ${value.title}`);
           } else {
             this._logger.log(`BlogEntity update successfully, guid: ${value.feed.guid}, title: ${value.title}`);
           }
-        },
+        }},
       // (value) => {this._logger.log(`New BlogEntity persist successfully, ${value}`);},
       (error) => this._logger.error(`fetchMediumRss fetch RSS failed, error: ${error}`),
       () => this._logger.log(`fetchMediumRss fetch RSS completed`));
