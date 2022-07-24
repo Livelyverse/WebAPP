@@ -4,13 +4,19 @@ import * as Parser from 'rss-parser';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
 import * as Rxjs from 'rxjs';
-import { BlogEntity, ProtocolType } from '../entities/blog.entity';
+import { BlogEntity, ProtocolType } from '../entity/blog.entity';
 import { MediumRssCreateDto } from '../dto/mediumRssCreate.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from "typeorm";
+import { QueryFailedError, Repository } from "typeorm";
+import { DatabaseError } from 'pg-protocol';
 import { ConfigService } from "@nestjs/config";
+import { TypeORMError } from "typeorm/error/TypeORMError";
 
-type MediumFeed = { generator: string };
+type MediumFeed = { generator: string, thumbnail: string };
+type ThumbnailFeed = {guid: string, thumbnail: string};
+
+export const isQueryFailedError = (err: unknown): err is QueryFailedError & DatabaseError =>
+  err instanceof QueryFailedError;
 
 @Injectable()
 export class MediumTaskService {
@@ -20,6 +26,7 @@ export class MediumTaskService {
   private readonly _xmlParser;
   private readonly _configService: ConfigService;
   private readonly _mediumRssAddress: string;
+  private readonly _mediumThumbnailAddress: string;
 
   constructor(
     readonly httpService: HttpService,
@@ -35,9 +42,14 @@ export class MediumTaskService {
         feed: ['generator'],
       },
     });
-    this._mediumRssAddress = this._configService.get<string>('blog.mediumRss');
+    this._mediumRssAddress = this._configService.get<string>('blog.medium.rss');
     if (!this._mediumRssAddress) {
-      throw new Error("blog.mediumRss config is empty");
+      throw new Error("blog.medium.rss config is empty");
+    }
+
+    this._mediumThumbnailAddress = this._configService.get<string>('blog.medium.thumbnail');
+    if (!this._mediumThumbnailAddress) {
+      throw new Error("blog.medium.thumbnail config is empty");
     }
     this.fetchMediumRss();
   }
@@ -46,7 +58,8 @@ export class MediumTaskService {
   fetchMediumRss() {
     // this._logger.log('Called when the current second is 1');
     // let result = await this._blogRepository.query(`select count(*) from blog where '{"guid":"test"}'::jsonb <@ feed`)
-    const observer: Rxjs.Observable<BlogEntity> = this._httpService
+    // const observer: Rxjs.Observable<BlogEntity> = this._httpService
+    const observer = this._httpService
       .get(this._mediumRssAddress)
       .pipe(
         Rxjs.map((response) => {
@@ -66,7 +79,20 @@ export class MediumTaskService {
             })(),
           );
         }),
-        Rxjs.mergeMap(([blogEntityPattern, dto]: [BlogEntity, MediumRssCreateDto & MediumFeed]) => {
+        Rxjs.zipWith(this._httpService
+          .get(this._mediumThumbnailAddress)
+          .pipe(Rxjs.map(response => {
+              let thumbnailItems: Array<ThumbnailFeed> = [];
+              for (const {guid, thumbnail} of response.data.items) {
+                thumbnailItems.push({guid: guid, thumbnail: thumbnail});
+              }
+              return thumbnailItems;
+            }),
+            retryWithDelay(10000, 3),
+          )
+        ),
+        Rxjs.map(tuple => [...tuple[0], tuple[1]]),
+        Rxjs.mergeMap(([blogEntityPattern, dto, thumbnailItems]: [BlogEntity, MediumRssCreateDto & MediumFeed, [ThumbnailFeed]]) => {
           let blogs: BlogEntity[] = [];
           for (const item of dto.items) {
             const blogEntity = new BlogEntity();
@@ -82,32 +108,53 @@ export class MediumTaskService {
             blogEntity.publishedAt = new Date(item.isoDate);
             blogEntity.image = dto.image;
             blogEntity.feed = item;
+            for (const thumbnailItem of thumbnailItems) {
+              if (item.guid === thumbnailItem.guid) {
+                blogEntity.thumbnail = thumbnailItem.thumbnail;
+                dto.thumbnail = thumbnailItem.thumbnail;
+                break;
+              }
+            }
             blogs.push(blogEntity);
           }
-          return Rxjs.from(blogs)
-            .pipe(
-              Rxjs.zipWith(Rxjs.from(dto.items)
-                .pipe(Rxjs.mergeMap((item) =>
-                  Rxjs.from(this._blogRepository.query(`select count(*) from blog where '{"guid":"${item.guid}"}'::jsonb <@ feed`))
-                  .pipe(
-                    // Rxjs.tap((result) => this._logger.log(`query result: ${result[0].count}`)),
-                    Rxjs.map((result) => parseInt(result[0].count) === 0))
-                  )
-                )
-              ),
-              Rxjs.filter(([_, isFound]) => isFound === true),
-              Rxjs.mergeMap(([blog, _]) => Rxjs.from(this._blogRepository.save(blog))))
+          return Rxjs.from(blogs);
+        }),
+        Rxjs.mergeMap((newBlog) => {
+            return Rxjs.zip(Rxjs.of(newBlog), Rxjs.from(this._blogRepository.query(`select * from blog where '{"guid":"${newBlog.feed.guid}"}'::jsonb <@ feed`)));
+        }),
+        Rxjs.mergeMap((tuple) => {
+          let [newBlog, result] = tuple;
+          if (result && result.length > 0) {
+            // this._logger.log(`query result entity found: ${result[0].feed.guid}`);
+            const fetchedBlog = result[0];
+            if (newBlog.title === fetchedBlog.title &&
+                newBlog.feed.link === fetchedBlog.feed.link &&
+                newBlog.thumbnail === fetchedBlog.thumbnail) {
+              return Rxjs.of(newBlog);
+            }
+            return Rxjs.from(this._blogRepository.update({ id: fetchedBlog.id }, { title: newBlog.title, thumbnail: newBlog.thumbnail, feed: newBlog.feed }))
+              .pipe(
+                // Rxjs.tap(result => this._logger.log(`update result: ${JSON.stringify(result)}`)),
+                Rxjs.map(_ => newBlog)
+              );
+          } else {
+            // this._logger.log(`query result blog not found, new Blog: ${newBlog.feed.guid}`);
+            return Rxjs.from(this._blogRepository.save(newBlog));
+          }
         }),
         retryWithDelay(10000, 3),
-        // Rxjs.catchError((error: unknown) => {
-        //   this._logger.error(`fetchMediumRss fetch RSS failed: ${error}`);
-        //   return Rxjs.of(null);
-        // }),
       );
 
     // await lastValueFrom(observer);
     observer.subscribe(
-      (value: BlogEntity) => {this._logger.log(`New BlogEntity persist successfully, id: ${value.id}, title: ${value.title}`);},
+      (value: BlogEntity) => {
+          if(value.id) {
+            this._logger.log(`New BlogEntity persist successfully, guid: ${value.feed.guid}, title: ${value.title}`);
+          } else {
+            this._logger.log(`BlogEntity update successfully, guid: ${value.feed.guid}, title: ${value.title}`);
+          }
+        },
+      // (value) => {this._logger.log(`New BlogEntity persist successfully, ${value}`);},
       (error) => this._logger.error(`fetchMediumRss fetch RSS failed, error: ${error}`),
       () => this._logger.log(`fetchMediumRss fetch RSS completed`));
   }
@@ -123,7 +170,7 @@ export function retryWithDelay<T>(delay: number, count = 1): Rxjs.MonoTypeOperat
             error: undefined as any,
           }),
           Rxjs.tap((current) => {
-            if (current.count > count) {
+            if (current.error instanceof TypeORMError || current.count > count) {
               throw current.error;
             }
           }),

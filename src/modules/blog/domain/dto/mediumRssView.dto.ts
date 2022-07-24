@@ -5,7 +5,7 @@ import {
   MediumRssItemDto,
   MediumRssPaginationLinks
 } from "./mediumRssCreate.dto";
-import { BlogEntity, ProtocolType } from "../entities/blog.entity";
+import { BlogEntity, ProtocolType } from "../entity/blog.entity";
 
 
 export class MediumRssViewDto {

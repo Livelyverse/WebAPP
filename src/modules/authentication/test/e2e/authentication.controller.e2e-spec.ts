@@ -33,7 +33,7 @@
 //   it('should return expires_in and access_token', async () => {
 //     return request(server)
 //       .post('/login')
-//       .send({ email: 'tests@tests.fr', password: 'password' })
+//       .send({ email: 'test@test.fr', password: 'password' })
 //       .expect((res) => {
 //         expect(res.body.expires_in).toBe(3600);
 //         expect(res.body.access_token).not.toBeNull();
