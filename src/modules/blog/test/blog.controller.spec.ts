@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BlogController } from '../blog.controller';
 import { BlogService } from '../blog.service';
-import { BlogEntity } from "../domain/entities/blog.entity";
+import { BlogEntity } from "../domain/entity/blog.entity";
 import { HttpException, HttpStatus } from "@nestjs/common";
 
 describe('BlogController', () => {

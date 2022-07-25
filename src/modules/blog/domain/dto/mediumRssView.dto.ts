@@ -5,7 +5,7 @@ import {
   MediumRssItemDto,
   MediumRssPaginationLinks
 } from "./mediumRssCreate.dto";
-import { BlogEntity, ProtocolType } from "../entities/blog.entity";
+import { BlogEntity, ProtocolType } from "../entity/blog.entity";
 
 
 export class MediumRssViewDto {
@@ -21,7 +21,8 @@ export class MediumRssViewDto {
       rssViewDto.description= blog.description;
       rssViewDto.image= blog.image;
       rssViewDto.item= blog.feed;
-      rssViewDto.protocol= blog.protocol === ProtocolType.RSS ? "RSS" : "ATOM";
+      rssViewDto.thumbnail = blog.thumbnail;
+      rssViewDto.protocol= blog.protocol;
       rssViewDto.version= blog.protocolVersion;
       return rssViewDto;
     }
@@ -42,6 +43,9 @@ export class MediumRssViewDto {
 
   @ApiProperty()
   public title: string;
+
+  @ApiProperty()
+  public thumbnail: string;
 
   @ApiProperty()
   public feedUrl: string;

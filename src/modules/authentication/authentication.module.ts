@@ -16,7 +16,7 @@ export class AuthenticationModule {
       provide: 'Strategy',
       useFactory: async (authenticationService: AuthenticationService) => {
         const Strategy = (
-          await import(`./domain/passports/${strategy}.strategy`)
+          await import(`./domain/passport/${strategy}.strategy`)
         ).default;
         return new Strategy(authenticationService);
       },
