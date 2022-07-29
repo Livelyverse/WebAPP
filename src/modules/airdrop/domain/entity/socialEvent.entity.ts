@@ -1,20 +1,26 @@
-import { Column, Entity, ManyToOne, OneToMany } from "typeorm";
+import { Column, Entity, ManyToOne, OneToMany, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { ContentDto } from "../dto/content.dto";
-import { SocialMediaEntity } from "./socialMedia.entity";
+import { SocialLivelyEntity } from "./socialLively.entity";
 import { SocialTrackerEntity } from "./socialTracker.entity";
+import { SocialEventType } from "./enums";
+import { SocialFollowerEntity } from "./socialFollower.entity";
+import { SocialScheduleEntity } from "./SocialSchedule.entity";
 
 @Entity({ name: 'social_event' })
 export class SocialEventEntity extends BaseEntity {
 
-  @Column({ type: 'varchar', length: 128, unique: false, nullable: false })
-  contentId: string
+  @Column({ type: 'text', nullable: false})
+  eventType: SocialEventType
 
-  @Column({ type: 'jsonb', unique: false, nullable: false })
+  @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
+  contentId?: string
+
+  @Column({ type: 'jsonb', unique: false, nullable: true })
   content?: ContentDto
 
-  @Column({ type: 'varchar', length: 128, unique: false, nullable: false })
-  authorId: string
+  @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
+  authorId?: string
 
   @Column({ type: 'varchar', length: 256, unique: false, nullable: true })
   authorName?: string
@@ -22,29 +28,14 @@ export class SocialEventEntity extends BaseEntity {
   // @Column({ type: 'varchar', length: 1024, unique: false, nullable: false })
   // context: string
 
-  @Column({ type: 'varchar', length: 32, unique: false, nullable: false })
-  lang: string
+  @Column({ type: 'varchar', length: 32, unique: false, nullable: true })
+  lang?: string
 
-  @Column({ type: 'varchar', length: 1024, unique: false, nullable: false })
-  contentUrl: string
+  @Column({ type: 'varchar', length: 1024, unique: false, nullable: true })
+  contentUrl?: string
 
   @Column({ type: 'timestamptz', unique: false, nullable: true })
-  publishedAt: Date
-
-  @ManyToOne((type) => SocialMediaEntity, (social) => social.events, {
-    cascade: ['soft-remove'],
-    onDelete: 'NO ACTION',
-    nullable: false,
-    lazy: false,
-    eager: true,
-    orphanedRowAction: 'nullify',
-  })
-  social: SocialMediaEntity
-
-  @OneToMany((type) => SocialTrackerEntity, (socialTracker) => socialTracker.event, {
-    nullable: true,
-  })
-  observes: Promise<Array<SocialTrackerEntity>>
+  publishedAt?: Date
 
   @Column({ type: 'timestamptz', nullable: false })
   trackingStartedAt: Date
@@ -55,4 +46,28 @@ export class SocialEventEntity extends BaseEntity {
   @Column({ type: 'integer', unique: false, nullable: false })
   trackingInterval: number
 
+  @OneToOne((type) => SocialFollowerEntity, (follower) => follower.event, {
+    cascade: ['soft-remove'],
+    onDelete: 'NO ACTION',
+    nullable: true,
+    lazy: false,
+    eager: true,
+    orphanedRowAction: 'nullify',
+  })
+  follower: SocialFollowerEntity
+
+  @ManyToOne((type) => SocialLivelyEntity, (social) => social.events, {
+    cascade: ['soft-remove'],
+    onDelete: 'NO ACTION',
+    nullable: true,
+    lazy: false,
+    eager: true,
+    orphanedRowAction: 'nullify',
+  })
+  social: SocialLivelyEntity
+
+  @OneToMany((type) => SocialScheduleEntity, (scheduleTracker) => scheduleTracker.event, {
+    nullable: true,
+  })
+  schedules: Promise<Array<SocialScheduleEntity>>
 }

@@ -5,6 +5,7 @@ import {
   AuthMailEntity,
   TokenEntity,
 } from '../../../authentication/domain/entity';
+import { SocialMediaEntity } from "./socialMedia.entity";
 
 @Entity({ name: 'user' })
 export class UserEntity extends BaseEntity {
@@ -47,6 +48,11 @@ export class UserEntity extends BaseEntity {
     orphanedRowAction: 'nullify',
   })
   group: GroupEntity;
+
+  @OneToMany((type) => SocialMediaEntity, (socialMedia) => socialMedia.user, {
+    nullable: true,
+  })
+  socials: Promise<Array<SocialMediaEntity>>;
 
   @OneToMany((type) => AuthMailEntity, (authMails) => authMails.user)
   authMails: Promise<Array<AuthMailEntity>>;

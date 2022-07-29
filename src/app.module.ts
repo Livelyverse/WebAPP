@@ -15,6 +15,7 @@ import { AirdropModule } from './modules/airdrop/airdrop.module';
     MailModule,
     ProfileModule,
     BlogModule,
+    AirdropModule,
     ConfigModule.forRoot({
       load: [yamlReader],
     }),

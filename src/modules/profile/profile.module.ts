@@ -14,6 +14,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { memoryStorage } from 'multer';
 import { BackofficeController } from './controllers/dashboard.controller';
+import { SocialMediaEntity } from "./domain/entity/socialMedia.entity";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { BackofficeController } from './controllers/dashboard.controller';
       UserEntity,
       AuthMailEntity,
       TokenEntity,
+      SocialMediaEntity,
     ]),
     MailModule,
     ConfigModule,

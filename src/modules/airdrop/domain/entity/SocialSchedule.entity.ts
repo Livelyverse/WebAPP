@@ -1,9 +1,10 @@
-import { Column, Entity, ManyToOne } from "typeorm";
+import { Column, Entity, ManyToOne, OneToMany, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialEventEntity } from "./socialEvent.entity";
+import { SocialTrackerEntity } from "./socialTracker.entity";
 
-@Entity({ name: 'schedule_tracker' })
-export class ScheduleTrackerEntity extends BaseEntity {
+@Entity({ name: 'social_schedule' })
+export class SocialScheduleEntity extends BaseEntity {
 
   @Column({ type: 'timestamptz', nullable: false })
   triggeredAt: Date
@@ -23,4 +24,10 @@ export class ScheduleTrackerEntity extends BaseEntity {
     orphanedRowAction: 'nullify',
   })
   event: SocialEventEntity
+
+  @OneToMany(() => SocialTrackerEntity, (tracker) => tracker.schedule)
+  tracker: SocialTrackerEntity
+
+
+
 }
