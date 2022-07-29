@@ -8,6 +8,7 @@ import { MailModule } from './modules/mail/mail.module';
 import { BlogModule } from './modules/blog/blog.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AirdropModule } from './modules/airdrop/airdrop.module';
+import { BlockchainModule } from './modules/blockchain/blockchain.module';
 @Module({
   imports: [
     AuthenticationModule.forRoot('jwt'),
@@ -39,6 +40,7 @@ import { AirdropModule } from './modules/airdrop/airdrop.module';
       inject: [ConfigService],
     }),
     AirdropModule,
+    BlockchainModule,
   ],
   controllers: [],
   providers: [],

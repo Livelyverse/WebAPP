@@ -12,12 +12,14 @@ import { SocialTrackerEntity } from "./domain/entity/socialTracker.entity";
 import { SocialScheduleEntity } from "./domain/entity/SocialSchedule.entity";
 import { SocialAirdropEntity } from "./domain/entity/socialAirdrop.entity";
 import { SocialAirdropRuleEntity } from "./domain/entity/socialAirdropRule.entity";
+import { BlockchainModule } from "../blockchain/blockchain.module";
 
 @Module({
   imports: [
     ProfileModule,
     HttpModule,
     ConfigModule,
+    BlockchainModule,
     TypeOrmModule.forFeature([
       SocialLivelyEntity,
       SocialFollowerEntity,
