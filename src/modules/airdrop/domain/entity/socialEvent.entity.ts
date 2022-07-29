@@ -8,6 +8,12 @@ import { SocialTrackerEntity } from "./socialTracker.entity";
 export class SocialEventEntity extends BaseEntity {
 
   @Column({ type: 'varchar', length: 128, unique: false, nullable: false })
+  contentId: string
+
+  @Column({ type: 'jsonb', unique: false, nullable: false })
+  content?: ContentDto
+
+  @Column({ type: 'varchar', length: 128, unique: false, nullable: false })
   authorId: string
 
   @Column({ type: 'varchar', length: 256, unique: false, nullable: true })
@@ -19,17 +25,11 @@ export class SocialEventEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 32, unique: false, nullable: false })
   lang: string
 
-  @Column({ type: 'varchar', length: 128, unique: false, nullable: false })
-  contentId: string
-
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: false })
   contentUrl: string
 
-  @Column({ type: 'jsonb', unique: false, nullable: false })
-  content?: ContentDto
-
   @Column({ type: 'timestamptz', unique: false, nullable: true })
-  submittedAt: Date
+  publishedAt: Date
 
   @ManyToOne((type) => SocialMediaEntity, (social) => social.events, {
     cascade: ['soft-remove'],
