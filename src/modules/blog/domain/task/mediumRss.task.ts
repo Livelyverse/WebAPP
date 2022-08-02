@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import * as Parser from 'rss-parser';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
-import * as Rxjs from 'rxjs';
+import * as RxJS from 'rxjs';
 import { BlogEntity, ProtocolType } from '../entity/blog.entity';
 import { MediumRssCreateDto } from '../dto/mediumRssCreate.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +11,7 @@ import { QueryFailedError, Repository } from "typeorm";
 import { DatabaseError } from 'pg-protocol';
 import { ConfigService } from "@nestjs/config";
 import { TypeORMError } from "typeorm/error/TypeORMError";
+import * as cheerio from "cheerio";
 
 type MediumFeed = { generator: string, thumbnail: string };
 type ThumbnailFeed = {guid: string, thumbnail: string};
@@ -26,7 +27,7 @@ export class MediumTaskService {
   private readonly _xmlParser;
   private readonly _configService: ConfigService;
   private readonly _mediumRssAddress: string;
-  private readonly _mediumThumbnailAddress: string;
+  private readonly _mediumHomepage: string;
 
   constructor(
     readonly httpService: HttpService,
@@ -47,9 +48,9 @@ export class MediumTaskService {
       throw new Error("blog.medium.rss config is empty");
     }
 
-    this._mediumThumbnailAddress = this._configService.get<string>('blog.medium.thumbnail');
-    if (!this._mediumThumbnailAddress) {
-      throw new Error("blog.medium.thumbnail config is empty");
+    this._mediumHomepage = this._configService.get<string>('blog.medium.homepage');
+    if (!this._mediumHomepage) {
+      throw new Error("blog.medium.homepage config is empty");
     }
     this.fetchMediumRss();
   }
@@ -62,38 +63,31 @@ export class MediumTaskService {
     const observer = this._httpService
       .get(this._mediumRssAddress)
       .pipe(
-        Rxjs.map((response) => {
+        RxJS.map((response) => {
           const result = /<rss.*version="(.*)" (.*)/.exec(response.data);
           const blogEntity = new BlogEntity();
           blogEntity.protocolVersion = result[1];
           blogEntity.protocol = ProtocolType.RSS;
           return [blogEntity, response];
         }),
-        Rxjs.concatMap((tuple: [BlogEntity, AxiosResponse]) => {
-          return Rxjs.from(
-            (async () => {
-              return [
-                tuple[0],
-                await this._xmlParser.parseString(tuple[1].data),
-              ];
-            })(),
-          );
-        }),
-        Rxjs.zipWith(this._httpService
-          .get(this._mediumThumbnailAddress)
-          .pipe(Rxjs.map(response => {
-              let thumbnailItems: Array<ThumbnailFeed> = [];
-              for (const {guid, thumbnail} of response.data.items) {
-                thumbnailItems.push({guid: guid, thumbnail: thumbnail});
-              }
-              return thumbnailItems;
-            }),
-            retryWithDelay(10000, 3),
+        RxJS.switchMap((tuple: [BlogEntity, AxiosResponse]) => {
+          return RxJS.zip(
+            RxJS.from(
+              (async () => {
+                return [
+                  tuple[0],
+                  await this._xmlParser.parseString(tuple[1].data),
+                ];
+              })(),
+            ),
+            this._httpService.get(this._mediumHomepage).pipe(retryWithDelay(10000, 3))
           )
-        ),
-        Rxjs.map(tuple => [...tuple[0], tuple[1]]),
-        Rxjs.mergeMap(([blogEntityPattern, dto, thumbnailItems]: [BlogEntity, MediumRssCreateDto & MediumFeed, [ThumbnailFeed]]) => {
+        }),
+        RxJS.map(tuple => [...tuple[0], tuple[1]]),
+        RxJS.mergeMap(([blogEntityPattern, dto, response]: [BlogEntity, MediumRssCreateDto & MediumFeed, any]) => {
           let blogs: BlogEntity[] = [];
+          const $ = cheerio.load(response.data);
+          const reg = new RegExp("^https.*\/");
           for (const item of dto.items) {
             const blogEntity = new BlogEntity();
             blogEntity.protocolVersion = blogEntityPattern.protocolVersion;
@@ -108,21 +102,24 @@ export class MediumTaskService {
             blogEntity.publishedAt = new Date(item.isoDate);
             blogEntity.image = dto.image;
             blogEntity.feed = item;
-            for (const thumbnailItem of thumbnailItems) {
-              if (item.guid === thumbnailItem.guid) {
-                blogEntity.thumbnail = thumbnailItem.thumbnail;
-                dto.thumbnail = thumbnailItem.thumbnail;
+
+            const images = $(`img[alt='${item.title}']`);
+            for (const image of images) {
+              // @ts-ignore:
+              let src = image?.attribs?.src
+              if (src) {
+                blogEntity.thumbnail = src.replace(reg, 'https://cdn-images-1.medium.com/max/1024/')
                 break;
               }
             }
             blogs.push(blogEntity);
           }
-          return Rxjs.from(blogs);
+          return RxJS.from(blogs);
         }),
-        Rxjs.mergeMap((newBlog) => {
-            return Rxjs.zip(Rxjs.of(newBlog), Rxjs.from(this._blogRepository.query(`select * from blog where '{"guid":"${newBlog.feed.guid}"}'::jsonb <@ feed`)));
+        RxJS.mergeMap((newBlog) => {
+            return RxJS.zip(RxJS.of(newBlog), RxJS.from(this._blogRepository.query(`select * from blog where '{"guid":"${newBlog.feed.guid}"}'::jsonb <@ feed`)));
         }),
-        Rxjs.mergeMap((tuple) => {
+        RxJS.mergeMap((tuple) => {
           let [newBlog, result] = tuple;
           if (result && result.length > 0) {
             // this._logger.log(`query result entity found: ${result[0].feed.guid}`);
@@ -130,16 +127,16 @@ export class MediumTaskService {
             if (newBlog.title === fetchedBlog.title &&
                 newBlog.feed.link === fetchedBlog.feed.link &&
                 newBlog.thumbnail === fetchedBlog.thumbnail) {
-              return Rxjs.of(null);
+              return RxJS.of(null);
             }
-            return Rxjs.from(this._blogRepository.update({ id: fetchedBlog.id }, { title: newBlog.title, thumbnail: newBlog.thumbnail, feed: newBlog.feed }))
+            return RxJS.from(this._blogRepository.update({ id: fetchedBlog.id }, { title: newBlog.title, thumbnail: newBlog.thumbnail, feed: newBlog.feed }))
               .pipe(
                 // Rxjs.tap(result => this._logger.log(`update result: ${JSON.stringify(result)}`)),
-                Rxjs.map(_ => newBlog)
+                RxJS.map(_ => newBlog)
               );
           } else {
             // this._logger.log(`query result blog not found, new Blog: ${newBlog.feed.guid}`);
-            return Rxjs.from(this._blogRepository.save(newBlog));
+              return !!newBlog.thumbnail ? RxJS.from(this._blogRepository.save(newBlog)) : RxJS.EMPTY;
           }
         }),
         retryWithDelay(10000, 3),
@@ -161,21 +158,21 @@ export class MediumTaskService {
   }
 }
 
-export function retryWithDelay<T>(delay: number, count = 1): Rxjs.MonoTypeOperatorFunction<T> {
+export function retryWithDelay<T>(delay: number, count = 1): RxJS.MonoTypeOperatorFunction<T> {
   return (input) =>
     input.pipe(
-      Rxjs.retryWhen((errors) =>
+      RxJS.retryWhen((errors) =>
         errors.pipe(
-          Rxjs.scan((acc, error) => ({ count: acc.count + 1, error }), {
+          RxJS.scan((acc, error) => ({ count: acc.count + 1, error }), {
             count: 0,
             error: undefined as any,
           }),
-          Rxjs.tap((current) => {
+          RxJS.tap((current) => {
             if (current.error instanceof TypeORMError || current.count > count) {
               throw current.error;
             }
           }),
-          Rxjs.delay(delay)
+          RxJS.delay(delay)
         )
       )
     );
