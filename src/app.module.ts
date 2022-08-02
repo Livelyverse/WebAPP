@@ -17,11 +17,13 @@ import { BlockchainModule } from './modules/blockchain/blockchain.module';
     ProfileModule,
     BlogModule,
     AirdropModule,
+    BlockchainModule,
     ConfigModule.forRoot({
       load: [yamlReader],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
+      // name: "postgresDatasource",
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         host: configService.get<string>('db.postgres.host'),
@@ -39,8 +41,6 @@ import { BlockchainModule } from './modules/blockchain/blockchain.module';
       }),
       inject: [ConfigService],
     }),
-    AirdropModule,
-    BlockchainModule,
   ],
   controllers: [],
   providers: [],

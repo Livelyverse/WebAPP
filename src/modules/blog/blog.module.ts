@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { BlogService } from './blog.service';
 import { BlogController } from './blog.controller';
 import { ProfileModule } from '../profile/profile.module';
-import { MediumTaskService } from './domain/task/mediumRss.task';
+import { MediumRssTask } from './domain/task/mediumRss.task';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BlogEntity } from './domain/entity/blog.entity';
@@ -16,6 +16,6 @@ import { ConfigModule } from '@nestjs/config';
     TypeOrmModule.forFeature([BlogEntity]),
   ],
   controllers: [BlogController],
-  providers: [BlogService, MediumTaskService],
+  providers: [BlogService, MediumRssTask],
 })
 export class BlogModule {}

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ContentDto } from './domain/dto/content.dto';
-import { UpdateAirdropDto } from './domain/dto/update-airdrop.dto';
+import { TwitterUserProfileDto } from './domain/dto/twitterUserProfile.dto';
 
 @Injectable()
 export class AirdropService {
@@ -16,7 +16,7 @@ export class AirdropService {
     return `This action returns a #${id} airdrop`;
   }
 
-  update(id: number, updateAirdropDto: UpdateAirdropDto) {
+  update(id: number, updateAirdropDto: TwitterUserProfileDto) {
     return `This action updates a #${id} airdrop`;
   }
 

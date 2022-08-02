@@ -19,8 +19,8 @@ export const isQueryFailedError = (err: unknown): err is QueryFailedError & Data
   err instanceof QueryFailedError;
 
 @Injectable()
-export class MediumTaskService {
-  private readonly _logger = new Logger(MediumTaskService.name);
+export class MediumRssTask {
+  private readonly _logger = new Logger(MediumRssTask.name);
   private readonly _httpService: HttpService;
   private readonly _blogRepository: Repository<BlogEntity>;
   private readonly _xmlParser;

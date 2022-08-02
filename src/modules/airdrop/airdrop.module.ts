@@ -13,6 +13,7 @@ import { SocialScheduleEntity } from "./domain/entity/SocialSchedule.entity";
 import { SocialAirdropEntity } from "./domain/entity/socialAirdrop.entity";
 import { SocialAirdropRuleEntity } from "./domain/entity/socialAirdropRule.entity";
 import { BlockchainModule } from "../blockchain/blockchain.module";
+import { TwitterFollowerTask } from "./domain/task/twitter/follower.task";
 
 @Module({
   imports: [
@@ -31,6 +32,6 @@ import { BlockchainModule } from "../blockchain/blockchain.module";
     ]),
   ],
   controllers: [AirdropController],
-  providers: [AirdropService]
+  providers: [AirdropService, TwitterFollowerTask]
 })
 export class AirdropModule {}
