@@ -26,7 +26,7 @@ export class MediumTaskService {
   private readonly _xmlParser;
   private readonly _configService: ConfigService;
   private readonly _mediumRssAddress: string;
-  private readonly _mediumThumbnailAddress: string;
+  private readonly _mediumHomepage: string;
 
   constructor(
     readonly httpService: HttpService,
@@ -47,9 +47,9 @@ export class MediumTaskService {
       throw new Error("blog.medium.rss config is empty");
     }
 
-    this._mediumThumbnailAddress = this._configService.get<string>('blog.medium.thumbnail');
-    if (!this._mediumThumbnailAddress) {
-      throw new Error("blog.medium.thumbnail config is empty");
+    this._mediumHomepage = this._configService.get<string>('blog.medium.homepage');
+    if (!this._mediumHomepage) {
+      throw new Error("blog.medium.homepage config is empty");
     }
     this.fetchMediumRss();
   }
@@ -79,20 +79,8 @@ export class MediumTaskService {
             })(),
           );
         }),
-        Rxjs.zipWith(this._httpService
-          .get(this._mediumThumbnailAddress)
-          .pipe(Rxjs.map(response => {
-              let thumbnailItems: Array<ThumbnailFeed> = [];
-              for (const {guid, thumbnail} of response.data.items) {
-                thumbnailItems.push({guid: guid, thumbnail: thumbnail});
-              }
-              return thumbnailItems;
-            }),
-            retryWithDelay(10000, 3),
-          )
-        ),
-        Rxjs.map(tuple => [...tuple[0], tuple[1]]),
-        Rxjs.mergeMap(([blogEntityPattern, dto, thumbnailItems]: [BlogEntity, MediumRssCreateDto & MediumFeed, [ThumbnailFeed]]) => {
+        // Rxjs.map(tuple => [...tuple[0], tuple[1]]),
+        Rxjs.mergeMap(([blogEntityPattern, dto]: [BlogEntity, MediumRssCreateDto & MediumFeed]) => {
           let blogs: BlogEntity[] = [];
           for (const item of dto.items) {
             const blogEntity = new BlogEntity();
@@ -108,17 +96,29 @@ export class MediumTaskService {
             blogEntity.publishedAt = new Date(item.isoDate);
             blogEntity.image = dto.image;
             blogEntity.feed = item;
-            for (const thumbnailItem of thumbnailItems) {
-              if (item.guid === thumbnailItem.guid) {
-                blogEntity.thumbnail = thumbnailItem.thumbnail;
-                dto.thumbnail = thumbnailItem.thumbnail;
-                break;
-              }
-            }
+            // for (const thumbnailItem of thumbnailItems) {
+            //   if (item.guid === thumbnailItem.guid) {
+            //     blogEntity.thumbnail = thumbnailItem.thumbnail;
+            //     dto.thumbnail = thumbnailItem.thumbnail;
+            //     break;
+            //   }
+            // }
             blogs.push(blogEntity);
           }
           return Rxjs.from(blogs);
         }),
+        Rxjs.switchMap((blogEntity) =>
+          this._httpService.get(this._mediumHomepage).pipe(
+            Rxjs.map(response => {
+              let thumbnailItems: Array<ThumbnailFeed> = [];
+              for (const {guid, thumbnail} of response.data.items) {
+                thumbnailItems.push({guid: guid, thumbnail: thumbnail});
+              }
+              return thumbnailItems;
+            }),
+            retryWithDelay(10000, 3),
+          )
+        ),
         Rxjs.mergeMap((newBlog) => {
             return Rxjs.zip(Rxjs.of(newBlog), Rxjs.from(this._blogRepository.query(`select * from blog where '{"guid":"${newBlog.feed.guid}"}'::jsonb <@ feed`)));
         }),
