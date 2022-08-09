@@ -2,8 +2,9 @@ import { Column, Entity, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialActionType } from "./enums";
 import { SocialProfileEntity } from "../../../profile/domain/entity/socialProfile.entity";
-import { SocialScheduleEntity } from "./SocialSchedule.entity";
 import { SocialAirdropEntity } from "./socialAirdrop.entity";
+import { SocialFollowerEntity } from "./socialFollower.entity";
+import { SocialEventEntity } from "./socialEvent.entity";
 
 
 @Entity({ name: 'social_tracker' })
@@ -12,29 +13,39 @@ export class SocialTrackerEntity extends BaseEntity {
   @Column({ type: 'text', nullable: false})
   actionType: SocialActionType
 
-  @ManyToOne((type) => SocialScheduleEntity, (schedule) => schedule.tracker, {
+  @Column({ type: 'timestamptz', nullable: true })
+  submittedAt?: Date
+
+  @ManyToOne((type) => SocialEventEntity,{
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
-    nullable: false,
+    nullable: true,
     lazy: false,
     eager: true,
     orphanedRowAction: 'nullify',
   })
-  schedule: SocialScheduleEntity
+  socialEvent: SocialEventEntity
 
   @ManyToOne((type) => SocialProfileEntity,{
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
-    nullable: false,
+    nullable: true,
     lazy: false,
     eager: true,
     orphanedRowAction: 'nullify',
   })
-  socialUser: SocialProfileEntity
+  socialProfile: SocialProfileEntity
 
   @OneToOne(() => SocialAirdropEntity, (airdrop) => airdrop.tracker)
   airdrop: SocialAirdropEntity
 
-  @Column({ type: 'timestamptz', nullable: false })
-  submittedAt: Date
+  @OneToOne((type) => SocialFollowerEntity, (follower) => follower.socialTracker, {
+    cascade: ['soft-remove'],
+    onDelete: 'NO ACTION',
+    nullable: true,
+    lazy: false,
+    eager: true,
+    orphanedRowAction: 'nullify',
+  })
+  follower: SocialFollowerEntity
 }

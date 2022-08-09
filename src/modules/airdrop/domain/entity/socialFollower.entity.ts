@@ -2,7 +2,7 @@ import { Entity, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity, UserEntity } from "../../../profile/domain/entity";
 import { SocialLivelyEntity } from "./socialLively.entity";
 import { SocialProfileEntity } from "../../../profile/domain/entity/socialProfile.entity";
-import { SocialEventEntity } from "./socialEvent.entity";
+import { SocialTrackerEntity } from "./socialTracker.entity";
 
 @Entity({ name: 'social_follower' })
 export class SocialFollowerEntity extends BaseEntity {
@@ -26,6 +26,6 @@ export class SocialFollowerEntity extends BaseEntity {
   })
   socialLively: SocialLivelyEntity
 
-  @OneToOne(() =>SocialEventEntity, (socialEvent) => socialEvent.follower)
-  event: SocialEventEntity
+  @OneToOne(() =>SocialTrackerEntity, (socialTracker) => socialTracker.follower)
+  socialTracker: SocialTrackerEntity
 }

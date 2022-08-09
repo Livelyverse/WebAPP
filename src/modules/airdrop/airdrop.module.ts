@@ -9,11 +9,11 @@ import { SocialLivelyEntity } from "./domain/entity/socialLively.entity";
 import { SocialFollowerEntity } from "./domain/entity/socialFollower.entity";
 import { SocialEventEntity } from "./domain/entity/socialEvent.entity";
 import { SocialTrackerEntity } from "./domain/entity/socialTracker.entity";
-import { SocialScheduleEntity } from "./domain/entity/SocialSchedule.entity";
 import { SocialAirdropEntity } from "./domain/entity/socialAirdrop.entity";
 import { SocialAirdropRuleEntity } from "./domain/entity/socialAirdropRule.entity";
 import { BlockchainModule } from "../blockchain/blockchain.module";
 import { TwitterFollowerJob } from "./domain/jobs/twitter/follower.job";
+import { TweetTrackerJob } from "./domain/jobs/twitter/tweetTracker.job";
 
 @Module({
   imports: [
@@ -26,12 +26,11 @@ import { TwitterFollowerJob } from "./domain/jobs/twitter/follower.job";
       SocialFollowerEntity,
       SocialEventEntity,
       SocialTrackerEntity,
-      SocialScheduleEntity,
       SocialAirdropEntity,
       SocialAirdropRuleEntity
     ]),
   ],
   controllers: [AirdropController],
-  providers: [AirdropService, TwitterFollowerJob]
+  providers: [AirdropService, TwitterFollowerJob, TweetTrackerJob]
 })
 export class AirdropModule {}

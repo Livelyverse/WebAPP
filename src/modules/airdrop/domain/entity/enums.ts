@@ -1,12 +1,8 @@
-export enum SocialEventType {
-  NEW_FOLLOWER = "NEW_FOLLOWER",
-  NEW_CONTENT = "NEW_CONTENT"
-}
-
 export enum SocialActionType {
   LIKE = "LIKE",
+  RETWEET = "RETWEET",
   SHARE = "SHARE",
-  // PAGE_FOLLOW = "PAGE_FOLLOW",
+  PAGE_FOLLOWER = "PAGE_FOLLOWER",
   // HASHTAG_FOLLOW = "HASHTAG_FOLLOW",
   COMMENT = "COMMENT",
   VIEW = "VIEW",

@@ -165,7 +165,7 @@ export function retryWithDelay<T>(delay: number, count = 1): RxJS.MonoTypeOperat
         errors.pipe(
           RxJS.scan((acc, error) => ({ count: acc.count + 1, error }), {
             count: 0,
-            error: undefined as any,
+            error: Error,
           }),
           RxJS.tap((current) => {
             if (current.error instanceof TypeORMError || current.count > count) {

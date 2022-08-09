@@ -22,13 +22,9 @@ export class TwitterFollowerJob {
   private readonly _entityManager: EntityManager
   private readonly _configService: ConfigService;
   private readonly _authToken: string
-  private readonly _userid: string
-  private readonly _username: string
   private readonly _twitterClient: TwitterApiv2ReadOnly
 
   constructor(
-    @InjectRepository(SocialFollowerEntity)
-    private readonly followerRepository,
     @InjectEntityManager()
     private entityManager: EntityManager,
     readonly configService: ConfigService)
@@ -39,16 +35,6 @@ export class TwitterFollowerJob {
     this._authToken = this._configService.get<string>('airdrop.twitter.authToken');
     if (!this._authToken) {
       throw new Error("airdrop.twitter.authToken config is empty");
-    }
-
-    this._userid = this._configService.get<string>('airdrop.twitter.userId');
-    if (!this._userid) {
-      throw new Error("airdrop.twitter.userId config is empty");
-    }
-
-    this._username = this._configService.get<string>('airdrop.twitter.username');
-    if (!this._username) {
-      throw new Error("airdrop.twitter.username config is empty");
     }
 
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
@@ -136,7 +122,7 @@ export class TwitterFollowerJob {
               inputObj.socialProfile.profileUrl = "https://twitter.com/" + inputObj.socialProfile.username;
               inputObj.socialProfile.location = inputObj.twitterUser.location;
               inputObj.socialProfile.website = inputObj.twitterUser.entities?.url?.urls[0]?.expanded_url;
-              this._logger.log(`fetchLivelyVerseTwitterFollowers => new twitter follower found, id: ${inputObj.socialProfile.id}, username: ${inputObj.socialProfile.username}`);
+              // this._logger.log(`fetchLivelyVerseTwitterFollowers => new twitter follower found, id: ${inputObj.socialProfile.id}, username: ${inputObj.socialProfile.username}`);
               let socialFollower = new SocialFollowerEntity();
               socialFollower.socialProfile = inputObj.socialProfile;
               socialFollower.socialLively = inputObj.socialLively;
