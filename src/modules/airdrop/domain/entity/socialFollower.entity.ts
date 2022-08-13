@@ -1,5 +1,5 @@
 import { Entity, ManyToOne, OneToOne } from "typeorm";
-import { BaseEntity, UserEntity } from "../../../profile/domain/entity";
+import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialLivelyEntity } from "./socialLively.entity";
 import { SocialProfileEntity } from "../../../profile/domain/entity/socialProfile.entity";
 import { SocialTrackerEntity } from "./socialTracker.entity";

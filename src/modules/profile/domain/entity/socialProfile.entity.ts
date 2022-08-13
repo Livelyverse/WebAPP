@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { UserEntity } from "./user.entity";
 
@@ -45,5 +45,6 @@ export class SocialProfileEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({ name: 'userId' })
   user: UserEntity
 }

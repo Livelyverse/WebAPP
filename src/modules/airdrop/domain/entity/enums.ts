@@ -2,7 +2,7 @@ export enum SocialActionType {
   LIKE = "LIKE",
   RETWEET = "RETWEET",
   SHARE = "SHARE",
-  PAGE_FOLLOWER = "PAGE_FOLLOWER",
+  FOLLOW = "FOLLOW",
   // HASHTAG_FOLLOW = "HASHTAG_FOLLOW",
   COMMENT = "COMMENT",
   VIEW = "VIEW",

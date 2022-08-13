@@ -10,11 +10,11 @@ import * as RxJS from "rxjs";
 import { SocialProfileEntity, SocialType } from "../../../../profile/domain/entity/socialProfile.entity";
 import { SocialLivelyEntity } from "../../entity/socialLively.entity";
 import { UserV2 } from "twitter-api-v2/dist/types/v2/user.v2.types";
-import { TypeORMError } from "typeorm/error/TypeORMError";
-import { UserEntity } from "../../../../profile/domain/entity";
 import { ApiPartialResponseError, ApiRequestError, ApiResponseError } from "twitter-api-v2/dist/types/errors.types";
 import { TwitterApiError } from "../../error/TwitterApiError";
 import { finalize } from "rxjs";
+import { SocialTrackerEntity } from "../../entity/socialTracker.entity";
+import { SocialActionType } from "../../entity/enums";
 
 @Injectable()
 export class TwitterFollowerJob {
@@ -38,18 +38,18 @@ export class TwitterFollowerJob {
     }
 
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
-    this.fetchLivelyVerseTwitterFollowers();
+    this.fetchTwitterFollowers();
   }
 
-  @Cron(CronExpression.EVERY_10_MINUTES)
-  fetchLivelyVerseTwitterFollowers() {
+  @Cron(CronExpression.EVERY_6_HOURS)
+  fetchTwitterFollowers() {
 
     let socialLivelyQueryResultObservable = RxJS.from(this.entityManager.createQueryBuilder(SocialLivelyEntity, "socialLively")
       .where('"socialLively"."socialType" = \'TWITTER\'')
       .andWhere('"socialLively"."isActive" = \'true\'')
       .getOneOrFail())
       .pipe(
-        RxJS.tap((socialLively) => this._logger.log(`fetch social lively: ${socialLively}`))
+        RxJS.tap((socialLively) => this._logger.log(`fetch social lively, socialType: ${socialLively.socialType}`))
       )
 
     RxJS.from(socialLivelyQueryResultObservable).pipe(
@@ -61,11 +61,45 @@ export class TwitterFollowerJob {
             "user.fields": ["id", "name", "username", "url", "location", "entities"]}))
         ).pipe(
           RxJS.expand((paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
+          RxJS.tap({
+            error: (error) => this._logger.error(`tweeter client paginator failed, ${error}`)
+          }),
+          RxJS.concatMap((paginator) =>
+            RxJS.merge(
+              RxJS.of(paginator).pipe(
+                RxJS.filter((paginator) => paginator.rateLimit.remaining > 0),
+                RxJS.tap({
+                  next: (paginator) => this._logger.log(`tweeter client paginator rate limit not exceeded, remaining: ${paginator.rateLimit.remaining}`),
+                })
+              ),
+              RxJS.of(paginator).pipe(
+                RxJS.filter((paginator) => !paginator.rateLimit.remaining),
+                RxJS.tap({
+                  next: (paginator) => this._logger.log(`tweeter client paginator rate limit exceeded, resetAt: ${new Date(paginator.rateLimit.reset * 1000)}`),
+                }),
+                RxJS.delayWhen((paginator) => RxJS.timer(new Date(paginator.rateLimit.reset * 1000)))
+              )
+            )
+          ),
+          RxJS.tap((paginator) => this._logger.log(`tweeter client paginator users count: ${paginator.meta.result_count}`)),
           RxJS.switchMap((paginator) => {
-            this._logger.log(`paginator data count: ${paginator.meta.result_count}`)
             return RxJS.from(paginator.users)
               .pipe(RxJS.map((follower) => [socialLively, follower]))
           }),
+          RxJS.retryWhen((errors) =>
+            errors.pipe(
+              RxJS.takeWhile((err) => {
+                if (!(err instanceof ApiResponseError && err.code === 429)) {
+                  throw err;
+                }
+                return true
+              }),
+              RxJS.tap({
+                next: (paginator) => this._logger.log(`tweeter client rate limit exceeded, retry for 15 minutes later`),
+              }),
+              RxJS.delay(960000)
+            )
+          ),
           RxJS.catchError((err) =>  {
             if (err instanceof ApiPartialResponseError ||
               err instanceof ApiRequestError ||
@@ -75,7 +109,7 @@ export class TwitterFollowerJob {
             return RxJS.throwError (err);
           }),
           finalize(() => this._logger.log(`finalize twitter client follower . . .`)),
-          this.retryWithDelay(3000, 1),
+          this.retryWithDelay(30000, 3),
         )
       ),
       RxJS.concatMap(([socialLively, twitterUser]: [SocialLivelyEntity, UserV2]) =>
@@ -111,24 +145,27 @@ export class TwitterFollowerJob {
           })
         ),
       ),
-      RxJS.tap((inputObj) => this._logger.log(`twitter follower received, username: ${inputObj?.socialProfile?.username}`)),
       RxJS.concatMap((inputData) => {
         return RxJS.merge(
           RxJS.of(inputData).pipe(
-            RxJS.filter((value)=> !value.followerId && !!value.socialProfile),
-            RxJS.map((inputObj) => {
-              inputObj.socialProfile.socialId = inputObj.twitterUser.id;
-              inputObj.socialProfile.socialName = inputObj.twitterUser.name;
-              inputObj.socialProfile.profileUrl = "https://twitter.com/" + inputObj.socialProfile.username;
-              inputObj.socialProfile.location = inputObj.twitterUser.location;
-              inputObj.socialProfile.website = inputObj.twitterUser.entities?.url?.urls[0]?.expanded_url;
-              // this._logger.log(`fetchLivelyVerseTwitterFollowers => new twitter follower found, id: ${inputObj.socialProfile.id}, username: ${inputObj.socialProfile.username}`);
-              let socialFollower = new SocialFollowerEntity();
-              socialFollower.socialProfile = inputObj.socialProfile;
-              socialFollower.socialLively = inputObj.socialLively;
-              return [inputObj, socialFollower]
+            RxJS.filter((data)=> !data.followerId && !!data.socialProfile),
+            RxJS.map((data) => {
+              data.socialProfile.socialId = data.twitterUser.id;
+              data.socialProfile.socialName = data.twitterUser.name;
+              data.socialProfile.profileUrl = "https://twitter.com/" + data.socialProfile.username;
+              data.socialProfile.location = data.twitterUser.location;
+              data.socialProfile.website = data.twitterUser.entities?.url?.urls[0]?.expanded_url;
+
+              const socialFollower = new SocialFollowerEntity();
+              socialFollower.socialProfile = data.socialProfile;
+              socialFollower.socialLively = data.socialLively;
+
+              const socialTracker = new SocialTrackerEntity();
+              socialTracker.actionType = SocialActionType.FOLLOW;
+              socialTracker.socialProfile = data.socialProfile;
+              return [data, socialFollower, socialTracker]
             }),
-            RxJS.concatMap(([filterData, socialFollower]) => {
+            RxJS.concatMap(([data, socialFollower, socialTracker]) => {
               return RxJS.from(
                 this._entityManager.connection.transaction(async (manager) => {
                   await manager.createQueryBuilder()
@@ -138,16 +175,18 @@ export class TwitterFollowerJob {
                     .execute();
 
                   await manager.createQueryBuilder()
-                    .update(SocialProfileEntity)
-                    .set(filterData.socialProfile)
-                    .where("id = :id", { id: filterData.socialProfile.id })
+                    .insert()
+                    .into(SocialTrackerEntity)
+                    .values([socialTracker])
                     .execute();
+
+                  await manager.getRepository(SocialProfileEntity).save(data.socialProfile)
                 })
               ).pipe(
                 RxJS.map((result) => {
-                  this._logger.log(`result update: ${result}`);
                   return {
-                    socialProfile: filterData.socialProfile,
+                    socialProfile: data.socialProfile,
+                    socialTracker: socialTracker,
                     // @ts-ignore
                     followerId: socialFollower.id
                   };
@@ -158,220 +197,41 @@ export class TwitterFollowerJob {
           RxJS.of(inputData).pipe(
             RxJS.filter((value)=> !value.followerId && !(!!value.socialProfile)),
             RxJS.map((filterData) => {filterData.socialProfile, filterData.followerId}),
-            RxJS.tap((mapData) => this._logger.log(`fetchLivelyVerseTwitterFollowers => twitter follower hasn't still registered, username: ${inputData.twitterUser.username}`))
+            RxJS.tap((mapData) => this._logger.log(`twitter follower hasn't still registered, username: ${inputData.twitterUser.username}`))
           ),
-          // RxJS.of(inputData).pipe(
-          //   RxJS.filter((value)=> !value.followerId && !(!!value.socialProfile)),
-          //   RxJS.tap((mapData) => this._logger.log(`fetchLivelyVerseTwitterFollowers => twitter follower hasn't still registered, username: ${inputData.twitterUser.username}`)),
-          //   RxJS.map((filterData) => {
-          //     let newTwitterUser = new UserEntity();
-          //     newTwitterUser.id = "77f2bdbd-49da-49ab-9c8f-70d24830de95";
-          //
-          //     let newSocialProfile = new SocialProfileEntity();
-          //     newSocialProfile.socialType = SocialType.TWITTER;
-          //     newSocialProfile.socialId = filterData.twitterUser.id;
-          //     newSocialProfile.username = filterData.twitterUser.username;
-          //     newSocialProfile.profileName = filterData.twitterUser.name;
-          //     newSocialProfile.profileUrl = "https://twitter.com/" + newSocialProfile.username;
-          //     newSocialProfile.location = filterData.twitterUser.location;
-          //     newSocialProfile.website = filterData.twitterUser.entities?.url?.urls[0]?.expanded_url;
-          //     newSocialProfile.user = newTwitterUser;
-          //     this._logger.log(`fetchLivelyVerseTwitterFollowers => new twitter follower found, id: ${newSocialProfile.id}, username: ${newSocialProfile.username}`);
-          //
-          //     let socialFollower = new SocialFollowerEntity();
-          //     socialFollower.socialProfile = newSocialProfile;
-          //     socialFollower.socialLively = filterData.socialLively;
-          //
-          //     return [newSocialProfile, filterData.socialLively, filterData.twitterUser, socialFollower]
-          //   }),
-          //   RxJS.concatMap((tuple) => {
-          //     return RxJS.from(this._entityManager.connection.transaction(async (manager) => {
-          //       let result = await manager.createQueryBuilder()
-          //         .insert()
-          //         .into(SocialProfileEntity)
-          //         .values([tuple[0]])
-          //         .execute();
-          //
-          //       this._logger.log(`social profile insert result: ${result}`);
-          //
-          //       await manager.createQueryBuilder()
-          //         .insert()
-          //         .into(SocialFollowerEntity)
-          //         .values([tuple[3]])
-          //         .execute();
-          //
-          //       this._logger.log(`social follower insert result: ${result}`);
-          //       return {
-          //         socialProfile: tuple[0],
-          //         // @ts-ignore
-          //         followerId: tuple[3].id
-          //       };
-          //     }))
-          //   })
-          // ),
           RxJS.of(inputData).pipe(
             RxJS.filter((value)=> value.followerId && !!value.socialProfile),
             RxJS.map((filterData) => {filterData.socialProfile, filterData.followerId}),
-            RxJS.tap((mapData) => this._logger.log(`fetchLivelyVerseTwitterFollowers => twitter follower already has registered, username: ${inputData.twitterUser.username}`))
+            RxJS.tap((mapData) => this._logger.log(`twitter follower already has registered, username: ${inputData.twitterUser.username}`))
           )
         )
       }),
+      RxJS.retryWhen((errors) =>
+        errors.pipe(
+          RxJS.takeWhile((err) => {
+            if (!(err instanceof ApiResponseError && err.code === 429)) {
+              throw err;
+            }
+            return true
+          }),
+          RxJS.tap({
+            next: (paginator) => this._logger.log(`tweeter client rate limit exceeded, retry for 15 minutes later`),
+          }),
+          RxJS.delay(960000)
+        )
+      ),
     ).subscribe({
-      next: (inputData: {socialProfile: SocialProfileEntity, followerId: string}) => {
-        if (inputData && inputData.followerId) {
-          this._logger.log(`new follower persist successfully, id: ${inputData.followerId}`);
-        } else if (inputData && inputData.socialProfile){
-          this._logger.log(`social profile has updated successfully, username: ${inputData.socialProfile.username}`);
-        }},
-      error: (error) => {
-          this._logger.error(`fetchLivelyVerseTwitterFollowers fetch followers failed, 
-            error: ${error},
-            stack: ${error?.stack}, 
-            cause-stack: ${error?.cause?.stack}`)
+      next: (data: {socialProfile: SocialProfileEntity, socialTracker: SocialTrackerEntity, followerId: string}) => {
+        if (!!data?.followerId) {
+          this._logger.log(`new follower persist successfully, followerId: ${data.followerId}, trackerId: ${data.socialTracker.id}`);
+        } else if (!!data?.socialProfile) {
+          this._logger.log(`social profile has updated successfully, username: ${data.socialProfile.username}`);
+        }
       },
-      complete: () => this._logger.log(`fetchLivelyVerseTwitterFollowers fetch followers completed`)
+      error: (error) => this._logger.error(`fetch tweeter followers failed, ${error.stack}\n${error?.cause?.stack}`),
+      complete: () => this._logger.log(`fetch tweeter followers completed`)
     });
   }
-
-  // @Cron(CronExpression.EVERY_10_MINUTES)
-  // fetchLivelyVerseTwitterFollowers() {
-  //
-  //   let socialLivelyQueryResultObservable = RxJS.from(this.entityManager.createQueryBuilder(SocialLivelyEntity, "socialLively")
-  //     .where('"socialLively"."socialType" = \'TWITTER\'')
-  //     .andWhere('"socialLively"."isActive" = \'true\'')
-  //     .getOneOrFail())
-  //     .pipe(
-  //       RxJS.tap((socialLively) => this._logger.log(`fetch social lively: ${socialLively}`))
-  //     )
-  //
-  //   RxJS.from(socialLivelyQueryResultObservable).pipe(
-  //     RxJS.switchMap((socialLively) =>
-  //       RxJS.from(this._twitterClient.followers(socialLively.userId, {
-  //         max_results: 128,
-  //         asPaginator: true,
-  //         "user.fields": ["id", "name", "username", "url", "location", "entities"]})
-  //       ).pipe(
-  //         RxJS.expand((paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
-  //         RxJS.switchMap((paginator) => {
-  //           this._logger.log(`paginator data count: ${paginator.meta.result_count}`)
-  //           return RxJS.from(paginator.users)
-  //             .pipe(RxJS.map((follower) => [socialLively, follower]))
-  //         }),
-  //       )
-  //     ),
-  //     RxJS.concatMap(([socialLively, twitterUser]: [SocialLivelyEntity, UserV2]) =>
-  //       RxJS.from(this.entityManager.createQueryBuilder(SocialProfileEntity,"socialProfile")
-  //         .select('"socialProfile".*')
-  //         .addSelect('"socialFollower"."id" as "followerId"')
-  //         .leftJoin("social_follower", "socialFollower", '"socialFollower"."socialProfileId" = "socialProfile"."id"')
-  //         .where('"socialProfile"."username" = :username', {username: twitterUser.username})
-  //         .andWhere('"socialProfile"."socialType" = :socialType', {socialType: socialLively.socialType})
-  //         .getRawOne()
-  //       ).pipe(
-  //         RxJS.switchMap((socialProfileExt) => {
-  //           return RxJS.merge(
-  //             RxJS.of(socialProfileExt).pipe(
-  //               RxJS.filter((data) => !!data),
-  //               RxJS.map((data) => {
-  //                 let { followerId: followerId, ...socialProfile } = data;
-  //                 return {followerId, socialProfile, socialLively, twitterUser};
-  //               })
-  //             ),
-  //             RxJS.of(socialProfileExt).pipe(
-  //               RxJS.filter((data) => !!!data),
-  //               RxJS.map((_) => {
-  //                 return {
-  //                   followerId: undefined,
-  //                   socialProfile: undefined,
-  //                   socialLively: socialLively,
-  //                   twitterUser: twitterUser
-  //                 }
-  //               })
-  //             ),
-  //           )
-  //         })
-  //       ),
-  //     ),
-  //     RxJS.tap((inputObj) => this._logger.log(`twitter follower received, username: ${inputObj.socialProfile.username}`)),
-  //     RxJS.concatMap((inputData) => {
-  //       return RxJS.merge(
-  //         RxJS.of(inputData).pipe(
-  //           RxJS.filter((value)=> !value.followerId && !!value.socialProfile),
-  //           RxJS.map((inputObj) => {
-  //             inputObj.socialProfile.socialId = inputObj.twitterUser.id;
-  //             inputObj.socialProfile.socialName = inputObj.twitterUser.name;
-  //             inputObj.socialProfile.profileUrl = "https://twitter.com/" + inputObj.socialProfile.username;
-  //             inputObj.socialProfile.location = inputObj.twitterUser.location;
-  //             inputObj.socialProfile.website = inputObj.twitterUser.entities?.url?.urls[0]?.expanded_url;
-  //             this._logger.log(`fetchLivelyVerseTwitterFollowers => new twitter follower found, id: ${inputObj.socialProfile.id}, username: ${inputObj.socialProfile.username}`);
-  //             let socialFollower = new SocialFollowerEntity();
-  //             socialFollower.socialProfile = inputObj.socialProfile;
-  //             socialFollower.socialLively = inputObj.socialLively;
-  //             return [inputObj, socialFollower]
-  //           }),
-  //           RxJS.concatMap(([filterData, socialFollower]) => {
-  //             return RxJS.from(
-  //               this._entityManager.connection.transaction(async (manager) => {
-  //                 await manager.createQueryBuilder()
-  //                   .insert()
-  //                   .into(SocialFollowerEntity)
-  //                   .values([socialFollower])
-  //                   .execute();
-  //
-  //                 await manager.createQueryBuilder()
-  //                   .update(SocialProfileEntity)
-  //                   .set(filterData.socialProfile)
-  //                   .where("id = :id", { id: filterData.socialProfile.id })
-  //                   .execute();
-  //               })
-  //             ).pipe(
-  //               RxJS.map((result) => {
-  //                 this._logger.log(`result update: ${result}`);
-  //                 return {
-  //                   socialProfile: filterData.socialProfile,
-  //                   // @ts-ignore
-  //                   followerId: socialFollower.id
-  //                 };
-  //               })
-  //             )
-  //           }),
-  //         ),
-  //         RxJS.of(inputData).pipe(
-  //           RxJS.filter((value)=> !value.followerId && !(!!value.socialProfile)),
-  //           RxJS.map((filterData) => {filterData.socialProfile, filterData.followerId}),
-  //           RxJS.tap((mapData) => this._logger.log(`fetchLivelyVerseTwitterFollowers => twitter follower hasn't still registered, username: ${inputData.twitterUser.username}`))
-  //         ),
-  //         RxJS.of(inputData).pipe(
-  //           RxJS.filter((value)=> value.followerId && !!value.socialProfile),
-  //           RxJS.map((filterData) => {filterData.socialProfile, filterData.followerId}),
-  //           RxJS.tap((mapData) => this._logger.log(`fetchLivelyVerseTwitterFollowers => twitter follower already has registered, username: ${inputData.twitterUser.username}`))
-  //         )
-  //       )
-  //     })
-  //     // retryWithDelay(30000, 7)
-  //     // ).subscribe((value) => console.log(`subscribe to rx, value: ${value}`));
-  //   ).subscribe({
-  //     next: (inputData: {socialProfile: SocialProfileEntity, followerId: string}) => {
-  //       if (inputData && inputData.followerId) {
-  //         this._logger.log(`new follower persist successfully, id: ${inputData.followerId}`);
-  //       } else if (inputData && inputData.socialProfile){
-  //         this._logger.log(`social profile has updated successfully, username: ${inputData.socialProfile.username}`);
-  //       }},
-  //     error: (error) => this._logger.error(`fetchLivelyVerseTwitterFollowers fetch followers failed, error: ${error}`),
-  //     complete: () => this._logger.log(`fetchLivelyVerseTwitterFollowers fetch followers completed`)
-  //   });
-  //
-  //   // ).subscribe(([socialProfile, followerId]: [SocialProfileEntity, string]) => {
-  //   //   if (followerId) {
-  //   //     this._logger.log(`new follower persist successfully, id: ${followerId}`);
-  //   //   } else if (socialProfile){
-  //   //     this._logger.log(`social profile has updated successfully, username: ${socialProfile.username}`);
-  //   //   }},
-  //   //   (error) => this._logger.error(`fetchLivelyVerseTwitterFollowers fetch followers failed, error: ${error}`),
-  //   //   () => this._logger.log(`fetchLivelyVerseTwitterFollowers fetch followers completed`)
-  //   // );
-  // }
-  //
 
   public retryWithDelay<T>(delay: number, count = 1): RxJS.MonoTypeOperatorFunction<T> {
     return (input) =>
@@ -386,7 +246,7 @@ export class TwitterFollowerJob {
               if (!(current.error instanceof TwitterApiError) || current.count > count) {
                 throw current.error;
               }
-              this._logger.error(`fetch follower from twitter failed, error: ${current?.error?.cause}`)
+              this._logger.error(`fetch twitter follower failed, error: ${current?.error?.cause}`)
               this._logger.log(`fetch follower retrying ${current.count} . . .`)
             }),
             RxJS.delay(delay)
