@@ -1,7 +1,6 @@
-import { Column, Entity, ManyToOne, OneToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialTrackerEntity } from "./socialTracker.entity";
-import { UnitType } from "./enums";
 import { SocialAirdropRuleEntity } from "./socialAirdropRule.entity";
 import { NetworkTxEntity } from "../../../blockchain/entity/networkTx.entity";
 
@@ -28,15 +27,17 @@ export class SocialAirdropEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({name:"trackerId"})
   tracker: SocialTrackerEntity
 
   @OneToOne((type) => NetworkTxEntity,{
       cascade: ['soft-remove'],
       onDelete: 'NO ACTION',
-      nullable: false,
+      nullable: true,
       lazy: false,
       eager: true,
       orphanedRowAction: 'nullify',
-    })
-  txRecord: NetworkTxEntity
+  })
+  @JoinColumn({name:"networkTxId"})
+  networkTx?: NetworkTxEntity
 }

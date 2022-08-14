@@ -1,9 +1,8 @@
-import { Column, Entity, ManyToOne, OneToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialActionType } from "./enums";
 import { SocialProfileEntity } from "../../../profile/domain/entity/socialProfile.entity";
 import { SocialAirdropEntity } from "./socialAirdrop.entity";
-import { SocialFollowerEntity } from "./socialFollower.entity";
 import { SocialEventEntity } from "./socialEvent.entity";
 
 
@@ -24,12 +23,12 @@ export class SocialTrackerEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
-  socialEvent: SocialEventEntity
+  socialEvent?: SocialEventEntity
 
   @ManyToOne((type) => SocialProfileEntity,{
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
-    nullable: true,
+    nullable: false,
     lazy: false,
     eager: true,
     orphanedRowAction: 'nullify',
@@ -37,15 +36,5 @@ export class SocialTrackerEntity extends BaseEntity {
   socialProfile: SocialProfileEntity
 
   @OneToOne(() => SocialAirdropEntity, (airdrop) => airdrop.tracker)
-  airdrop: SocialAirdropEntity
-
-  @OneToOne((type) => SocialFollowerEntity, (follower) => follower.socialTracker, {
-    cascade: ['soft-remove'],
-    onDelete: 'NO ACTION',
-    nullable: true,
-    lazy: false,
-    eager: true,
-    orphanedRowAction: 'nullify',
-  })
-  follower: SocialFollowerEntity
+  airdrop?: SocialAirdropEntity
 }

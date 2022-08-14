@@ -2,7 +2,6 @@ import { Column, Entity, OneToMany } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialEventEntity } from "./socialEvent.entity";
 import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
-import { SocialFollowerEntity } from "./socialFollower.entity";
 
 @Entity({ name: 'social_lively' })
 export class SocialLivelyEntity extends BaseEntity {
@@ -26,9 +25,4 @@ export class SocialLivelyEntity extends BaseEntity {
     nullable: true,
   })
   events?: Promise<Array<SocialEventEntity>>
-
-  @OneToMany((type) => SocialFollowerEntity, (follower) => follower.socialLively, {
-    nullable: true,
-  })
-  followers?: Promise<Array<SocialFollowerEntity>>
 }

@@ -3,18 +3,15 @@ import { AirdropService } from "./airdrop.service";
 import { ContentDto } from "./domain/dto/content.dto";
 import { TwitterUserProfileDto } from "./domain/dto/twitterUserProfile.dto";
 import { InjectEntityManager, InjectRepository } from "@nestjs/typeorm";
-import { SocialFollowerEntity } from "./domain/entity/socialFollower.entity";
 import { EntityManager, Repository } from "typeorm";
 import { SocialProfileEntity, SocialType } from "../profile/domain/entity/socialProfile.entity";
-import { UserEntity } from "../profile/domain/entity";
-import { SocialLivelyEntity } from "./domain/entity/socialLively.entity";
+import { SocialAirdropRuleEntity } from "./domain/entity/socialAirdropRule.entity";
+import { SocialActionType, UnitType } from "./domain/entity/enums";
 
 @Controller('/api/airdrop')
 export class AirdropController {
   constructor(
     private readonly airdropService: AirdropService,
-    @InjectRepository(SocialFollowerEntity)
-    readonly followerRepository: Repository<SocialFollowerEntity>,
     @InjectEntityManager()
     private entityManager: EntityManager,
   ) {}
@@ -87,15 +84,41 @@ export class AirdropController {
     //   .where('"socialProfile"."username" = :username', {username: "Twitter Tester 2"})
     //   .getRawAndEntities()
 
+    let followRule = new SocialAirdropRuleEntity();
+    followRule.decimal = 18;
+    followRule.socialType = SocialType.TWITTER;
+    followRule.actionType = SocialActionType.FOLLOW;
+    followRule.unit = UnitType.LVL_TOKEN;
+    followRule.amount = 200n;
 
-    let socialResult = await this.entityManager
-      .getRepository(SocialProfileEntity)
-      .createQueryBuilder("socialProfile")
-      .select('"socialProfile".*')
-      .addSelect('"socialFollower"."id" as "followerId"')
-      .leftJoin("social_follower", "socialFollower", '"socialFollower"."socialProfileId" = "socialProfile"."id"')
-      .where('"socialProfile"."username" = :username', {username: "Twitter Tester 3"})
-      .getRawOne()
+    let followLike = new SocialAirdropRuleEntity();
+    followLike.decimal = 18;
+    followLike.socialType = SocialType.TWITTER;
+    followLike.actionType = SocialActionType.LIKE;
+    followLike.unit = UnitType.LVL_TOKEN;
+    followLike.amount = 100n;
+
+    let followRetweet = new SocialAirdropRuleEntity();
+    followRetweet.decimal = 18;
+    followRetweet.socialType = SocialType.TWITTER;
+    followRetweet.actionType = SocialActionType.RETWEET;
+    followRetweet.unit = UnitType.LVL_TOKEN;
+    followRetweet.amount = 150n;
+
+    let socialResult = await this.entityManager.createQueryBuilder()
+      .insert()
+      .into(SocialAirdropRuleEntity)
+      .values([followRule, followLike, followRetweet])
+      .execute()
+
+    // let socialResult = await this.entityManager
+    //   .getRepository(SocialProfileEntity)
+    //   .createQueryBuilder("socialProfile")
+    //   .select('"socialProfile".*')
+    //   .addSelect('"socialFollower"."id" as "followerId"')
+    //   .leftJoin("social_follower", "socialFollower", '"socialFollower"."socialProfileId" = "socialProfile"."id"')
+    //   .where('"socialProfile"."username" = :username', {username: "Twitter Tester 3"})
+    //   .getRawOne()
 
     // let socialResult = await this.entityManager
     //   .createQueryBuilder(SocialProfileEntity, "socialProfile")
