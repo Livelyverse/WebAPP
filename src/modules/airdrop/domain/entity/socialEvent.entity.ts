@@ -28,9 +28,6 @@ export class SocialEventEntity extends BaseEntity {
   @Column({ type: 'timestamptz', nullable: false })
   trackingEndAt: Date
 
-  @Column({ type: 'integer', unique: false, nullable: false })
-  trackingInterval: number
-
   @ManyToOne((type) => SocialLivelyEntity, (social) => social.events, {
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
@@ -39,7 +36,7 @@ export class SocialEventEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
-  social: SocialLivelyEntity
+  socialLively: SocialLivelyEntity
 
   @OneToMany((type) => SocialTrackerEntity, (socialTracker) => socialTracker.socialEvent, {
     nullable: true,

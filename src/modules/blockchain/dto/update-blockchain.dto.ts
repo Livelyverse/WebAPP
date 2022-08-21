@@ -1,4 +1,4 @@
 import { PartialType } from '@nestjs/swagger';
-import { CreateBlockchainDto } from './create-blockchain.dto';
+// import { TransactionRequestDto } from './airdropRequest.dto';
 
-export class UpdateBlockchainDto extends PartialType(CreateBlockchainDto) {}
+// export class UpdateBlockchainDto extends PartialType(TransactionRequestDto) {}

@@ -171,8 +171,8 @@ export class TweetTrackerJob {
                                       socialEvent.contentUrl = 'https://twitter.com/' + data.socialLively.username + '/status/' + tweet.id;
                                       socialEvent.trackingStartedAt = moment().toDate();
                                       socialEvent.trackingEndAt = moment().add(this._trackerDuration, 'seconds').toDate();
-                                      socialEvent.trackingInterval = this._trackerInterval;
-                                      socialEvent.social = data.socialLively;
+                                      // socialEvent.trackingInterval = this._trackerInterval;
+                                      socialEvent.socialLively = data.socialLively;
                                       socialEvent.socialTracker = null;
                                       return socialEvent;
                                     }),
@@ -234,8 +234,8 @@ export class TweetTrackerJob {
                                     socialEvent.contentUrl = 'https://twitter.com/' + data.socialLively.username + '/status/' + tweet.id;
                                     socialEvent.trackingStartedAt = moment().toDate();
                                     socialEvent.trackingEndAt = moment().add(this._trackerDuration, 'seconds').toDate();
-                                    socialEvent.trackingInterval = this._trackerInterval;
-                                    socialEvent.social = data.socialLively;
+                                    // socialEvent.trackingInterval = this._trackerInterval;
+                                    socialEvent.socialLively = data.socialLively;
                                     socialEvent.socialTracker = null;
                                     return socialEvent;
                                   }),
@@ -333,8 +333,8 @@ export class TweetTrackerJob {
                                 socialEvent.contentUrl = 'https://twitter.com/' + data.socialLively.username + '/status/' + tweet.id;
                                 socialEvent.trackingStartedAt = moment().toDate();
                                 socialEvent.trackingEndAt = moment().add(this._trackerDuration, 's').toDate();
-                                socialEvent.trackingInterval = this._trackerInterval;
-                                socialEvent.social = data.socialLively;
+                                // socialEvent.trackingInterval = this._trackerInterval;
+                                socialEvent.socialLively = data.socialLively;
                                 socialEvent.socialTracker = null;
                                 return socialEvent;
                               }),

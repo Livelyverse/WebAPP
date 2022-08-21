@@ -49,7 +49,7 @@ export class UserEntity extends BaseEntity {
   })
   group: GroupEntity;
 
-  @OneToMany((type) => SocialProfileEntity, (socialMedia) => socialMedia.user, {
+  @OneToMany((type) => SocialProfileEntity, (socialProfile) => socialProfile.user, {
     nullable: true,
   })
   socials: Promise<Array<SocialProfileEntity>>;

@@ -9,6 +9,7 @@ import { BlogModule } from './modules/blog/blog.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AirdropModule } from './modules/airdrop/airdrop.module';
 import { BlockchainModule } from './modules/blockchain/blockchain.module';
+import { APP_MODE, BlockchainConfig } from "./modules/blockchain/blockchainConfig";
 @Module({
   imports: [
     AuthenticationModule.forRoot('jwt'),
@@ -17,9 +18,9 @@ import { BlockchainModule } from './modules/blockchain/blockchain.module';
     ProfileModule,
     BlogModule,
     AirdropModule,
-    BlockchainModule,
     ConfigModule.forRoot({
       load: [yamlReader],
+      expandVariables: true,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -41,6 +42,24 @@ import { BlockchainModule } from './modules/blockchain/blockchain.module';
       }),
       inject: [ConfigService],
     }),
+    BlockchainModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        let blockchainConfig = configService.get<BlockchainConfig>('blockchain');
+        let mode;
+        let envMode = configService.get<string>('WEB_APP_ENV_MODE').toUpperCase();
+        if (envMode === "DEV" || envMode === "TEST" || envMode === "PROD") {
+          mode = envMode as APP_MODE
+        } else {
+          throw new Error('Invalid WEB_APP_ENV_MODE variable');
+        }
+        return {
+          appMode: mode,
+          config: blockchainConfig
+        }
+      },
+      inject: [ConfigService]
+    })
   ],
   controllers: [],
   providers: [],

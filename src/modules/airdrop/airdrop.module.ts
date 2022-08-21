@@ -13,6 +13,8 @@ import { SocialAirdropRuleEntity } from "./domain/entity/socialAirdropRule.entit
 import { BlockchainModule } from "../blockchain/blockchain.module";
 import { TwitterFollowerJob } from "./domain/jobs/twitter/followerTracker.job";
 import { TweetTrackerJob } from "./domain/jobs/twitter/tweetTracker.job";
+import { SocialFollowerEntity } from "./domain/entity/socialFollower.entity";
+import { SocialAirdropJob } from "./domain/jobs/twitter/socialAirdrop.job";
 
 @Module({
   imports: [
@@ -23,13 +25,14 @@ import { TweetTrackerJob } from "./domain/jobs/twitter/tweetTracker.job";
     TypeOrmModule.forFeature([
       SocialLivelyEntity,
       SocialEventEntity,
+      SocialFollowerEntity,
       SocialTrackerEntity,
       SocialAirdropEntity,
       SocialAirdropRuleEntity
     ]),
   ],
   controllers: [AirdropController],
-  providers: [AirdropService, TwitterFollowerJob, TweetTrackerJob]
-  // providers: [AirdropService, TweetTrackerJob]
+  // providers: [AirdropService, TwitterFollowerJob, TweetTrackerJob]
+  providers: [AirdropService, SocialAirdropJob]
 })
 export class AirdropModule {}

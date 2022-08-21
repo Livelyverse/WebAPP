@@ -2,11 +2,11 @@ import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/commo
 import { AirdropService } from "./airdrop.service";
 import { ContentDto } from "./domain/dto/content.dto";
 import { TwitterUserProfileDto } from "./domain/dto/twitterUserProfile.dto";
-import { InjectEntityManager, InjectRepository } from "@nestjs/typeorm";
-import { EntityManager, Repository } from "typeorm";
+import { InjectEntityManager } from "@nestjs/typeorm";
+import { EntityManager } from "typeorm";
 import { SocialProfileEntity, SocialType } from "../profile/domain/entity/socialProfile.entity";
-import { SocialAirdropRuleEntity } from "./domain/entity/socialAirdropRule.entity";
-import { SocialActionType, UnitType } from "./domain/entity/enums";
+import { UserEntity } from "../profile/domain/entity";
+import { SocialEventEntity } from "./domain/entity/socialEvent.entity";
 
 @Controller('/api/airdrop')
 export class AirdropController {
@@ -84,32 +84,58 @@ export class AirdropController {
     //   .where('"socialProfile"."username" = :username', {username: "Twitter Tester 2"})
     //   .getRawAndEntities()
 
-    let followRule = new SocialAirdropRuleEntity();
-    followRule.decimal = 18;
-    followRule.socialType = SocialType.TWITTER;
-    followRule.actionType = SocialActionType.FOLLOW;
-    followRule.unit = UnitType.LVL_TOKEN;
-    followRule.amount = 200n;
+    // let followRule = new SocialAirdropRuleEntity();
+    // followRule.decimal = 18;
+    // followRule.socialType = SocialType.TWITTER;
+    // followRule.actionType = SocialActionType.FOLLOW;
+    // followRule.unit = UnitType.LVL_TOKEN;
+    // followRule.amount = 200n;
+    //
+    // let followLike = new SocialAirdropRuleEntity();
+    // followLike.decimal = 18;
+    // followLike.socialType = SocialType.TWITTER;
+    // followLike.actionType = SocialActionType.LIKE;
+    // followLike.unit = UnitType.LVL_TOKEN;
+    // followLike.amount = 100n;
+    //
+    // let followRetweet = new SocialAirdropRuleEntity();
+    // followRetweet.decimal = 18;
+    // followRetweet.socialType = SocialType.TWITTER;
+    // followRetweet.actionType = SocialActionType.RETWEET;
+    // followRetweet.unit = UnitType.LVL_TOKEN;
+    // followRetweet.amount = 150n;
+    //
+    // let socialResult = await this.entityManager.createQueryBuilder()
+    //   .insert()
+    //   .into(SocialAirdropRuleEntity)
+    //   .values([followRule, followLike, followRetweet])
+    //   .execute()
 
-    let followLike = new SocialAirdropRuleEntity();
-    followLike.decimal = 18;
-    followLike.socialType = SocialType.TWITTER;
-    followLike.actionType = SocialActionType.LIKE;
-    followLike.unit = UnitType.LVL_TOKEN;
-    followLike.amount = 100n;
+    let result = await this.entityManager.getRepository(UserEntity)
+      .findByIds(['77f2bdbd-49da-49ab-9c8f-70d24830de95', '631f1af7-54cf-451d-a618-37073c0c72b1'])
+    
+    // let user1 = new UserEntity();
+    // user1.id = '77f2bdbd-49da-49ab-9c8f-70d24830de95';
+    //
+    // let user2 = new UserEntity();
+    // user2.id = '631f1af7-54cf-451d-a618-37073c0c72b1';
 
-    let followRetweet = new SocialAirdropRuleEntity();
-    followRetweet.decimal = 18;
-    followRetweet.socialType = SocialType.TWITTER;
-    followRetweet.actionType = SocialActionType.RETWEET;
-    followRetweet.unit = UnitType.LVL_TOKEN;
-    followRetweet.amount = 150n;
+    let socialProfile1 = new SocialProfileEntity();
+    socialProfile1.socialType = SocialType.TWITTER;
+    socialProfile1.username = 'marianoquadrini';
+    socialProfile1.user = result[0];
 
-    let socialResult = await this.entityManager.createQueryBuilder()
-      .insert()
-      .into(SocialAirdropRuleEntity)
-      .values([followRule, followLike, followRetweet])
-      .execute()
+    let socialProfile2 = new SocialProfileEntity();
+    socialProfile2.socialType = SocialType.TWITTER;
+    socialProfile2.username = 'rogiiz16';
+    socialProfile2.user = result[1];
+
+    let socialResult = await this.entityManager.getRepository(SocialProfileEntity).save(socialProfile1);
+    let socialResult1 = await this.entityManager.getRepository(SocialProfileEntity).save(socialProfile2);
+      // .insert()
+      // .into(SocialProfileEntity)
+      // .values([socialProfile1, socialProfile2])
+      // .execute()
 
     // let socialResult = await this.entityManager
     //   .getRepository(SocialProfileEntity)

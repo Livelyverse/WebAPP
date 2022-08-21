@@ -17,6 +17,7 @@ import { SocialTrackerEntity } from "../../entity/socialTracker.entity";
 import { SocialActionType } from "../../entity/enums";
 import { SocialAirdropRuleEntity } from "../../entity/socialAirdropRule.entity";
 import { SocialAirdropEntity } from "../../entity/socialAirdrop.entity";
+import { SocialFollowerEntity } from "../../entity/socialFollower.entity";
 
 @Injectable()
 export class TwitterFollowerJob {
@@ -126,12 +127,15 @@ export class TwitterFollowerJob {
       RxJS.concatMap(([socialLively, airdropRule, twitterUser]: [SocialLivelyEntity, SocialAirdropRuleEntity, UserV2]) =>
         RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity,"socialProfile")
           .select('"socialProfile".*')
-          .addSelect('"socialTracker"."id" as "trackerId"')
-          .leftJoin(qb =>
-            qb.select()
-              .from(SocialTrackerEntity, "socialTracker")
-              .where('"socialTracker"."actionType" = :actionType', {actionType: SocialActionType.FOLLOW}),
-            "socialTracker", '"socialTracker"."socialProfileId" = "socialProfile"."id"')
+          .addSelect('"socialFollower"."id" as "followerId"')
+          .leftJoin("social_follower", "socialFollower", '"socialFollower"."socialProfileId" = "socialProfile"."id"')
+          // .select('"socialProfile".*')
+          // .addSelect('"socialTracker"."id" as "trackerId"')
+          // .leftJoin(qb =>
+          //   qb.select()
+          //     .from(SocialTrackerEntity, "socialTracker")
+          //     .where('"socialTracker"."actionType" = :actionType', {actionType: SocialActionType.FOLLOW}),
+          //   "socialTracker", '"socialTracker"."socialProfileId" = "socialProfile"."id"')
           .where('"socialProfile"."username" = :username', {username: twitterUser.username})
           .andWhere('"socialProfile"."socialType" = :socialType', {socialType: socialLively.socialType})
           .getRawOne()
@@ -141,15 +145,15 @@ export class TwitterFollowerJob {
               RxJS.of(socialProfileExt).pipe(
                 RxJS.filter((data) => !!data),
                 RxJS.map((data) => {
-                  let { trackerId: trackerId, ...socialProfile } = data;
-                  return {trackerId, socialProfile, socialLively, airdropRule, twitterUser};
+                  let { followerId: followerId, ...socialProfile } = data;
+                  return {followerId: followerId, socialProfile, socialLively, airdropRule, twitterUser};
                 })
               ),
               RxJS.of(socialProfileExt).pipe(
                 RxJS.filter((data) => !!!data),
                 RxJS.map((_) => {
                   return {
-                    trackerId: null,
+                    followerId: null,
                     socialProfile: null,
                     airdropRule: airdropRule,
                     socialLively: socialLively,
@@ -164,7 +168,7 @@ export class TwitterFollowerJob {
       RxJS.concatMap((inputData) => {
         return RxJS.merge(
           RxJS.of(inputData).pipe(
-            RxJS.filter((data)=> !data.trackerId && !!data.socialProfile),
+            RxJS.filter((data)=> !data.followerId && !!data.socialProfile),
             RxJS.map((data) => {
               data.socialProfile.socialId = data.twitterUser.id;
               data.socialProfile.socialName = data.twitterUser.name;
@@ -172,19 +176,32 @@ export class TwitterFollowerJob {
               data.socialProfile.location = data.twitterUser.location;
               data.socialProfile.website = data.twitterUser.entities?.url?.urls[0]?.expanded_url;
 
+              const socialFollower = new SocialFollowerEntity();
+              socialFollower.socialProfile = data.socialProfile;
+              socialFollower.socialLively = data.socialLively;
+
               const socialTracker = new SocialTrackerEntity();
               socialTracker.actionType = SocialActionType.FOLLOW;
               socialTracker.socialProfile = data.socialProfile;
+              socialTracker.follower = socialFollower;
+
+              socialFollower.socialTracker = socialTracker;
 
               const socialAirdrop = new SocialAirdropEntity();
               socialAirdrop.airdropRule = data.airdropRule;
               socialAirdrop.tracker = socialTracker;
 
-              return ({socialTracker, socialAirdrop, ...data})
+              return ({socialFollower, socialTracker, socialAirdrop, ...data})
             }),
             RxJS.concatMap((data) => {
               return RxJS.from(
                 this._entityManager.connection.transaction(async (manager) => {
+                  await manager.createQueryBuilder()
+                    .insert()
+                    .into(SocialFollowerEntity)
+                    .values([data.socialFollower])
+                    .execute();
+
                   await manager.createQueryBuilder()
                     .insert()
                     .into(SocialTrackerEntity)
@@ -205,6 +222,7 @@ export class TwitterFollowerJob {
                     socialProfile: data.socialProfile,
                     socialTracker: data.socialTracker,
                     socialAirdrop: data.socialAirdrop,
+                    socialFollower: data.socialFollower,
                   };
                 })
               )
@@ -216,7 +234,7 @@ export class TwitterFollowerJob {
             RxJS.tap((mapData) => this._logger.log(`twitter follower hasn't still registered, username: ${inputData.twitterUser.username}`))
           ),
           RxJS.of(inputData).pipe(
-            RxJS.filter((data)=> data.trackerId && data.socialProfile),
+            RxJS.filter((data)=> data.followerId && data.socialProfile),
             RxJS.map((data) => { data.socialProfile }),
             RxJS.tap((mapData) => this._logger.log(`twitter follower already has registered, username: ${inputData.twitterUser.username}`))
           )
@@ -237,8 +255,8 @@ export class TwitterFollowerJob {
         )
       ),
     ).subscribe({
-      next: (data: {socialProfile: SocialProfileEntity, socialTracker: SocialTrackerEntity, socialAirdrop: SocialAirdropEntity}) => {
-        if (!!data?.socialTracker) {
+      next: (data: {socialProfile: SocialProfileEntity, socialTracker: SocialTrackerEntity, socialAirdrop: SocialAirdropEntity, socialFollower: SocialFollowerEntity}) => {
+        if (!!data?.socialFollower) {
           this._logger.log(`new follower persist successfully, follower: ${data.socialProfile.username}`);
         } else if (!!data?.socialProfile) {
           this._logger.log(`social profile has updated successfully, username: ${data.socialProfile.username}`);

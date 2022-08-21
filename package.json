@@ -1,8 +1,8 @@
 {
-  "name": "webapp",
+  "name": "@livelyverse/webapp",
   "version": "0.0.2",
   "description": "",
-  "author": "S.T",
+  "author": "Sina Tadayon",
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -21,6 +21,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@livelyverse/lively-core-onchain": "^1.0.1",
     "@nestjs-modules/mailer": "^1.7.1",
     "@nestjs/axios": "^0.0.8",
     "@nestjs/common": "^8.4.7",
@@ -36,6 +37,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.13.2",
     "dotenv": "^10.0.0",
+    "ethers": "^5.6.9",
     "fast-xml-parser": "^4.0.8",
     "handlebars": "^4.7.7",
     "joi": "^17.6.0",

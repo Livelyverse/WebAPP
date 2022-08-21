@@ -45,6 +45,5 @@ export class SocialProfileEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
-  @JoinColumn({ name: 'userId' })
   user: UserEntity
 }

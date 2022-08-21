@@ -1,7 +1,7 @@
 export class BaseError extends Error {
   public readonly name: string;
   public readonly code: string;
-  public readonly cause: object;
+  public readonly cause: any;
 
   constructor(name: string, message: string, options = {}) {
     super(message);

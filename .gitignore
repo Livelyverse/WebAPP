@@ -230,5 +230,6 @@ artifacts
 *.sql
 *.pem
 config.yml
+config-*.yml
 
 # End of https://www.gitignore.io/api/osx,node,linux,windows
