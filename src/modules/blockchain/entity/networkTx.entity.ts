@@ -7,11 +7,19 @@ export enum TxStatus {
   PENDING = "PENDING"
 }
 
+export enum TxType {
+  LEGACY = 'LEGACY',
+  DEFAULT = 'DEFAULT'
+}
+
 @Entity({ name: 'network_tx' })
 export class NetworkTxEntity extends BaseEntity {
 
   @Column({ type: 'varchar', length: 256, unique: true, nullable: false })
   txHash: string
+
+  @Column({ type: 'text', unique: false, nullable: false })
+  txType: TxType
 
   @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
   from: string
@@ -46,8 +54,8 @@ export class NetworkTxEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
   networkName: string
 
-  @Column({ type: 'timestamptz', nullable: true })
-  blockTimestamp?: Date
+  // @Column({ type: 'timestamptz', nullable: true })
+  // blockTimestamp?: Date
 
   @Column({ type: 'integer', nullable: true })
   blockNumber?: number
@@ -61,8 +69,11 @@ export class NetworkTxEntity extends BaseEntity {
   @Column({ type: 'bigint', unique: false, nullable: true })
   effectiveGasPrice?: bigint
 
-  @Column({ type: 'boolean', unique: false, nullable: false })
+  @Column({ type: 'boolean', unique: false, nullable: true })
   isByzantium: boolean
+
+  @Column({ type: 'text', unique: false, nullable: true })
+  failInfo: string
 
   @Column({ type: 'text', unique: false, nullable: false })
   status: TxStatus

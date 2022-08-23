@@ -1066,10 +1066,10 @@
     "@jridgewell/resolve-uri" "^3.0.3"
     "@jridgewell/sourcemap-codec" "^1.4.10"
 
-"@livelyverse/lively-core-onchain@^1.0.1":
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/@livelyverse/lively-core-onchain/-/lively-core-onchain-1.0.1.tgz#a282574937f7d839d61e048c6cbda0f387570f40"
-  integrity sha512-kkKbxdyVDjI/yyFaeKWB0+zVwZjeeK+As3wQICbdnCtq7eb9NJiOVxuC+LwoRA9vyykvek7cl3SoTDN6KXNMKw==
+"@livelyverse/lively-core-onchain@^1.0.2":
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/@livelyverse/lively-core-onchain/-/lively-core-onchain-1.0.2.tgz#60d2b00c69c9a8024265662148b46fec4d457584"
+  integrity sha512-3iFcpUkXaaMkA2qjbjGb5izofWG4qaCuvFEJEBkdQ1vUVAZzA/U5XkeQ9qgdDEquvv3iMUo1VFqqK/oqBQyJBw==
   dependencies:
     "@openzeppelin/contracts" "^4.7.0"
     "@openzeppelin/contracts-upgradeable" "^4.7.0"
