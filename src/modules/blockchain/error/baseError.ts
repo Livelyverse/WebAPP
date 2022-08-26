@@ -5,12 +5,9 @@ export class BaseError extends Error {
   constructor(name: string, message: string, options = {}) {
     super(message);
 
-    for (const [key, value] of Object.entries(options)) {
-      if (key === 'cause' && value instanceof Error) {
-        this[key as string] = value;
-      }
+    if (options && Object.hasOwn(options, 'cause') && Object.hasOwn(options['cause'], 'stack')) {
+      this.cause = options['cause'];
     }
-
     this.name = name;
   }
 }

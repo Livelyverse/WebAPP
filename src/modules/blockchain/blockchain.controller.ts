@@ -57,9 +57,13 @@ export class BlockchainController {
     request.data.push({destination: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30", amount: 100n * (10n ** 18n)})
 
 
-    console.log(`findAll reqId: ${String(request.id)}`)
-    let response = await this.blockchainService.sendAirdropTx(request);
-    console.log(`findAll txId: ${String(response.id)}, balance: ${response.totalAmount.toString()} `);
+    try {
+      console.log(`findAll reqId: ${String(request.id)}`)
+      let response = await this.blockchainService.sendAirdropTx(request);
+      console.log(`findAll txId: ${String(response.id)}, balance: ${response.totalAmount.toString()} `);
+    } catch (err) {
+      console.error(`blockchain airdrop failed . . .`)
+    }
 
 
     // let customHttpProvider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545/');

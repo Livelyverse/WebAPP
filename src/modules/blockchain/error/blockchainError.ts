@@ -10,6 +10,12 @@ export enum ErrorCode {
 
   DB_OPERATION_FAILED = "DB_OPERATION_FAILED",
 
+  NODE_JS_ERROR = "NODE_JS_ERROR",
+
+  AIRDROP_REQUEST_LISTENER_NOT_FOUND = "AIRDROP_REQUEST_LISTENER_NOT_FOUND",
+
+  INVALID_TX_RECEIPT = "INVALID_TX_RECEIPT",
+
   // Generic Errors
   // Unknown Error
   UNKNOWN_ERROR = "UNKNOWN_ERROR",
@@ -108,10 +114,10 @@ export class BlockchainError extends BaseError {
   public readonly event: string;
   public readonly code: ErrorCode;
   public readonly id: symbol;
-  constructor(message, cause: any) {
-    super(new.target.name, message,{cause});
-    this.event = cause?.event;
-    this.id = cause?.id;
-    this.code = cause?.code
+  constructor(message, options: any) {
+    super(new.target.name, message,options);
+    this.event = options?.event;
+    this.id = options?.id;
+    this.code = options?.code
   }
 }
