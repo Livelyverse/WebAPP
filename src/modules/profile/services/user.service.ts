@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { UserCreateDto, UserUpdateDto } from '../domain/dto/index.dto';
+import { UserCreateDto, UserUpdateDto } from '../domain/dto';
 import { validate } from 'class-validator';
 import { IService } from './IService';
 import { UserEntity } from '../domain/entity';

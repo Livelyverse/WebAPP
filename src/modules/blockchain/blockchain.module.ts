@@ -31,7 +31,8 @@ export class BlockchainModule {
           provide: BLOCK_CHAIN_MODULE_OPTIONS,
           useValue: configs
         }
-      ]
+      ],
+      exports: [BlockchainService]
     }
   }
 
@@ -41,6 +42,7 @@ export class BlockchainModule {
       imports: asyncOptions.imports,
       controllers: [BlockchainController],
       providers: [BlockchainService, this.blockChainOptionFactory(asyncOptions)],
+      exports: [BlockchainService]
     }
   }
 

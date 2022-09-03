@@ -30,7 +30,7 @@ export class SocialAirdropEntity extends BaseEntity {
   @JoinColumn({name:"trackerId"})
   tracker: SocialTrackerEntity
 
-  @OneToOne((type) => NetworkTxEntity,{
+  @ManyToOne((type) => NetworkTxEntity,{
       cascade: ['soft-remove'],
       onDelete: 'NO ACTION',
       nullable: true,

@@ -179,7 +179,10 @@ export class BlockchainService {
                             .values([networkTx])
                             .execute()
                           ).pipe(
-                            RxJS.tap((_) => this._logger.log(`save networkTxEntity success, id: ${networkTxEntity.id}`)),
+                            RxJS.tap({
+                              next: (_) => this._logger.log(`save networkTxEntity success, id: ${networkTxEntity.id}, txHash: ${networkTx.txHash}`),
+                              error: err => this._logger.error(`save networkTxEntity failed, txHash: ${networkTx.txHash}\n${err.stack}`)
+                            }),
                             RxJS.map((_) => [airdropReq, airdropTx, networkTxEntity]),
                           )
                         ),
@@ -187,11 +190,11 @@ export class BlockchainService {
                           RxJS.merge(
                             RxJS.of(error).pipe(
                               RxJS.filter(err => err instanceof TypeORMError),
-                              RxJS.map(err => new BlockchainError('blockchain module internal error', {cause: err, code: ErrorCode.DB_OPERATION_FAILED, id: airdropReq.id})),
+                              RxJS.map(err => new BlockchainError('blockchain service internal error', {cause: err, code: ErrorCode.SAFE_MODE, id: airdropReq.id})),
                               RxJS.tap({
                                 next: (error) => {
                                   this._safeMode = true;
-                                  this._logger.warn(`save networkTxEntity failed, ${error.stack}`);
+                                  this._logger.warn(`blockchain service safe mode activated . . .`),
                                   this._eventEmitter.emit(EventType.ERROR_EVENT, error)
                                 },
                                 error: RxJS.noop,
@@ -199,16 +202,14 @@ export class BlockchainService {
                               }),
                             ),
                             RxJS.of(error).pipe(
-                              RxJS.filter(err => !(err instanceof TypeORMError)),
-                              RxJS.map(err => new BlockchainError('blockchain module internal error', {cause: err, code: ErrorCode.UNKNOWN_ERROR, id: airdropReq.id})),
-                              RxJS.tap({
-                                next: (error) => {
-                                  this._logger.warn(`save networkTxEntity failed, ${error.stack}`);
-                                  this._eventEmitter.emit(EventType.ERROR_EVENT, error)
-                                },
-                                error: RxJS.noop,
-                                complete: RxJS.noop,
-                              }),
+                              RxJS.filter(err => !(err instanceof TypeORMError) && err instanceof Error),
+                              RxJS.map(err => new BlockchainError('blockchain service internal error', {cause: err, code: ErrorCode.NODE_JS_ERROR, id: airdropReq.id})),
+                              RxJS.tap((error) => this._eventEmitter.emit(EventType.ERROR_EVENT, error)),
+                            ),
+                            RxJS.of(error).pipe(
+                              RxJS.filter(err => !(err instanceof Error)),
+                              RxJS.map(err => new BlockchainError('blockchain service internal error', {cause: err, code: ErrorCode.UNKNOWN_ERROR, id: airdropReq.id})),
+                              RxJS.tap((error) => this._eventEmitter.emit(EventType.ERROR_EVENT, error)),
                             )
                           ).pipe(
                             RxJS.mergeMap( _ => RxJS.of([airdropReq, airdropTx, null]))
@@ -221,10 +222,12 @@ export class BlockchainService {
                 RxJS.catchError((err) =>
                   RxJS.merge(
                     RxJS.of(err).pipe(
+                      // block chain error handling
                       RxJS.filter((error) => error instanceof Error && Object.hasOwn(error, 'event') && Object.hasOwn(error, 'code')),
                       RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", error))),
                     ),
                     RxJS.of(err).pipe(
+                      // general error handling
                       RxJS.filter((error) => error instanceof Error),
                       RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
                     )
@@ -232,8 +235,12 @@ export class BlockchainService {
                 ),
                 RxJS.finalize(() => this._logger.debug(`finalize batchTransfer token call . . . `)),
                 this.retryWithDelay(30000, 3),
+                RxJS.tap({
+                  next: (tuple:[AirdropRequestDto, ContractTransaction, NetworkTxEntity]) => this._logger.log(`send airdrop tx to blockchain success, token: ${tuple[0].tokenType}, txHash: ${tuple[1].hash}`),
+                  error: err => this._logger.error(`send airdrop tx to blockchain failed\n${err.stack}\n${err?.cause?.stack}`)
+                }),
               )
-            ),
+            ), // send tx to blockchain
             RxJS.mergeMap((tuple:[AirdropRequestDto, ContractTransaction, NetworkTxEntity]) =>
               RxJS.of(this._confirmationCount).pipe(
                 RxJS.switchMap((confirmationCount) =>
@@ -279,11 +286,12 @@ export class BlockchainService {
                                 networkTx.status = receiptTx.status === 1 ? TxStatus.SUCCESS : TxStatus.FAILED;
                                 return [event, networkTx];
                               }),
+                              // update networkTxEntity
                               RxJS.switchMap(([event, networkTx]:[Event, NetworkTxEntity]) =>
                                 RxJS.of([event, networkTx]).pipe(
                                   RxJS.mergeMap(([event, networkTx]) => RxJS.from(this._entityManager.getRepository(NetworkTxEntity).save(networkTx))),
                                   RxJS.tap({
-                                    next: (updateResult) => this._logger.log(`update networkTx success, reqId: ${tuple[0].id.toString()}, txHash: ${updateResult.txHash}, status: ${updateResult.status}, networkTxId: ${updateResult.id}`),
+                                    next: (updateResult) => this._logger.log(`update networkTxEntity success, reqId: ${tuple[0].id.toString()}, txHash: ${updateResult.txHash}, status: ${updateResult.status}, networkTxId: ${updateResult.id}`),
                                     error: (error) => this._logger.error(`update networkTxEntity failed, reqId: ${tuple[0].id.toString()}, txHash: ${networkTx.txHash}, networkTxId: ${networkTx.id}\n${error.stack}`)
                                   }),
                                   RxJS.map(_ => [event, networkTx]),
@@ -320,13 +328,13 @@ export class BlockchainService {
                             return response;
                           }),
                           RxJS.tap({
-                            next: response => this._logger.log(`airdrop tx of LVL token completed, reqId: ${response.id.toString()}, txHash: ${response.txHash}, amount: ${response.totalAmount.toString()}, recordId: ${response.recordId}`),
+                            next: response => this._logger.log(`airdrop tx token completed, reqId: ${response.id.toString()}, txHash: ${response.txHash}, amount: ${response.totalAmount.toString()}, recordId: ${response.recordId}`),
                             error: err => {
-                              this._logger.error(`airdrop tx of LVL token failed\n${err.stack}\n${err?.cause?.stack}`)
+                              this._logger.error(`airdrop tx token failed, txHash: ${airdropReceiptTx.transactionHash}\n${err.stack}\n${err?.cause?.stack}`)
                               this._eventEmitter.emit(EventType.ERROR_EVENT, err)
                             }
                           }),
-                          RxJS.catchError((err) => RxJS.EMPTY )
+                          RxJS.catchError((_) => RxJS.EMPTY)
                         )
                       )
                     )
@@ -369,8 +377,12 @@ export class BlockchainService {
              RxJS.mergeMap((error) => RxJS.throwError(error)),
            ),
            RxJS.of(err).pipe(
-             RxJS.filter((error) => !(error instanceof BlockchainError)),
+             RxJS.filter((error) => !(error instanceof BlockchainError) && error instanceof Error),
              RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("blockchain airdrop event handler pipeline failed", {cause: error, code: ErrorCode.NODE_JS_ERROR}))),
+           ),
+           RxJS.of(err).pipe(
+             RxJS.filter((error) => !(error instanceof Error)),
+             RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("blockchain airdrop event handler pipeline failed", {cause: error, code: ErrorCode.UNKNOWN_ERROR}))),
            )
          ).pipe(
            RxJS.tap({
@@ -395,9 +407,6 @@ export class BlockchainService {
   }
 
   public async sendAirdropTx(airdropReq: AirdropRequestDto): Promise<AirdropResponseDto> {
-    // this._logger.log(`before AIRDROP_REQUEST_EVENT listener count, count: ${this._eventEmitter.listenerCount(EventType.AIRDROP_REQUEST_EVENT)}`)
-    // this._logger.log(`before AIRDROP_RESPONSE_EVENT listener count, count: ${this._eventEmitter.listenerCount(EventType.AIRDROP_RESPONSE_EVENT)}`)
-    // this._logger.log(`before ERROR_EVENT listener count, count: ${this._eventEmitter.listenerCount(EventType.ERROR_EVENT)}`)
     let promise;
     try {
       let emitResult = await RxJS.firstValueFrom(
@@ -460,9 +469,6 @@ export class BlockchainService {
         reject(err)
       })
     }
-    // this._logger.log(`after AIRDROP_REQUEST_EVENT listener count, count: ${this._eventEmitter.listenerCount(EventType.AIRDROP_REQUEST_EVENT)}`)
-    // this._logger.log(`after AIRDROP_RESPONSE_EVENT listener count, count: ${this._eventEmitter.listenerCount(EventType.AIRDROP_RESPONSE_EVENT)}`)
-    // this._logger.log(`after ERROR_EVENT listener count, count: ${this._eventEmitter.listenerCount(EventType.ERROR_EVENT)}`)
     return promise;
   }
 

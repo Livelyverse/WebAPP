@@ -8,7 +8,7 @@ import {
 import { RoleEntity } from '../domain/entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { RoleCreateDto, RoleUpdateDto } from '../domain/dto/index.dto';
+import { RoleCreateDto, RoleUpdateDto } from '../domain/dto';
 import { validate } from 'class-validator';
 import { IService } from './IService';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
