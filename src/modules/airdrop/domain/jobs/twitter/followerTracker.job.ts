@@ -1,6 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { EntityManager } from "typeorm";
-// import { SocialFollowerEntity } from "../../entity/socialFollower.entity";
+import { EntityManager, Repository } from "typeorm";
 import { InjectEntityManager, InjectRepository } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { Cron, CronExpression } from "@nestjs/schedule";
@@ -11,13 +10,14 @@ import { SocialProfileEntity, SocialType } from "../../../../profile/domain/enti
 import { SocialLivelyEntity } from "../../entity/socialLively.entity";
 import { UserV2 } from "twitter-api-v2/dist/types/v2/user.v2.types";
 import { ApiPartialResponseError, ApiRequestError, ApiResponseError } from "twitter-api-v2/dist/types/errors.types";
-import { TwitterApiError } from "../../error/TwitterApiError";
+import { TwitterApiError } from "../../error/twitterApi.error";
 import { finalize } from "rxjs";
 import { SocialTrackerEntity } from "../../entity/socialTracker.entity";
 import { SocialActionType } from "../../entity/enums";
 import { SocialAirdropRuleEntity } from "../../entity/socialAirdropRule.entity";
 import { SocialAirdropEntity } from "../../entity/socialAirdrop.entity";
 import { SocialFollowerEntity } from "../../entity/socialFollower.entity";
+import { TwitterFollowerError } from "../../error/twitterFollower.error";
 
 @Injectable()
 export class TwitterFollowerJob {
@@ -47,8 +47,11 @@ export class TwitterFollowerJob {
       .andWhere('"socialLively"."isActive" = \'true\'')
       .getOneOrFail())
       .pipe(
-        RxJS.tap((socialLively) => this._logger.log(`fetch social lively, socialType: ${socialLively.socialType}`))
+        RxJS.tap((socialLively) => this._logger.debug(`fetch social lively success, socialType: ${socialLively.socialType}`)),
+        RxJS.catchError(err => RxJS.throwError(() => new TwitterFollowerError('fetch social lively failed', err)))
       )
+
+    this._logger.debug("tweets follower job starting . . . ");
 
     RxJS.from(socialLivelyQueryResultObservable).pipe(
       RxJS.mergeMap((socialLively) =>
@@ -59,94 +62,97 @@ export class TwitterFollowerJob {
           .getOneOrFail()
         ).pipe(
           RxJS.tap({
-            next: (airdropRule) => this._logger.log(`tweeter follower airdrop rule found, token: ${airdropRule.unit},  amount: ${airdropRule.amount}, decimal: ${airdropRule.decimal}`),
-            error: (err) => this._logger.error(`find tweeter follower airdrop rule failed, ${err}`)
+            next: (airdropRule) => this._logger.debug(`tweeter follower airdrop rule found, token: ${airdropRule.unit},  amount: ${airdropRule.amount}, decimal: ${airdropRule.decimal}`),
+            // error: (err) => this._logger.error(`find tweeter follower airdrop rule failed, ${err}`)
           }),
-          RxJS.map((airdropRule) => [ socialLively, airdropRule ])
+          RxJS.map((airdropRule) => [ socialLively, airdropRule ]),
+          RxJS.catchError(err => RxJS.throwError(() => new TwitterFollowerError('fetch tweeter follower airdrop rule failed', err)))
         )
       ),
-      RxJS.switchMap(([socialLively, airdropRule ]: [SocialLivelyEntity, SocialAirdropRuleEntity]) =>
-        RxJS.defer(() =>
-          RxJS.from(this._twitterClient.followers(socialLively.userId, {
+      RxJS.concatMap(([socialLively, airdropRule ]: [SocialLivelyEntity, SocialAirdropRuleEntity]) =>
+        RxJS.from(this._twitterClient.followers(socialLively.userId, {
             max_results: 128,
             asPaginator: true,
-            "user.fields": ["id", "name", "username", "url", "location", "entities"]}))
-        ).pipe(
+            "user.fields": ["id", "name", "username", "url", "location", "entities"]})).pipe(
           RxJS.expand((paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
-          RxJS.tap({
-            error: (error) => this._logger.error(`tweeter client paginator failed, ${error}`)
-          }),
           RxJS.concatMap((paginator) =>
             RxJS.merge(
               RxJS.of(paginator).pipe(
                 RxJS.filter((paginator) => paginator.rateLimit.remaining > 0),
                 RxJS.tap({
-                  next: (paginator) => this._logger.log(`tweeter client paginator rate limit not exceeded, remaining: ${paginator.rateLimit.remaining}`),
+                  next: (paginator) => this._logger.debug(`tweeter client paginator rate limit not exceeded, remaining: ${paginator.rateLimit.remaining}`),
                 })
               ),
               RxJS.of(paginator).pipe(
                 RxJS.filter((paginator) => !paginator.rateLimit.remaining),
                 RxJS.tap({
-                  next: (paginator) => this._logger.log(`tweeter client paginator rate limit exceeded, resetAt: ${new Date(paginator.rateLimit.reset * 1000)}`),
+                  next: (paginator) => this._logger.warn(`tweeter client paginator rate limit exceeded, resetAt: ${new Date(paginator.rateLimit.reset * 1000)}`),
                 }),
                 RxJS.delayWhen((paginator) => RxJS.timer(new Date(paginator.rateLimit.reset * 1000)))
               )
             )
           ),
-          RxJS.tap((paginator) => this._logger.log(`tweeter client paginator users count: ${paginator.meta.result_count}`)),
-          RxJS.switchMap((paginator) => {
-            return RxJS.from(paginator.users)
-              .pipe(RxJS.map((follower) => [socialLively, airdropRule, follower]))
+          RxJS.tap({
+            next: (paginator) => this._logger.log(`tweeter client paginator users count: ${paginator.meta.result_count}`),
+            error: (error) => this._logger.error(`tweeter client paginator users failed, ${error}`)
           }),
-          RxJS.retryWhen((errors) =>
-            errors.pipe(
-              RxJS.takeWhile((err) => {
-                if (!(err instanceof ApiResponseError && err.code === 429)) {
-                  throw err;
-                }
-                return true
-              }),
-              RxJS.tap({
-                next: (paginator) => this._logger.log(`tweeter client rate limit exceeded, retry for 15 minutes later`),
-              }),
-              RxJS.delay(960000)
+          RxJS.concatMap((paginator) =>
+            RxJS.from(paginator.users).pipe(
+              RxJS.map((follower) => [socialLively, airdropRule, follower]),
             )
           ),
-          RxJS.catchError((err) =>  {
-            if (err instanceof ApiPartialResponseError ||
-              err instanceof ApiRequestError ||
-              err instanceof ApiResponseError) {
-              return RxJS.throwError(() => new TwitterApiError("twitter follower api failed", err))
-            }
-            return RxJS.throwError (err);
+          RxJS.retry({
+            delay: (error) =>
+              RxJS.merge(
+                RxJS.of(error).pipe(
+                  RxJS.filter(err => err instanceof ApiResponseError && err.code === 429),
+                  RxJS.tap({
+                    next: (paginator) => this._logger.warn(`tweeter client rate limit exceeded, retry for 15 minutes later`),
+                  }),
+                  RxJS.delay(960000)
+                ),
+                RxJS.of(error).pipe(
+                  RxJS.filter(err => (err instanceof ApiResponseError && err.code !== 429) || err instanceof Error),
+                  RxJS.mergeMap(err => RxJS.throwError(err))
+                ),
+              )
           }),
-          finalize(() => this._logger.log(`finalize twitter client follower . . .`)),
+          RxJS.catchError((error) =>
+            RxJS.merge(
+              RxJS.of(error).pipe(
+                RxJS.filter(err =>
+                  err instanceof ApiPartialResponseError ||
+                  err instanceof ApiRequestError ||
+                  err instanceof ApiResponseError
+                ),
+                RxJS.mergeMap(err => RxJS.throwError(() => new TwitterApiError("twitter follower api failed", err)))
+              ),
+              RxJS.of(error).pipe(
+                RxJS.filter(err => err instanceof Error),
+                RxJS.mergeMap(err => RxJS.throwError(() => new TwitterFollowerError('twitter fetch follower failed', err)))
+              )
+            )
+          ),
+          finalize(() => this._logger.debug(`finalize twitter client follower . . .`)),
           this.retryWithDelay(30000, 3),
         )
       ),
       RxJS.concatMap(([socialLively, airdropRule, twitterUser]: [SocialLivelyEntity, SocialAirdropRuleEntity, UserV2]) =>
-        RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity,"socialProfile")
+        RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity, "socialProfile")
           .select('"socialProfile".*')
           .addSelect('"socialFollower"."id" as "followerId"')
           .leftJoin("social_follower", "socialFollower", '"socialFollower"."socialProfileId" = "socialProfile"."id"')
-          // .select('"socialProfile".*')
-          // .addSelect('"socialTracker"."id" as "trackerId"')
-          // .leftJoin(qb =>
-          //   qb.select()
-          //     .from(SocialTrackerEntity, "socialTracker")
-          //     .where('"socialTracker"."actionType" = :actionType', {actionType: SocialActionType.FOLLOW}),
-          //   "socialTracker", '"socialTracker"."socialProfileId" = "socialProfile"."id"')
           .where('"socialProfile"."username" = :username', {username: twitterUser.username})
           .andWhere('"socialProfile"."socialType" = :socialType', {socialType: socialLively.socialType})
           .getRawOne()
         ).pipe(
-          RxJS.switchMap((socialProfileExt) => {
-            return RxJS.merge(
+          RxJS.concatMap((socialProfileExt) =>
+            RxJS.merge(
               RxJS.of(socialProfileExt).pipe(
                 RxJS.filter((data) => !!data),
                 RxJS.map((data) => {
-                  let { followerId: followerId, ...socialProfile } = data;
-                  return {followerId: followerId, socialProfile, socialLively, airdropRule, twitterUser};
+                  let {followerId, ...socialProfile } = data;
+                  return {followerId, socialProfile, socialLively, airdropRule, twitterUser};
                 })
               ),
               RxJS.of(socialProfileExt).pipe(
@@ -162,11 +168,15 @@ export class TwitterFollowerJob {
                 })
               ),
             )
-          })
+          ),
+          RxJS.tap({
+            error: err => this._logger.error(`fetch lively socialProfile failed, ${err}`)
+          }),
+          RxJS.catchError(error => RxJS.throwError(() => new TwitterFollowerError('fetch lively socialProfile failed', error)))
         ),
       ),
-      RxJS.concatMap((inputData) => {
-        return RxJS.merge(
+      RxJS.concatMap((inputData) =>
+        RxJS.merge(
           RxJS.of(inputData).pipe(
             RxJS.filter((data)=> !data.followerId && !!data.socialProfile),
             RxJS.map((data) => {
@@ -193,8 +203,8 @@ export class TwitterFollowerJob {
 
               return ({socialFollower, socialTracker, socialAirdrop, ...data})
             }),
-            RxJS.concatMap((data) => {
-              return RxJS.from(
+            RxJS.concatMap((data) =>
+              RxJS.from(
                 this._entityManager.connection.transaction(async (manager) => {
                   await manager.createQueryBuilder()
                     .insert()
@@ -224,34 +234,24 @@ export class TwitterFollowerJob {
                     socialAirdrop: data.socialAirdrop,
                     socialFollower: data.socialFollower,
                   };
-                })
+                }),
+                RxJS.tap({
+                  error: err => this._logger.error(`twitter follower transaction failed, socialUsername: ${data.socialProfile.username}, socialProfileId: ${data.socialProfile.Id}, error: ${err}`)
+                }),
+                RxJS.catchError(error => RxJS.throwError(() => new TwitterFollowerError('twitter follower transaction failed', error)))
               )
-            }),
+            ),
           ),
           RxJS.of(inputData).pipe(
             RxJS.filter((data) => !!!data.socialProfile),
             RxJS.map((data) => { data.socialProfile }),
-            RxJS.tap((mapData) => this._logger.log(`twitter follower hasn't still registered, username: ${inputData.twitterUser.username}`))
+            RxJS.tap((mapData) => this._logger.debug(`twitter follower hasn't still registered, username: ${inputData.twitterUser.username}`))
           ),
           RxJS.of(inputData).pipe(
             RxJS.filter((data)=> data.followerId && data.socialProfile),
             RxJS.map((data) => { data.socialProfile }),
-            RxJS.tap((mapData) => this._logger.log(`twitter follower already has registered, username: ${inputData.twitterUser.username}`))
+            RxJS.tap((mapData) => this._logger.debug(`twitter follower already has registered, username: ${inputData.twitterUser.username}`))
           )
-        )
-      }),
-      RxJS.retryWhen((errors) =>
-        errors.pipe(
-          RxJS.takeWhile((err) => {
-            if (!(err instanceof ApiResponseError && err.code === 429)) {
-              throw err;
-            }
-            return true
-          }),
-          RxJS.tap({
-            next: (paginator) => this._logger.log(`tweeter client rate limit exceeded, retry for 15 minutes later`),
-          }),
-          RxJS.delay(960000)
         )
       ),
     ).subscribe({
@@ -262,8 +262,8 @@ export class TwitterFollowerJob {
           this._logger.log(`social profile has updated successfully, username: ${data.socialProfile.username}`);
         }
       },
-      error: (error) => this._logger.error(`fetch tweeter followers failed, ${error.stack}\n${error?.cause?.stack}`),
-      complete: () => this._logger.log(`fetch tweeter followers completed`)
+      error: (error) => this._logger.error(`fetch tweeter followers failed\n error: ${error.stack}\n cause: ${error?.cause?.stack}`),
+      complete: () => this._logger.debug(`fetch tweeter followers completed`)
     });
   }
 
@@ -280,7 +280,7 @@ export class TwitterFollowerJob {
               if (!(current.error instanceof TwitterApiError) || current.count > count) {
                 throw current.error;
               }
-              this._logger.error(`fetch twitter follower failed, error: ${current?.error?.cause}`)
+              this._logger.warn(`fetch twitter follower failed,\n error: ${current?.error?.cause}`)
               this._logger.log(`fetch follower retrying ${current.count} . . .`)
             }),
             RxJS.delay(delay)

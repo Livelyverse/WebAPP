@@ -21,6 +21,7 @@ export class SocialTrackerEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({name:"socialEventId"})
   socialEvent?: SocialEventEntity
 
   @ManyToOne((type) => SocialProfileEntity,{
@@ -31,6 +32,7 @@ export class SocialTrackerEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({name:"socialProfileId"})
   socialProfile: SocialProfileEntity
 
   @OneToOne((type) => SocialFollowerEntity, (follower) => follower.socialTracker, {

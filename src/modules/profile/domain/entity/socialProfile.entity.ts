@@ -25,9 +25,6 @@ export class SocialProfileEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
   username: string
 
-  @Column({ type: 'varchar', length: 256, unique: false, nullable: true })
-  profileName?: string
-
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: true })
   profileUrl?: string
 
@@ -45,5 +42,6 @@ export class SocialProfileEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({ name: 'userId' })
   user: UserEntity
 }

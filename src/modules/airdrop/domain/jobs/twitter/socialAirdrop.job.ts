@@ -35,7 +35,7 @@ export class SocialAirdropJob {
       .addSelect('"airdrop".*')
       .innerJoin("social_profile", "socialProfile", '"socialProfile"."userId" = "users"."id"')
       .innerJoin("social_tracker", "socialTracker", '"socialTracker"."socialProfileId" = "socialProfile"."id"')
-      .innerJoin("social_airdrop", "airdrop", '"airdrop"."trackerId" = "socialTracker"."id"')
+      .innerJoin("social_airdrop", "airdrop", '"airdrop"."socialTrackerId" = "socialTracker"."id"')
       .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
       .where('"airdrop"."networkTxId" IS NULL')
       .getRawMany()).pipe(
@@ -53,6 +53,8 @@ export class SocialAirdropJob {
         ),
         RxJS.catchError(err => RxJS.of(err).pipe(RxJS.mergeMap(_ => RxJS.EMPTY)))
       )
+
+    this._logger.debug("airdrop tokens job starting . . . ");
 
     RxJS.merge(
       RxJS.of(this._safeMode).pipe(

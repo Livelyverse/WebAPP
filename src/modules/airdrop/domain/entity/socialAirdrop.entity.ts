@@ -16,6 +16,7 @@ export class SocialAirdropEntity extends BaseEntity {
       eager: true,
       orphanedRowAction: 'nullify',
     })
+  @JoinColumn({name:"airdropRuleId"})
   airdropRule: SocialAirdropRuleEntity
 
   @OneToOne((type) => SocialTrackerEntity,
@@ -27,7 +28,7 @@ export class SocialAirdropEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
-  @JoinColumn({name:"trackerId"})
+  @JoinColumn({name:"socialTrackerId"})
   tracker: SocialTrackerEntity
 
   @ManyToOne((type) => NetworkTxEntity,{

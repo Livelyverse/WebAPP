@@ -49,11 +49,6 @@ export class UserEntity extends BaseEntity {
   })
   group: GroupEntity;
 
-  @OneToMany((type) => SocialProfileEntity, (socialProfile) => socialProfile.user, {
-    nullable: true,
-  })
-  socials: Promise<Array<SocialProfileEntity>>;
-
   @OneToMany((type) => AuthMailEntity, (authMails) => authMails.user)
   authMails: Promise<Array<AuthMailEntity>>;
 

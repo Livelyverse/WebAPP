@@ -32,7 +32,7 @@ import { SocialAirdropJob } from "./domain/jobs/twitter/socialAirdrop.job";
     ]),
   ],
   controllers: [AirdropController],
-  // providers: [AirdropService, TwitterFollowerJob, TweetTrackerJob]
-  providers: [AirdropService, SocialAirdropJob]
+  providers: [AirdropService, TwitterFollowerJob, TweetTrackerJob, SocialAirdropJob]
+  // providers: [AirdropService, TweetTrackerJob]
 })
 export class AirdropModule {}

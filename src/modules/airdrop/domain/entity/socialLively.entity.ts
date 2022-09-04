@@ -21,14 +21,4 @@ export class SocialLivelyEntity extends BaseEntity {
 
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: false })
   profileUrl: string
-
-  @OneToMany((type) => SocialEventEntity, (socialEvent) => socialEvent.socialLively, {
-    nullable: true,
-  })
-  events?: Promise<Array<SocialEventEntity>>
-
-  @OneToMany((type) => SocialFollowerEntity, (follower) => follower.socialLively, {
-    nullable: true,
-  })
-  followers?: Promise<Array<SocialFollowerEntity>>
 }

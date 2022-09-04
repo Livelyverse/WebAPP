@@ -1,4 +1,4 @@
-import { Entity, ManyToOne, OneToOne } from "typeorm";
+import { Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialLivelyEntity } from "./socialLively.entity";
 import { SocialProfileEntity } from "../../../profile/domain/entity/socialProfile.entity";
@@ -14,6 +14,7 @@ export class SocialFollowerEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({name:"socialProfileId"})
   socialProfile: SocialProfileEntity
 
   @ManyToOne((type) => SocialLivelyEntity,{
@@ -24,6 +25,7 @@ export class SocialFollowerEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({name:"socialLivelyId"})
   socialLively: SocialLivelyEntity
 
   @OneToOne(() =>SocialTrackerEntity, (socialTracker) => socialTracker.follower)
