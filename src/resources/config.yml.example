@@ -35,3 +35,43 @@ mail:
   from: 'support@example.com'
   templateDir: 'templates'
 
+blog:
+  medium:
+    rss: 'https://medium.com/feed/@example'
+    homepage: 'https://medium.com/@example'
+
+airdrop:
+  twitter:
+    authToken: 'auth token'
+    tracker:
+      duration: 604800
+      interval: 14400000
+
+blockchain:
+  network:
+    name: 'localhost'
+    type: 'testnet'
+    provider: 'hardhat'
+    chainId: 31337
+    url: 'http://localhost:8545/'
+    apiKey: ''
+
+accounts:
+    - name: 'systemAdmin'
+      privateKey: '0x0000000000000000000000000000000000000000'
+      address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    - name: 'admin'
+      privateKey: '0x0000000000000000000000000000000000000000'
+      address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    - name: 'assetManager'
+      privateKey: '0x00000000000000000000000000000000000000000'
+      address: '0xccccccccccccccccccccccccccccccccccccccccc'
+    - name: 'taxTreasury'
+      privateKey: '0x00000000000000000000000000000000000000000'
+      address: '0xdddddddddddddddddddddddddddddddddddddddddddd'
+
+tokens:
+    - name: 'LVL'
+      address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+
