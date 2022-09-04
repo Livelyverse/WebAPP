@@ -402,7 +402,7 @@ export class BlockchainService {
     ).subscribe({
       next: RxJS.noop,
       error: err => this._logger.error(`blockchain airdrop pipeline failed, ${err.stack}\n${err?.cause?.stack}`),
-      complete: () => this._logger.log(`blockchain airdrop pipeline completed`),
+      complete: () => this._logger.debug(`blockchain airdrop pipeline completed`),
     })
   }
 

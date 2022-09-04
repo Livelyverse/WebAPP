@@ -527,26 +527,6 @@ export class TweetTrackerJob {
                                   "sub", '"sub"."pid" = "socialProfile"."id"')
                                 .where('"socialProfile"."username" = :username', {username: tweetLiked.username})
                                 .getRawOne()
-                            // RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity, "socialProfile")
-                            //   .select('"socialTracker"."id" as "trackerId"')
-                            //   .addSelect('"socialProfile"."id" as "profileId", "socialProfile"."username" as "profileUsername"')
-                            //   .addSelect('"sub"."socialEventId" as "eventId"')
-                            //   // .from(qb =>
-                            //   //   qb.select('"socialEvent"."id" as "socialEventId"')
-                            //   //     .from(SocialEventEntity, "socialEvent")
-                            //   //     .where('"socialEvent"."contentId" = :contentId', {contentId: tuple[1].contentId}), "socialEvent")
-                            //   // .addFrom(SocialProfileEntity, "socialProfile")
-                            //   .leftJoin("social_tracker", "socialTracker", '"socialProfile"."id" = "socialTracker"."socialProfileId"')
-                            //   .leftJoin(qb =>
-                            //     qb.select('"socialEvent"."id" as "socialEventId", "socialTracker"."id" as "socialTrackerId"')
-                            //       .from(SocialEventEntity, "socialEvent")
-                            //       .innerJoin("social_tracker", "socialTracker", '"socialTracker"."socialEventId" = "socialEvent"."id"')
-                            //       .where('"socialEvent"."contentId" = :contentId', {contentId: tuple[1].contentId})
-                            //       .andWhere('"socialTracker"."actionType" = \'LIKE\''),
-                            //     "sub", '"socialTracker"."socialEventId" = "sub"."socialEventId"')
-                            //   .where('"socialProfile"."username" = :username', {username: tweetLiked.username})
-                            //   .andWhere('"socialProfile"."socialType" = :socialType', {socialType: tuple[0].socialType})
-                            //   .getRawOne()
                             ).pipe(
                               RxJS.tap( {
                                 error: (error) => this._logger.error(`pipe(3-1): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, error: ${error}`),
@@ -848,36 +828,6 @@ export class TweetTrackerJob {
           )
         )
       ),
-      // RxJS.retry({
-      //   delay: (error) =>
-      //     RxJS.merge(
-      //       RxJS.of(error).pipe(
-      //         RxJS.filter(err => err instanceof ApiResponseError && err.code === 429),
-      //         RxJS.tap({
-      //           next: (paginator) => this._logger.warn(`tweeter client rate limit exceeded, retry for 15 minutes later`),
-      //         }),
-      //         RxJS.delay(960000)
-      //       ),
-      //       RxJS.of(error).pipe(
-      //         RxJS.filter(err => (err instanceof ApiResponseError && err.code !== 429) || err instanceof Error),
-      //         RxJS.mergeMap(err => RxJS.throwError(err))
-      //       ),
-      //     )
-      // }),
-      // RxJS.retryWhen((errors) =>
-      //   errors.pipe(
-      //     RxJS.takeWhile((err) => {
-      //       if (!(err instanceof ApiResponseError && err.code === 429)) {
-      //         throw err;
-      //       }
-      //       return true
-      //     }),
-      //     RxJS.tap({
-      //       next: (paginator) => this._logger.log(`tweeter client rate limit exceeded, retry for 15 minutes later`),
-      //     }),
-      //     RxJS.delay(960000)
-      //   )
-      // ),
     ).subscribe({
       error: (err) => this._logger.error(`fetchTweetsFromPage failed, ${err.stack},\n${err?.cause?.stack}`),
       complete: () => this._logger.debug(`fetchTweetsFromPage completed`),
