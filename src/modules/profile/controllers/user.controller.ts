@@ -25,9 +25,9 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from '../services/user.service';
-import { UserCreateDto } from '../domain/dto/userCreate.dto';
-import { UserUpdateDto } from '../domain/dto/userUpdate.dto';
-import { UserViewDto } from '../domain/dto/userView.dto';
+import { UserCreateDto } from "../domain/dto";
+import { UserUpdateDto } from "../domain/dto";
+import { UserViewDto } from "../domain/dto";
 import { UserEntity } from '../domain/entity';
 import { isUUID } from './uuid.validate';
 import { JwtAuthGuard } from '../../authentication/domain/gurad/jwt-auth.guard';

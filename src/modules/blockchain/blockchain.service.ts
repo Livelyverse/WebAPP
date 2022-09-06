@@ -1,25 +1,53 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { HttpException, HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
 import { BigNumber, ContractReceipt, ethers, Wallet } from "ethers";
 import { InjectEntityManager } from "@nestjs/typeorm";
 import { EntityManager } from "typeorm";
 import { ConfigService } from "@nestjs/config";
-import { AirdropRequestDto, TokenType } from "./dto/airdropRequest.dto";
+import { AirdropRequestDto, TokenType } from "./domain/dto/airdropRequest.dto";
 import { APP_MODE, BLOCK_CHAIN_MODULE_OPTIONS, BlockchainOptions } from "./blockchainConfig";
 import { EventEmitter } from "events";
 import * as RxJS from "rxjs";
-import { AirdropResponseDto } from "./dto/airdropResponse.dto";
+import { AirdropResponseDto } from "./domain/dto/airdropResponse.dto";
 import { JsonRpcProvider } from "@ethersproject/providers/src.ts/json-rpc-provider";
 import { LivelyToken, LivelyToken__factory } from "@livelyverse/lively-core-onchain/export/types";
-import { BlockchainError, ErrorCode } from "./error/blockchainError";
+import { BlockchainError, ErrorCode } from "./domain/error/blockchainError";
 import { IERC20Extra } from "@livelyverse/lively-core-onchain/export/types/token/lively/LivelyToken";
 import { ContractTransaction, Event } from "@ethersproject/contracts/src.ts";
-import { NetworkTxEntity, TxStatus, TxType } from "./entity/networkTx.entity";
+import { BlockchainTxEntity, TxStatus, TxType } from "./domain/entity/blockchainTx.entity";
 import { TypeORMError } from "typeorm/error/TypeORMError";
+import { SortType } from "./domain/pipe/sortTypePipe";
+import { BlockchainTxViewDto } from "./domain/dto/blockchainTxView.dto";
+
+export interface BlockchainFilterType {
+  txHash: string;
+  from: string;
+  to: string;
+  status: TxStatus;
+  network: NetworkType;
+}
 
 export enum EventType {
   AIRDROP_REQUEST_EVENT = 'AIRDROP_REQUEST',
   AIRDROP_RESPONSE_EVENT = 'AIRDROP_RESPONSE',
   ERROR_EVENT = 'ERROR'
+}
+
+export enum BlockchainSortBy {
+  TIMESTAMP = 'createdAt',
+  BLOCK_NUMBER = 'blockNumber'
+}
+
+export enum NetworkType {
+  LOCALHOST = 'localhost',
+  ETHEREUM = 'ethereum',
+  BSC = 'bsc',
+  POLYGON = 'polygon',
+  GOERLI = 'goerli'
+}
+
+export type FindAllType = {
+  data: BlockchainTxEntity[],
+  total: number
 }
 
 @Injectable()
@@ -147,43 +175,43 @@ export class BlockchainService {
                 RxJS.concatMap( (airdropTx: ContractTransaction) =>
                   RxJS.of(airdropTx).pipe(
                     RxJS.map(tx => {
-                      let networkTx = new NetworkTxEntity();
-                      networkTx.txHash = tx.hash;
-                      networkTx.txType = tx.type === 0 ? TxType.LEGACY : TxType.DEFAULT;
-                      networkTx.from = tx.from;
-                      networkTx.to = tx.to;
-                      networkTx.nonce = tx.nonce;
-                      networkTx.gasLimit = tx?.gasLimit?.toBigInt();
-                      networkTx.gasPrice = tx?.gasPrice?.toBigInt() ? tx.gasPrice.toBigInt() : 0n;
-                      networkTx.maxFeePerGas = tx?.maxFeePerGas?.toBigInt();
-                      networkTx.maxPriorityFeePerGas = tx?.maxPriorityFeePerGas?.toBigInt();
-                      networkTx.data = tx.data;
-                      networkTx.value = tx.value.toBigInt();
-                      networkTx.networkChainId = this._jsonRpcProvider.network.chainId;
-                      networkTx.networkName = this._jsonRpcProvider.network.name;
-                      networkTx.blockNumber = null;
-                      networkTx.blockHash = null;
-                      networkTx.gasUsed = null;
-                      networkTx.effectiveGasPrice = null;
-                      networkTx.isByzantium = null;
-                      networkTx.failInfo = null;
-                      networkTx.status = TxStatus.PENDING;
-                      return networkTx;
+                      let blockchainTx = new BlockchainTxEntity();
+                      blockchainTx.txHash = tx.hash;
+                      blockchainTx.txType = tx.type === 0 ? TxType.LEGACY : TxType.DEFAULT;
+                      blockchainTx.from = tx.from;
+                      blockchainTx.to = tx.to;
+                      blockchainTx.nonce = tx.nonce;
+                      blockchainTx.gasLimit = tx?.gasLimit?.toBigInt();
+                      blockchainTx.gasPrice = tx?.gasPrice?.toBigInt() ? tx.gasPrice.toBigInt() : 0n;
+                      blockchainTx.maxFeePerGas = tx?.maxFeePerGas?.toBigInt();
+                      blockchainTx.maxPriorityFeePerGas = tx?.maxPriorityFeePerGas?.toBigInt();
+                      blockchainTx.data = tx.data;
+                      blockchainTx.value = tx.value.toBigInt();
+                      blockchainTx.networkChainId = this._jsonRpcProvider.network.chainId;
+                      blockchainTx.networkName = this._jsonRpcProvider.network.name;
+                      blockchainTx.blockNumber = null;
+                      blockchainTx.blockHash = null;
+                      blockchainTx.gasUsed = null;
+                      blockchainTx.effectiveGasPrice = null;
+                      blockchainTx.isByzantium = null;
+                      blockchainTx.failInfo = null;
+                      blockchainTx.status = TxStatus.PENDING;
+                      return blockchainTx;
                     }),
-                    RxJS.switchMap((networkTxEntity: NetworkTxEntity) =>
-                      RxJS.of(networkTxEntity).pipe(
-                        RxJS.mergeMap((networkTx) =>
+                    RxJS.switchMap((blockchainTxEntity: BlockchainTxEntity) =>
+                      RxJS.of(blockchainTxEntity).pipe(
+                        RxJS.mergeMap((blockchainTx) =>
                           RxJS.from(this._entityManager.createQueryBuilder()
                             .insert()
-                            .into(NetworkTxEntity)
-                            .values([networkTx])
+                            .into(BlockchainTxEntity)
+                            .values([blockchainTx])
                             .execute()
                           ).pipe(
                             RxJS.tap({
-                              next: (_) => this._logger.log(`save networkTxEntity success, id: ${networkTxEntity.id}, txHash: ${networkTx.txHash}`),
-                              error: err => this._logger.error(`save networkTxEntity failed, txHash: ${networkTx.txHash}\n${err.stack}`)
+                              next: (_) => this._logger.log(`save blockchainTxEntity success, id: ${blockchainTx.id}, txHash: ${blockchainTx.txHash}`),
+                              error: err => this._logger.error(`save blockchainTxEntity failed, txHash: ${blockchainTx.txHash}\n${err.stack}`)
                             }),
-                            RxJS.map((_) => [airdropReq, airdropTx, networkTxEntity]),
+                            RxJS.map((_) => [airdropReq, airdropTx, blockchainTx]),
                           )
                         ),
                         RxJS.catchError((error) =>
@@ -236,12 +264,12 @@ export class BlockchainService {
                 RxJS.finalize(() => this._logger.debug(`finalize batchTransfer token call . . . `)),
                 this.retryWithDelay(30000, 3),
                 RxJS.tap({
-                  next: (tuple:[AirdropRequestDto, ContractTransaction, NetworkTxEntity]) => this._logger.log(`send airdrop tx to blockchain success, token: ${tuple[0].tokenType}, txHash: ${tuple[1].hash}`),
+                  next: (tuple:[AirdropRequestDto, ContractTransaction, BlockchainTxEntity]) => this._logger.log(`send airdrop tx to blockchain success, token: ${tuple[0].tokenType}, txHash: ${tuple[1].hash}`),
                   error: err => this._logger.error(`send airdrop tx to blockchain failed\n${err.stack}\n${err?.cause?.stack}`)
                 }),
               )
             ), // send tx to blockchain
-            RxJS.mergeMap((tuple:[AirdropRequestDto, ContractTransaction, NetworkTxEntity]) =>
+            RxJS.mergeMap((tuple:[AirdropRequestDto, ContractTransaction, BlockchainTxEntity]) =>
               RxJS.of(this._confirmationCount).pipe(
                 RxJS.switchMap((confirmationCount) =>
                   RxJS.from(tuple[1].wait(confirmationCount)).pipe(
@@ -276,34 +304,34 @@ export class BlockchainService {
                                 )
                               ),
                               RxJS.map(([event, receiptTx]:[Event, ContractReceipt]) => {
-                                let networkTx = tuple[2];
-                                networkTx.blockNumber = receiptTx.blockNumber;
-                                networkTx.blockHash = receiptTx.blockHash;
-                                networkTx.gasUsed = receiptTx.gasUsed.toBigInt();
-                                networkTx.effectiveGasPrice = receiptTx.effectiveGasPrice.toBigInt();
-                                networkTx.isByzantium = receiptTx.byzantium;
-                                networkTx.failInfo = null;
-                                networkTx.status = receiptTx.status === 1 ? TxStatus.SUCCESS : TxStatus.FAILED;
-                                return [event, networkTx];
+                                let blockchainTx = tuple[2];
+                                blockchainTx.blockNumber = receiptTx.blockNumber;
+                                blockchainTx.blockHash = receiptTx.blockHash;
+                                blockchainTx.gasUsed = receiptTx.gasUsed.toBigInt();
+                                blockchainTx.effectiveGasPrice = receiptTx.effectiveGasPrice.toBigInt();
+                                blockchainTx.isByzantium = receiptTx.byzantium;
+                                blockchainTx.failInfo = null;
+                                blockchainTx.status = receiptTx.status === 1 ? TxStatus.SUCCESS : TxStatus.FAILED;
+                                return [event, blockchainTx];
                               }),
-                              // update networkTxEntity
-                              RxJS.switchMap(([event, networkTx]:[Event, NetworkTxEntity]) =>
-                                RxJS.of([event, networkTx]).pipe(
-                                  RxJS.mergeMap(([event, networkTx]) => RxJS.from(this._entityManager.getRepository(NetworkTxEntity).save(networkTx))),
+                              // update blockchainTxEntity
+                              RxJS.switchMap(([event, blockchainTx]:[Event, BlockchainTxEntity]) =>
+                                RxJS.of([event, blockchainTx]).pipe(
+                                  RxJS.mergeMap(([event, blockchainTx]) => RxJS.from(this._entityManager.getRepository(BlockchainTxEntity).save(blockchainTx))),
                                   RxJS.tap({
-                                    next: (updateResult) => this._logger.log(`update networkTxEntity success, reqId: ${tuple[0].id.toString()}, txHash: ${updateResult.txHash}, status: ${updateResult.status}, networkTxId: ${updateResult.id}`),
-                                    error: (error) => this._logger.error(`update networkTxEntity failed, reqId: ${tuple[0].id.toString()}, txHash: ${networkTx.txHash}, networkTxId: ${networkTx.id}\n${error.stack}`)
+                                    next: (updateResult) => this._logger.log(`update blockchainTxEntity success, reqId: ${tuple[0].id.toString()}, txHash: ${updateResult.txHash}, status: ${updateResult.status}, blockchainTxId: ${updateResult.id}`),
+                                    error: (error) => this._logger.error(`update blockchainTxEntity failed, reqId: ${tuple[0].id.toString()}, txHash: ${blockchainTx.txHash}, blockchainTxId: ${blockchainTx.id}\n${error.stack}`)
                                   }),
-                                  RxJS.map(_ => [event, networkTx]),
+                                  RxJS.map(_ => [event, blockchainTx]),
                                   RxJS.catchError((error) =>
                                     RxJS.merge(
                                       RxJS.of(error).pipe(
                                         RxJS.filter(err => err instanceof TypeORMError),
-                                        RxJS.mergeMap(err => RxJS.of(networkTx))
+                                        RxJS.mergeMap(err => RxJS.of(blockchainTx))
                                       ),
                                       RxJS.of(error).pipe(
                                         RxJS.filter(err => !(err instanceof TypeORMError) && err instanceof Error),
-                                        RxJS.mergeMap(err => RxJS.throwError(() => new BlockchainError('update networkTx failed', {cause: err, code: ErrorCode.NODE_JS_ERROR})))
+                                        RxJS.mergeMap(err => RxJS.throwError(() => new BlockchainError('update blockchainTx failed', {cause: err, code: ErrorCode.NODE_JS_ERROR})))
                                       )
                                     )
                                   )
@@ -311,19 +339,19 @@ export class BlockchainService {
                               ),
                             ),
                           ),
-                          RxJS.map(([event, networkTxEntity]: [Event, NetworkTxEntity]) => {
+                          RxJS.map(([event, blockchainTxEntity]: [Event, BlockchainTxEntity]) => {
                             let response = new AirdropResponseDto();
                             response.id = tuple[0].id;
-                            response.recordId = networkTxEntity.id;
+                            response.recordId = blockchainTxEntity.id;
                             response.tokenType = tuple[0].tokenType;
-                            response.txHash = networkTxEntity.txHash
-                            response.from = networkTxEntity.from;
-                            response.to = networkTxEntity.to;
-                            response.nonce = networkTxEntity.nonce;
+                            response.txHash = blockchainTxEntity.txHash
+                            response.from = blockchainTxEntity.from;
+                            response.to = blockchainTxEntity.to;
+                            response.nonce = blockchainTxEntity.nonce;
                             response.networkChainId = this._jsonRpcProvider.network.chainId;
                             response.networkName = this._jsonRpcProvider.network.name;
                             response.totalAmount = event.args.totalAmount.toBigInt();
-                            response.status = networkTxEntity.status;
+                            response.status = blockchainTxEntity.status;
                             this._eventEmitter.emit(EventType.AIRDROP_RESPONSE_EVENT, response)
                             return response;
                           }),
@@ -535,34 +563,57 @@ export class BlockchainService {
       );
   }
 
-  // create(createBlockchainDto: TransactionRequestDto) {
-  //   return 'This action adds a new blockchain';
-  // }
-  //
-  // findAll() {
-  //
-  //   let token: LivelyToken;
-  //   let admin: Signer;
-  //   let systemAdmin: Signer;
-  //
-  //   let customHttpProvider = new ethers.providers.JsonRpcProvider('https://boldest-small-river.ethereum-goerli.discover.quiknode.pro/b93d0ba5044bcc5bb7e2cd30a7850f51718ff058/');
-  //   customHttpProvider.getBlockNumber().then((result) => {
-  //     console.log("Current block number: " + result);
-  //   });
-  //
-  //   return `This action returns all blockchain`;
-  // }
-  //
-  // findOne(id: number) {
-  //   return `This action returns a #${id} blockchain`;
-  // }
-  //
-  // update(id: number, updateBlockchainDto: UpdateBlockchainDto) {
-  //   return `This action updates a #${id} blockchain`;
-  // }
-  //
-  // remove(id: number) {
-  //   return `This action removes a #${id} blockchain`;
-  // }
+  public findAll(offset: number, limit: number, sortType: SortType, sortBy: BlockchainSortBy): RxJS.Observable<FindAllType> {
+    return RxJS.from(this._entityManager.getRepository(BlockchainTxEntity)
+      .findAndCount({
+        skip: offset,
+        take: limit,
+        order: {
+          [sortBy]: sortType,
+        },
+      })
+    ).pipe(
+      RxJS.tap({
+        next: result => this._logger.debug(`findAll blockchainTx success, total: ${result[1]}`),
+        error: err => this._logger.error(`findAll blockchainTx failed`, err)
+      }),
+      RxJS.map(result => ({data: result[0], total: result[1]})),
+      RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
+        {
+          status: '500',
+          message: 'Internal Server Error',
+          errCode: 'internalServerError'
+        }, HttpStatus.INTERNAL_SERVER_ERROR))
+      )
+    )
+  }
+
+
+  findByFilter(filter: BlockchainFilterType): RxJS.Observable<FindAllType> {
+    return RxJS.from(this._entityManager.getRepository(BlockchainTxEntity)
+      .findAndCount({
+        where: [
+          { txHash: filter.txHash },
+          { from: filter.from },
+          { to: filter.from },
+          { networkName: filter.network },
+          { status: filter.status },
+        ]
+      })
+    ).pipe(
+      RxJS.tap({
+        next: result => this._logger.debug(`findAll blockchainTx success, total: ${result[1]}`),
+        error: err => this._logger.error(`findAll blockchainTx failed`, err)
+      }),
+      RxJS.map(result => ({data: result[0], total: result[1]})),
+      RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
+        {
+          status: '500',
+          message: 'Internal Server Error',
+          errCode: 'internalServerError'
+        }, HttpStatus.INTERNAL_SERVER_ERROR))
+      )
+    )
+  }
 }
 

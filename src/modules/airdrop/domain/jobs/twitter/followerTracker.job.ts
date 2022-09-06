@@ -112,7 +112,7 @@ export class TwitterFollowerJob {
                   RxJS.delay(960000)
                 ),
                 RxJS.of(error).pipe(
-                  RxJS.filter(err => (err instanceof ApiResponseError && err.code !== 429) || err instanceof Error),
+                  RxJS.filter(err => (err instanceof ApiResponseError && err.code !== 429) || !(err instanceof ApiResponseError)),
                   RxJS.mergeMap(err => RxJS.throwError(err))
                 ),
               )

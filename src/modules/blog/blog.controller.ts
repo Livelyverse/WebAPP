@@ -7,9 +7,10 @@ import {
   Query, HttpException
 } from "@nestjs/common";
 import { BlogService } from './blog.service';
-import { ApiQuery, ApiResponse } from "@nestjs/swagger";
+import { ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { FindAllViewDto } from "./domain/dto/findAllView.dto";
 
+@ApiTags('/api/blog')
 @Controller('/api/blog')
 export class BlogController {
   private readonly _logger = new Logger(BlogController.name);

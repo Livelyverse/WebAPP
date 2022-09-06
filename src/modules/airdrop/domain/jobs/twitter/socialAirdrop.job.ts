@@ -6,10 +6,10 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import * as RxJS from "rxjs";
 import { UserEntity } from "../../../../profile/domain/entity";
 import { BlockchainService } from "../../../../blockchain/blockchain.service";
-import { AirdropRequestDto, TokenType } from "../../../../blockchain/dto/airdropRequest.dto";
+import { AirdropRequestDto, TokenType } from "../../../../blockchain/domain/dto/airdropRequest.dto";
 import { SocialAirdropEntity } from "../../entity/socialAirdrop.entity";
-import { NetworkTxEntity } from "../../../../blockchain/entity/networkTx.entity";
-import { BlockchainError, ErrorCode } from "../../../../blockchain/error/blockchainError";
+import { BlockchainTxEntity } from "../../../../blockchain/domain/entity/blockchainTx.entity";
+import { BlockchainError, ErrorCode } from "../../../../blockchain/domain/error/blockchainError";
 
 @Injectable()
 export class SocialAirdropJob {
@@ -37,7 +37,7 @@ export class SocialAirdropJob {
       .innerJoin("social_tracker", "socialTracker", '"socialTracker"."socialProfileId" = "socialProfile"."id"')
       .innerJoin("social_airdrop", "airdrop", '"airdrop"."socialTrackerId" = "socialTracker"."id"')
       .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
-      .where('"airdrop"."networkTxId" IS NULL')
+      .where('"airdrop"."blockchainTxId" IS NULL')
       .getRawMany()).pipe(
         RxJS.tap({
           next: (queryResult) => this._logger.log(`fetch LVL token airdrops, count: ${queryResult.length}`),
@@ -96,10 +96,7 @@ export class SocialAirdropJob {
             RxJS.tap(data => {
               const airdropIds = data.userAirdrops.map(userAirdrop => userAirdrop.airdrop.id).reduce((acc, value) => [...acc, value], [])
               const userAirdrop = data.userAirdrops[0]
-              this._logger.log(`airdropInfo, username: ${userAirdrop.username}, walletAddress: ${userAirdrop.walletAddress}, 
-                socialUsername: ${userAirdrop.socialUsername}, socialType: ${userAirdrop.socialType}
-                actionType: ${userAirdrop.actionType}, totalAmount: ${data.total.toString()}, 
-                airdropIds: ${JSON.stringify(airdropIds)}`)
+              this._logger.log(`airdropInfo, username: ${userAirdrop.username}, walletAddress: ${userAirdrop.walletAddress}, socialUsername: ${userAirdrop.socialUsername}, socialType: ${userAirdrop.socialType}, actionType: ${userAirdrop.actionType}, totalAmount: ${data.total.toString()}, airdropIds: ${JSON.stringify(airdropIds)}`)
             }),
             RxJS.bufferCount(32),
             RxJS.concatMap(buffers =>
@@ -172,9 +169,9 @@ export class SocialAirdropJob {
                     RxJS.mergeMap(buffer =>
                       RxJS.from(buffer.userAirdrops).pipe(
                         RxJS.map((userAirdrop) => {
-                          let networkTx = new NetworkTxEntity();
-                          networkTx.id = airdropResponse.recordId;
-                          userAirdrop.airdrop.networkTx = networkTx;
+                          let blockchainTx = new BlockchainTxEntity();
+                          blockchainTx.id = airdropResponse.recordId;
+                          userAirdrop.airdrop.blockchainTx = blockchainTx;
                           return userAirdrop.airdrop;
                         }),
                         RxJS.toArray()
@@ -185,12 +182,12 @@ export class SocialAirdropJob {
                         RxJS.tap({
                           next: airdrops => {
                             let airdropIds = airdrops.map(airdrop => airdrop.id).reduce((acc, airdrop) => [...acc, airdrop], [])
-                            this._logger.log(`airdrop updates success with networkTxId: ${airdrops[0].networkTx.id}, airdropIds: ${airdropIds}`)
+                            this._logger.log(`airdrop updates success with blockchainTxId: ${airdrops[0].blockchainTx.id}, airdropIds: ${airdropIds}`)
                           },
                           error: err => {
                             this._safeMode = true
                             let airdropIds = airdrops.map(airdrop => airdrop.id).reduce((acc, airdrop) => [...acc, airdrop], [])
-                            this._logger.error(`airdrop updates failed for networkTxId: ${airdrops[0].networkTx.id}, airdropIds: ${airdropIds}\n${err.stack}\n cause:${err?.cause?.stack}`)
+                            this._logger.error(`airdrop updates failed for blockchainTxId: ${airdrops[0].blockchainTx.id}, airdropIds: ${airdropIds}\n${err.stack}\n cause:${err?.cause?.stack}`)
                           }
                         }),
                         RxJS.catchError(err => RxJS.EMPTY)

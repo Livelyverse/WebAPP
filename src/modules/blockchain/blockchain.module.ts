@@ -5,7 +5,7 @@ import { ProfileModule } from "../profile/profile.module";
 import { HttpModule } from "@nestjs/axios";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { NetworkTxEntity } from "./entity/networkTx.entity";
+import { BlockchainTxEntity } from "./domain/entity/blockchainTx.entity";
 import { BLOCK_CHAIN_MODULE_OPTIONS, BlockchainConfig } from "./blockchainConfig";
 import { BlockchainAsyncOptions, BlockchainOptionFactory } from "./blockchainAsyncOptions";
 
@@ -15,7 +15,7 @@ import { BlockchainAsyncOptions, BlockchainOptionFactory } from "./blockchainAsy
     ProfileModule,
     HttpModule,
     ConfigModule,
-    TypeOrmModule.forFeature([ NetworkTxEntity])
+    TypeOrmModule.forFeature([ BlockchainTxEntity])
   ],
   // controllers: [BlockchainController],
   // providers: [BlockchainService]

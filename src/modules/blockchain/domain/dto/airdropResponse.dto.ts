@@ -1,5 +1,5 @@
 
-import { TxStatus } from "../entity/networkTx.entity";
+import { TxStatus } from "../entity/blockchainTx.entity";
 import { TokenType } from "./airdropRequest.dto";
 
 export class AirdropResponseDto {

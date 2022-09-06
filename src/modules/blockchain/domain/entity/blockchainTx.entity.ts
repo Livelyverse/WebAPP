@@ -1,5 +1,5 @@
 import { Column, Entity } from "typeorm";
-import { BaseEntity } from "../../profile/domain/entity";
+import { BaseEntity } from "../../../profile/domain/entity";
 
 export enum TxStatus {
   FAILED = "FAILED",
@@ -12,8 +12,8 @@ export enum TxType {
   DEFAULT = 'DEFAULT'
 }
 
-@Entity({ name: 'network_tx' })
-export class NetworkTxEntity extends BaseEntity {
+@Entity({ name: 'blockchain_tx' })
+export class BlockchainTxEntity extends BaseEntity {
 
   @Column({ type: 'varchar', length: 256, unique: true, nullable: false })
   txHash: string
@@ -73,7 +73,7 @@ export class NetworkTxEntity extends BaseEntity {
   isByzantium: boolean
 
   @Column({ type: 'text', unique: false, nullable: true })
-  failInfo: string
+  failInfo?: string
 
   @Column({ type: 'text', unique: false, nullable: false })
   status: TxStatus

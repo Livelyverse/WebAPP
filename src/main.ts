@@ -12,7 +12,7 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Lively API')
-    .setDescription('The LivelyPlanet.io API description')
+    .setDescription('The LivelyVerse.io API description')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

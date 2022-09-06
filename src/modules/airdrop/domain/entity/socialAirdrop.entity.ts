@@ -2,7 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialTrackerEntity } from "./socialTracker.entity";
 import { SocialAirdropRuleEntity } from "./socialAirdropRule.entity";
-import { NetworkTxEntity } from "../../../blockchain/entity/networkTx.entity";
+import { BlockchainTxEntity } from "../../../blockchain/domain/entity/blockchainTx.entity";
 
 @Entity({ name: 'social_airdrop' })
 export class SocialAirdropEntity extends BaseEntity {
@@ -31,7 +31,7 @@ export class SocialAirdropEntity extends BaseEntity {
   @JoinColumn({name:"socialTrackerId"})
   tracker: SocialTrackerEntity
 
-  @ManyToOne((type) => NetworkTxEntity,{
+  @ManyToOne((type) => BlockchainTxEntity,{
       cascade: ['soft-remove'],
       onDelete: 'NO ACTION',
       nullable: true,
@@ -39,6 +39,6 @@ export class SocialAirdropEntity extends BaseEntity {
       eager: true,
       orphanedRowAction: 'nullify',
   })
-  @JoinColumn({name:"networkTxId"})
-  networkTx?: NetworkTxEntity
+  @JoinColumn({name:"blockchainTxId"})
+  blockchainTx?: BlockchainTxEntity
 }
