@@ -27,7 +27,9 @@ export class UserUpdateDto {
     return null;
   }
 
-  @IsUUID()
+  @IsNotEmpty({ message: 'Id must not empty' })
+  @IsDefined({ message: 'Id must be defined' })
+  @IsUUID("all", { message: 'Id must be valid UUID'})
   @ApiProperty()
   public id: string;
 

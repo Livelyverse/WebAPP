@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
+import { Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialTrackerEntity } from "./socialTracker.entity";
 import { SocialAirdropRuleEntity } from "./socialAirdropRule.entity";
@@ -19,8 +19,7 @@ export class SocialAirdropEntity extends BaseEntity {
   @JoinColumn({name:"airdropRuleId"})
   airdropRule: SocialAirdropRuleEntity
 
-  @OneToOne((type) => SocialTrackerEntity,
-    (socialTracker) => socialTracker.airdrop,{
+  @OneToOne((type) => SocialTrackerEntity,(socialTracker) => socialTracker.airdrop, {
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
     nullable: false,
@@ -29,7 +28,7 @@ export class SocialAirdropEntity extends BaseEntity {
     orphanedRowAction: 'nullify',
   })
   @JoinColumn({name:"socialTrackerId"})
-  tracker: SocialTrackerEntity
+  socialTracker: SocialTrackerEntity
 
   @ManyToOne((type) => BlockchainTxEntity,{
       cascade: ['soft-remove'],

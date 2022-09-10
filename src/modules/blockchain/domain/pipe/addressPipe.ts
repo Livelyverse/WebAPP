@@ -1,6 +1,7 @@
 import { ErrorHttpStatusCode, HttpErrorByCode } from "@nestjs/common/utils/http-error-by-code.util";
 import { ArgumentMetadata, HttpStatus, Injectable, Optional, PipeTransform } from "@nestjs/common";
 import { ethers } from "ethers";
+import { Type } from "@nestjs/common/interfaces";
 
 export interface AddressPipeOptions {
   errorHttpStatusCode?: ErrorHttpStatusCode;
@@ -23,6 +24,7 @@ export class AddressPipe implements PipeTransform<string, Promise<string | null>
     this.exceptionFactory =
       exceptionFactory ||
       (error => new HttpErrorByCode[errorHttpStatusCode](error));
+
   }
 
   /**

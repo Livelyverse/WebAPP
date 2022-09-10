@@ -5,8 +5,8 @@ import { BlockchainTxEntity } from "../entity/blockchainTx.entity";
 export class FindAllTxViewDto {
 
   public static from(
-    page,
-    offset,
+    page: number,
+    offset: number,
     totalCount: number,
     totalPage: number,
     entities: BlockchainTxEntity[],

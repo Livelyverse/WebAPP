@@ -1,0 +1,45 @@
+import { ApiResponseProperty } from "@nestjs/swagger";
+import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
+import { SocialLivelyEntity } from "../entity/socialLively.entity";
+
+export class SocialLivelyViewDto {
+  public static from(entity: SocialLivelyEntity): SocialLivelyViewDto | null {
+    if (entity) {
+      let livelyDto = new SocialLivelyViewDto();
+      livelyDto.id = entity.id;
+      livelyDto.socialType = entity.socialType;
+      livelyDto.userId = entity?.userId;
+      livelyDto.username = entity.username;
+      livelyDto.profileName = entity?.profileName;
+      livelyDto.profileUrl = entity?.profileUrl;
+      livelyDto.createdAt = entity.createdAt;
+      livelyDto.updatedAt = entity.updatedAt;
+      return livelyDto;
+    }
+    return null;
+  }
+
+  @ApiResponseProperty()
+  public id: string;
+
+  @ApiResponseProperty()
+  public username: string;
+
+  @ApiResponseProperty()
+  socialType: SocialType
+
+  @ApiResponseProperty()
+  userId?: string
+
+  @ApiResponseProperty()
+  profileName?: string
+
+  @ApiResponseProperty()
+  profileUrl?: string
+
+  @ApiResponseProperty()
+  public createdAt: Date;
+
+  @ApiResponseProperty()
+  public updatedAt: Date;
+}

@@ -580,9 +580,9 @@ export class BlockchainService {
       RxJS.map(result => ({data: result[0], total: result[1]})),
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
-          status: '500',
+          statusCode: '500',
           message: 'Internal Server Error',
-          errCode: 'internalServerError'
+          error: 'Internal Server'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )
     )
@@ -608,9 +608,9 @@ export class BlockchainService {
       RxJS.map(result => ({data: result[0], total: result[1]})),
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
-          status: '500',
+          statusCode: '500',
           message: 'Internal Server Error',
-          errCode: 'internalServerError'
+          error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )
     )

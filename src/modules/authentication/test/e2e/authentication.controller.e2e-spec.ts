@@ -1,7 +1,7 @@
 // import { Test } from '@nestjs/testing';
 // import express from 'express';
 // import request from 'supertest';
-// import { AuthenticationController } from '../../authentication.controller';
+// import { AuthenticationController } from '../../authentication.controllers';
 // import { AuthenticationService } from '../../authentication.service';
 // import { ProfileModule } from "../../../profile/profile.module";
 // import { UserService } from "../../../profile/services/user.service";

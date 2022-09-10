@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { AirdropService } from './airdrop.service';
-import { AirdropController } from './airdrop.controller';
+import { SocialLivelyService } from './services/socialLively.service';
+import { AirdropController } from './controllers/airdrop.controller';
 import { ProfileModule } from "../profile/profile.module";
 import { HttpModule } from "@nestjs/axios";
 import { ConfigModule } from "@nestjs/config";
@@ -32,7 +32,7 @@ import { SocialAirdropJob } from "./domain/jobs/twitter/socialAirdrop.job";
     ]),
   ],
   controllers: [AirdropController],
-  providers: [AirdropService, TwitterFollowerJob, TweetTrackerJob, SocialAirdropJob]
-  // providers: [AirdropService, TweetTrackerJob]
+  providers: [SocialLivelyService, TwitterFollowerJob, TweetTrackerJob, SocialAirdropJob]
+  // providers: [SocialLivelyService, TweetTrackerJob]
 })
 export class AirdropModule {}

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AirdropController } from '../airdrop.controller';
-import { AirdropService } from '../airdrop.service';
+import { AirdropController } from '../controllers/airdrop.controller';
+import { SocialLivelyService } from '../services/socialLively.service';
 
 describe('AirdropController', () => {
   let controller: AirdropController;
@@ -8,7 +8,7 @@ describe('AirdropController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AirdropController],
-      providers: [AirdropService],
+      providers: [SocialLivelyService],
     }).compile();
 
     controller = module.get<AirdropController>(AirdropController);

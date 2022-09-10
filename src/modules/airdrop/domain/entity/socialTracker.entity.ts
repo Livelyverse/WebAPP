@@ -46,6 +46,6 @@ export class SocialTrackerEntity extends BaseEntity {
   @JoinColumn({ name: 'socialFollowerId' })
   follower: SocialFollowerEntity
 
-  @OneToOne(() => SocialAirdropEntity, (airdrop) => airdrop.tracker)
+  @OneToOne(() => SocialAirdropEntity, (airdrop) => airdrop.socialTracker)
   airdrop?: SocialAirdropEntity
 }

@@ -199,7 +199,7 @@ export class TwitterFollowerJob {
 
               const socialAirdrop = new SocialAirdropEntity();
               socialAirdrop.airdropRule = data.airdropRule;
-              socialAirdrop.tracker = socialTracker;
+              socialAirdrop.socialTracker = socialTracker;
 
               return ({socialFollower, socialTracker, socialAirdrop, ...data})
             }),

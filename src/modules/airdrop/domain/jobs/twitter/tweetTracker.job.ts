@@ -567,7 +567,7 @@ export class TweetTrackerJob {
 
                                 const socialLikeAirdrop = new SocialAirdropEntity();
                                 socialLikeAirdrop.airdropRule = data.airdropLikeRule;
-                                socialLikeAirdrop.tracker = socialTracker;
+                                socialLikeAirdrop.socialTracker = socialTracker;
 
                                 return { socialTracker, socialLikeAirdrop, ...data};
                               }),
@@ -741,7 +741,7 @@ export class TweetTrackerJob {
 
                                 const socialRetweetAirdrop = new SocialAirdropEntity();
                                 socialRetweetAirdrop.airdropRule = data.airdropRetweetRule;
-                                socialRetweetAirdrop.tracker = socialTracker;
+                                socialRetweetAirdrop.socialTracker = socialTracker;
 
                                 return { socialTracker, socialRetweetAirdrop, ...data};
                               }),

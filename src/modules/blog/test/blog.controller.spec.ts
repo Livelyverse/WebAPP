@@ -36,7 +36,7 @@ describe('BlogController', () => {
     expect(service.findAll).toHaveBeenCalledWith(0, 5 ,"ASC");
   });
 
-  it('should controller.findAll raise validation exceptions',  async () => {
+  it('should controllers.findAll raise validation exceptions',  async () => {
 
     // when and then
     await expect(controller.findAll(-1,5, "asc")).rejects
