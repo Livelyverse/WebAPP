@@ -12,7 +12,6 @@ import {
   UseGuards,
   UsePipes
 } from "@nestjs/common";
-import { SocialLivelyService } from "../services/socialLively.service";
 import * as RxJS from "rxjs";
 import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import RoleGuard from "../../authentication/domain/gurad/role.guard";
@@ -29,14 +28,19 @@ import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
 import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
 import { isEnum, isUUID } from "class-validator";
 import { ContextType, ValidationPipe } from "../domain/pipe/validationPipe";
+import { AirdropRuleService } from "../services/airdropRule.service";
+import { AirdropRuleCreateDto } from "../domain/dto/airdropRuleCreate.dto";
+import { AirdropRuleViewDto } from "../domain/dto/airdropRuleView.dto";
+import { AirdropRuleUpdateDto } from "../domain/dto/airdropRuleUpdate.dto";
+import { SocialAirdropRuleEntity } from "../domain/entity/socialAirdropRule.entity";
 
 @ApiBearerAuth()
-@ApiTags('/api/lively/social/profile')
-@Controller('/api/lively/social/profile')
-export class SocialLivelyController {
+@ApiTags('/api/lively/airdrop/rule')
+@Controller('/api/lively/airdrop/rule')
+export class AirdropRuleController {
 
-  private readonly _logger = new Logger(SocialLivelyController.name);
-  constructor(private readonly _socialLivelyService: SocialLivelyService) {}
+  private readonly _logger = new Logger(AirdropRuleController.name);
+  constructor(private readonly _airdropRuleService: AirdropRuleService) {}
 
   @Post('create')
   @UsePipes(new ValidationPipe({
@@ -51,16 +55,16 @@ export class SocialLivelyController {
   @ApiResponse({
     status: 200,
     description: 'The record has been created successfully.',
-    type: SocialLivelyViewDto
+    type: AirdropRuleViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  create(@Body() socialLivelyDto: SocialLivelyCreateDto): RxJS.Observable<SocialLivelyViewDto> {
-    return RxJS.from(this._socialLivelyService.create(socialLivelyDto)).pipe(
-      RxJS.map(entity => SocialLivelyViewDto.from(entity)),
+  create(@Body() airdropRuleDto: AirdropRuleCreateDto): RxJS.Observable<AirdropRuleViewDto> {
+    return RxJS.from(this._airdropRuleService.create(airdropRuleDto)).pipe(
+      RxJS.map(entity => AirdropRuleViewDto.from(entity)),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -96,17 +100,17 @@ export class SocialLivelyController {
   @ApiResponse({
     status: 200,
     description: 'The record has been updated successfully.',
-    type: SocialLivelyViewDto
+    type: AirdropRuleViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  update(@Body() socialLivelyDto: SocialLivelyUpdateDto): RxJS.Observable<SocialLivelyViewDto> {
+  update(@Body() airdropRuleDto: AirdropRuleUpdateDto): RxJS.Observable<AirdropRuleViewDto> {
 
-    return RxJS.from(this._socialLivelyService.update(socialLivelyDto)).pipe(
-      RxJS.map(entity => SocialLivelyViewDto.from(entity)),
+    return RxJS.from(this._airdropRuleService.update(airdropRuleDto)).pipe(
+      RxJS.map(entity => AirdropRuleViewDto.from(entity)),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -170,9 +174,9 @@ export class SocialLivelyController {
     @Query('offset', new PaginationPipe()) offset: number,
     @Query('sortType', new SortTypePipe()) sortType: SortType,
     @Query('sortBy', new SortByPipe(SortBy)) sortBy: SortBy,
-  ): RxJS.Observable<FindAllViewDto<SocialLivelyViewDto>> {
-    return RxJS.from(this._socialLivelyService.findAll((page - 1) * offset, offset, sortType, sortBy)).pipe(
-      RxJS.mergeMap((result: FindAllType<SocialLivelyEntity>) =>
+  ): RxJS.Observable<FindAllViewDto<AirdropRuleViewDto>> {
+    return RxJS.from(this._airdropRuleService.findAll((page - 1) * offset, offset, sortType, sortBy)).pipe(
+      RxJS.mergeMap((result: FindAllType<SocialAirdropRuleEntity>) =>
         RxJS.merge(
           RxJS.of(result).pipe(
             RxJS.filter((findAllResult) => findAllResult.total === 0),
@@ -187,7 +191,7 @@ export class SocialLivelyController {
             RxJS.filter((findAllResult) => findAllResult.total >= 0),
             RxJS.map(findAllResult =>
               FindAllViewDto.from(page, offset, findAllResult.total,
-                Math.ceil(findAllResult.total / offset), findAllResult.data) as FindAllViewDto<SocialLivelyViewDto> ,
+                Math.ceil(findAllResult.total / offset), findAllResult.data) as FindAllViewDto<AirdropRuleViewDto> ,
             ),
             RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
               {
@@ -219,17 +223,17 @@ export class SocialLivelyController {
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findSocialLively(@Param() params): RxJS.Observable<SocialLivelyViewDto> {
+  findAirdropRules(@Param() params): RxJS.Observable<AirdropRuleViewDto | AirdropRuleViewDto[]> {
     return RxJS.merge(
       RxJS.of(params).pipe(
         RxJS.filter(pathParam => isUUID(pathParam.param)),
-        RxJS.mergeMap(pathParam => this._socialLivelyService.findById(pathParam.param)),
-        RxJS.map(entity => SocialLivelyViewDto.from(entity)),
+        RxJS.mergeMap(pathParam => this._airdropRuleService.findById(pathParam.param)),
+        RxJS.map(entity => AirdropRuleViewDto.from(entity)),
       ),
       RxJS.of(params).pipe(
         RxJS.filter(pathParam => isEnum(pathParam.param, SocialType)),
-        RxJS.mergeMap(pathParam => this._socialLivelyService.findOne( { socialType: pathParam.param } )),
-        RxJS.map(entity => SocialLivelyViewDto.from(entity)),
+        RxJS.mergeMap(pathParam => this._airdropRuleService.find( { socialType: pathParam.param } )),
+        RxJS.map(entities => entities.map(entity => AirdropRuleViewDto.from(entity)).reduce((acc, value) => [...acc, value], [])),
       ),
       RxJS.of(params).pipe(
         RxJS.filter(pathParam => !isUUID(pathParam.param) && !isEnum(pathParam.param, SocialType)),
@@ -274,6 +278,6 @@ export class SocialLivelyController {
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   findTotalCount(): RxJS.Observable<number> {
-    return this._socialLivelyService.findTotal();
+    return this._airdropRuleService.findTotal();
   }
 }

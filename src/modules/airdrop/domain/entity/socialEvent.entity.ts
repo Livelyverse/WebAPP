@@ -1,8 +1,7 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { ContentDto } from "../dto/content.dto";
 import { SocialLivelyEntity } from "./socialLively.entity";
-import { SocialTrackerEntity } from "./socialTracker.entity";
 
 @Entity({ name: 'social_event' })
 export class SocialEventEntity extends BaseEntity {

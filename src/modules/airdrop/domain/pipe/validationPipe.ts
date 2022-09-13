@@ -12,6 +12,7 @@ import { isNil } from "@nestjs/common/utils/shared.utils";
 import { SocialLivelyCreateDto } from "../dto/socialLivelyCreate.dto";
 import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
 import { SocialLivelyUpdateDto } from "../dto/socialLivelyUpdate.dto";
+import { AirdropRuleCreateDto } from "../dto/airdropRuleCreate.dto";
 
 export enum ContextType {
   CREATE,
@@ -137,9 +138,11 @@ export class ValidationPipe implements PipeTransform<any> {
     }
 
     if (this.validationContext === ContextType.CREATE) {
-      errors = this.createValidation(entity);
-      if (errors.length > 0) {
-        throw await this.exceptionFactory(errors);
+      if (entity instanceof SocialLivelyCreateDto) {
+        errors = this.socialLivelyCreateValidation(entity);
+        if (errors.length > 0) {
+          throw await this.exceptionFactory(errors);
+        }
       }
     } else if (this.validationContext === ContextType.UPDATE) {
       errors = this.updateValidation(entity);
@@ -289,7 +292,7 @@ export class ValidationPipe implements PipeTransform<any> {
     };
   }
 
-  protected createValidation(dto: SocialLivelyCreateDto): ValidationError[] {
+  protected socialLivelyCreateValidation(dto: SocialLivelyCreateDto): ValidationError[] {
     let validations: ValidationError[] = []
     if(dto.socialType === SocialType.TWITTER) {
 
@@ -332,7 +335,7 @@ export class ValidationPipe implements PipeTransform<any> {
     return validations;
   }
 
-  protected updateValidation(dto: SocialLivelyUpdateDto): ValidationError[] {
+  protected updateValidation(dto: object): ValidationError[] {
     let validations: ValidationError[] = []
     return validations;
   }
