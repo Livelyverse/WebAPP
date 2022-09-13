@@ -588,8 +588,7 @@ export class BlockchainService {
     )
   }
 
-
-  findByFilter(filter: BlockchainFilterType): RxJS.Observable<FindAllType> {
+  public findByFilter(filter: BlockchainFilterType): RxJS.Observable<FindAllType> {
     return RxJS.from(this._entityManager.getRepository(BlockchainTxEntity)
       .findAndCount({
         where: [

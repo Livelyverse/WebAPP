@@ -20,10 +20,10 @@ export class SocialLivelyViewDto {
   }
 
   @ApiResponseProperty()
-  public id: string;
+  id: string;
 
   @ApiResponseProperty()
-  public username: string;
+  username: string;
 
   @ApiResponseProperty()
   socialType: SocialType

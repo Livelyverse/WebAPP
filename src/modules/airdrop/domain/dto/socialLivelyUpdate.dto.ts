@@ -9,19 +9,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SocialLivelyUpdateDto {
-  public static from(dto: any): SocialLivelyUpdateDto | null {
-    if (dto) {
-      let livelyDto = new SocialLivelyUpdateDto();
-      livelyDto.id = dto?.id;
-      livelyDto.userId = dto?.userId;
-      livelyDto.username = dto?.username;
-      livelyDto.profileName = dto?.profileName;
-      livelyDto.profileUrl = dto?.profileUrl;
-      return livelyDto;
-    }
-    return null;
-  }
-
   @IsNotEmpty({ message: 'Id must not empty' })
   @IsDefined({ message: 'Id must be defined' })
   @IsUUID("all", { message: 'Id must be valid UUID'})
