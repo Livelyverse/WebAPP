@@ -389,8 +389,8 @@ export class UserService implements IService<UserEntity> {
         `user update validation failed, dto: ${userDto}, errors: ${errors}`,
       );
       throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        { message: 'Input data validation failed', errors },
+        HttpStatus.BAD_REQUEST,
       );
     }
 

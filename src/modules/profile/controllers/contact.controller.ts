@@ -10,7 +10,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { MailService } from '../../mail/mail.service';
-import { ContactDto } from '../domain/dto/contact.dto';
+import { ContactDto } from "../domain/dto";
 import { validate } from 'class-validator';
 import { SentMessageInfo } from 'nodemailer';
 

@@ -32,6 +32,7 @@ export class BackofficeController {
   @ApiResponse({
     status: 200,
     description: 'Backoffice dashboard stats fetch success',
+    type: DashboardStatsDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })

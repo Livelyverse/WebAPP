@@ -4,17 +4,15 @@ import {
   IsOptional,
   IsNotEmpty,
   IsDefined,
-  IsEnum, IsUUID
+  IsUUID
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
 
 export class SocialLivelyUpdateDto {
   public static from(dto: any): SocialLivelyUpdateDto | null {
     if (dto) {
       let livelyDto = new SocialLivelyUpdateDto();
       livelyDto.id = dto?.id;
-      livelyDto.socialType = dto?.socialType;
       livelyDto.userId = dto?.userId;
       livelyDto.username = dto?.username;
       livelyDto.profileName = dto?.profileName;
@@ -31,24 +29,18 @@ export class SocialLivelyUpdateDto {
   public id: string;
 
   @IsNotEmpty({ message: 'Username must not empty' })
-  @IsDefined({ message: 'Username must be defined' })
   @IsString({ message: 'Username must be string' })
   @IsOptional()
   @ApiPropertyOptional()
   public username?: string;
 
-  @IsNotEmpty({ message: 'SocialType must not empty' })
-  @IsDefined({ message: 'SocialType must be defined' })
-  @IsEnum(SocialType, { message: 'SocialType must one of these values, TWITTER | INSTAGRAM | TIKTOK | TELEGRAM | DISCORD' } )
-  @IsOptional()
-  @ApiPropertyOptional()
-  socialType?: SocialType
-
-  @IsString({ message: 'Username must be string' })
+  @IsNotEmpty({ message: 'UserId must not empty' })
+  @IsString({ message: 'UserId must be string' })
   @IsOptional()
   @ApiPropertyOptional()
   userId?: string
 
+  @IsNotEmpty({ message: 'ProfileName must not empty' })
   @IsString({ message: 'ProfileName must be string' })
   @IsOptional()
   @ApiPropertyOptional()

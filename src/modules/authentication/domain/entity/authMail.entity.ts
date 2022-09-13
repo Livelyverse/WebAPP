@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { UserEntity, BaseEntity } from '../../../profile/domain/entity';
 
 export enum AuthMailType {
@@ -29,7 +29,7 @@ export class AuthMailEntity extends BaseEntity {
   @Column({ type: 'timestamptz', unique: false, nullable: true })
   mailSentAt: Date;
 
-  @ManyToOne((type) => UserEntity, (user) => user.authMails, {
+  @ManyToOne((type) => UserEntity, {
     cascade: ['update', 'soft-remove'],
     onDelete: 'NO ACTION',
     nullable: false,
@@ -37,5 +37,6 @@ export class AuthMailEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({ name: 'userId' })
   public user: UserEntity;
 }

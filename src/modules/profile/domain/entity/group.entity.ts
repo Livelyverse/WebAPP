@@ -1,7 +1,6 @@
 import { BaseEntity } from './base.entity';
-import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, } from "typeorm";
 import { RoleEntity } from './role.entity';
-import { UserEntity } from './user.entity';
 
 @Entity({ name: 'group' })
 export class GroupEntity extends BaseEntity {
@@ -11,7 +10,7 @@ export class GroupEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 512, unique: false, nullable: true })
   description: string;
 
-  @ManyToOne((type) => RoleEntity, (role) => role.groups, {
+  @ManyToOne((type) => RoleEntity,{
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
     nullable: false,
@@ -19,10 +18,7 @@ export class GroupEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({ name: 'roleId' })
   role: RoleEntity;
 
-  @OneToMany((type) => UserEntity, (user) => user.group, {
-    nullable: true,
-  })
-  users: Promise<Array<UserEntity>>;
 }

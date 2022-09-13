@@ -5,7 +5,7 @@ const RoleGuard = (role: string): Type<CanActivate> => {
     canActivate(context: ExecutionContext) {
       const req = context.switchToHttp().getRequest() as any;
       const user = req.user;
-      return user?.group.role.name === role.toUpperCase();
+      return user?.group?.role?.name === role.toUpperCase();
     }
   }
 

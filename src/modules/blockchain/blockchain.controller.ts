@@ -6,12 +6,11 @@ import {
   HttpStatus,
   Logger,
   HttpException,
-  ParseUUIDPipe
 } from "@nestjs/common";
 import { BlockchainService, BlockchainSortBy, FindAllType, NetworkType } from "./blockchain.service";
 import { FindAllTxViewDto } from "./domain/dto/findAllTxView.dto";
 import { SortType, SortTypePipe } from "./domain/pipe/sortTypePipe";
-import { ApiQuery, ApiResponse, ApiTags, getSchemaPath } from "@nestjs/swagger";
+import { ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { SortByPipe } from "./domain/pipe/sortByPipe";
 import * as RxJS from "rxjs";
 import { PaginationPipe } from "./domain/pipe/paginationPipe";
@@ -25,7 +24,7 @@ import { EnumPipe } from "./domain/pipe/enumPipe";
 @Controller('/api/blockchain')
 export class BlockchainController {
   private readonly _logger = new Logger(BlockchainController.name);
-  constructor(private readonly blockchainService: BlockchainService) {}
+  constructor(private readonly _blockchainService: BlockchainService) {}
 
   @Get('/findAll')
   @HttpCode(HttpStatus.OK)
@@ -54,9 +53,9 @@ export class BlockchainController {
       'data sort field can be one of the timestamp or the block_number fields',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.'})
+  @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllTxViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
-  @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   findAll(
     @Query('page', new PaginationPipe()) page: number,
@@ -64,7 +63,7 @@ export class BlockchainController {
     @Query('sortType', new SortTypePipe()) sortType: SortType,
     @Query('sortBy', new SortByPipe(BlockchainSortBy)) sortBy: BlockchainSortBy,
   ): RxJS.Observable<FindAllTxViewDto> {
-    return RxJS.from(this.blockchainService.findAll((page - 1) * offset, offset, sortType, sortBy)).pipe(
+    return RxJS.from(this._blockchainService.findAll((page - 1) * offset, offset, sortType, sortBy)).pipe(
       RxJS.mergeMap((result:FindAllType) =>
         RxJS.merge(
           RxJS.of(result).pipe(
@@ -120,7 +119,7 @@ export class BlockchainController {
     description: 'transaction status',
     schema: { enum: Object.keys(TxStatus) },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.'})
+  @ApiResponse({ status: 200, description: 'The record is found.', type: BlockchainTxViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
@@ -144,7 +143,7 @@ export class BlockchainController {
         RxJS.of({txHash, from, to, network, status}).pipe(
           RxJS.filter(filter => !!filter.txHash || !!filter.from || !!filter.to || !!filter.network || !!filter.status),
           RxJS.mergeMap(filter =>
-            RxJS.from(this.blockchainService.findByFilter(filter)).pipe(
+            RxJS.from(this._blockchainService.findByFilter(filter)).pipe(
               RxJS.mergeMap((result:FindAllType) =>
                 RxJS.merge(
                   RxJS.of(result).pipe(

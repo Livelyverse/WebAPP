@@ -1,5 +1,5 @@
 import { GroupEntity, RoleEntity, UserEntity } from '../entity';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
 import { RoleViewDto } from './roleView.dto';
 import { GroupViewDto } from './groupView.dto';
 import { UserViewDto } from './userView.dto';
@@ -37,18 +37,18 @@ export class FindAllViewDto {
     return findAllDto;
   }
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public page: number;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public offset: number;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public totalPage: number;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public totalCount: number;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public data: RoleViewDto[] | GroupViewDto[] | UserViewDto[];
 }
