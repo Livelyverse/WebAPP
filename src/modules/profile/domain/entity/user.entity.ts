@@ -1,11 +1,10 @@
-import { Entity, Column, ManyToOne, OneToMany, OneToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany, OneToOne, JoinColumn } from "typeorm";
 import { BaseEntity } from './base.entity';
 import { GroupEntity } from './group.entity';
 import {
   AuthMailEntity,
   TokenEntity,
 } from '../../../authentication/domain/entity';
-import { SocialProfileEntity } from "./socialProfile.entity";
 
 @Entity({ name: 'user' })
 export class UserEntity extends BaseEntity {
@@ -39,7 +38,7 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 256, unique: true, nullable: true })
   walletAddress?: string;
 
-  @ManyToOne((type) => GroupEntity, (group) => group.users, {
+  @ManyToOne((type) => GroupEntity, {
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
     nullable: false,
@@ -47,10 +46,8 @@ export class UserEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
+  @JoinColumn({ name: 'groupId' })
   group: GroupEntity;
-
-  @OneToMany((type) => AuthMailEntity, (authMails) => authMails.user)
-  authMails: Promise<Array<AuthMailEntity>>;
 
   @OneToOne((type) => TokenEntity, (token) => token.user)
   token: TokenEntity;

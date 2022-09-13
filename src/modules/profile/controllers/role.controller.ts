@@ -22,9 +22,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { RoleService } from '../services/role.service';
-import { RoleCreateDto } from '../domain/dto/roleCreate.dto';
-import { RoleUpdateDto } from '../domain/dto/roleUpdate.dto';
-import { RoleViewDto } from '../domain/dto/roleView.dto';
+import { RoleCreateDto, RoleUpdateDto, RoleViewDto } from "../domain/dto";
 import { RoleEntity } from '../domain/entity';
 import { isUUID } from './uuid.validate';
 import { JwtAuthGuard } from '../../authentication/domain/gurad/jwt-auth.guard';
@@ -45,16 +43,17 @@ export class RoleController {
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully created.',
+    type: RoleViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async create(@Body() roleDto: RoleCreateDto): Promise<string> {
+  async create(@Body() roleDto: RoleCreateDto): Promise<RoleViewDto> {
     const dto = RoleCreateDto.from(roleDto);
     const role = await this.roleService.create(dto);
-    return role.id;
+    return RoleViewDto.from(role);
   }
 
   @Post('update')
@@ -64,6 +63,7 @@ export class RoleController {
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully updated.',
+    type: RoleViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -86,7 +86,7 @@ export class RoleController {
     description: 'either an uuid for the role id or a string for the role name',
     schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.' })
+  @ApiResponse({ status: 200, description: 'The record is found.', type: RoleViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
@@ -142,7 +142,7 @@ export class RoleController {
     description: 'data sort type can be one of ASC or DESC',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.' })
+  @ApiResponse({ status: 200, description: 'The record is found.', type: FindAllViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })

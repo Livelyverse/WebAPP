@@ -3,7 +3,7 @@ import { SocialType } from "../../../profile/domain/entity/socialProfile.entity"
 import { SocialLivelyEntity } from "../entity/socialLively.entity";
 
 export class SocialLivelyViewDto {
-  public static from(entity: SocialLivelyEntity): SocialLivelyViewDto | null {
+  public static from(entity: SocialLivelyEntity): SocialLivelyViewDto | null  {
     if (entity) {
       let livelyDto = new SocialLivelyViewDto();
       livelyDto.id = entity.id;

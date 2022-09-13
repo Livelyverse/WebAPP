@@ -15,12 +15,12 @@ import { JwtService } from '@nestjs/jwt';
 import * as fs from 'fs';
 import { Response } from 'express';
 import { UserService } from '../profile/services/user.service';
-import { UserEntity } from '../profile/domain/entity';
+import { GroupEntity, RoleEntity, UserEntity } from "../profile/domain/entity";
 import { ConfigService } from '@nestjs/config';
 import { join } from 'path';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectEntityManager, InjectRepository } from "@nestjs/typeorm";
 import { AuthMailEntity, TokenEntity } from './domain/entity';
-import { MoreThan, Repository } from 'typeorm';
+import { EntityManager, MoreThan, Repository } from "typeorm";
 import { RefreshDto } from './domain/dto/refresh.dto';
 import { GroupService } from '../profile/services/group.service';
 import * as argon2 from 'argon2';
@@ -50,43 +50,41 @@ export interface TokenPayload {
 
 @Injectable()
 export class AuthenticationService {
-  private readonly logger = new Logger(AuthenticationService.name);
+  private readonly _logger = new Logger(AuthenticationService.name);
   private readonly _privateKey;
   private readonly _publicKey;
   private readonly _refreshTokenTTL;
   private readonly _accessTokenTTL;
   private readonly _mailTokenTTL;
   constructor(
-    @InjectRepository(TokenEntity)
-    private readonly tokenRepository: Repository<TokenEntity>,
-    @InjectRepository(AuthMailEntity)
-    private readonly authMailRepository: Repository<AuthMailEntity>,
-    private readonly userService: UserService,
-    private readonly groupService: GroupService,
-    private readonly configService: ConfigService,
-    private readonly jwt: JwtService,
-    private readonly mailService: MailService,
+    @InjectEntityManager()
+    private readonly _entityManager: EntityManager,
+    private readonly _userService: UserService,
+    private readonly _groupService: GroupService,
+    private readonly _configService: ConfigService,
+    private readonly _jwt: JwtService,
+    private readonly _mailService: MailService,
   ) {
     this._privateKey = fs.readFileSync(
       join(
         process.cwd(),
         '/dist/resources/',
-        this.configService.get<string>('app.privateKey'),
+        this._configService.get<string>('app.privateKey'),
       ),
     );
     this._publicKey = fs.readFileSync(
       join(
         process.cwd(),
         '/dist/resources/',
-        this.configService.get<string>('app.publicKey'),
+        this._configService.get<string>('app.publicKey'),
       ),
     );
 
-    this._accessTokenTTL = this.configService.get<number>('app.accessTokenTTL');
-    this._refreshTokenTTL = this.configService.get<number>(
+    this._accessTokenTTL = this._configService.get<number>('app.accessTokenTTL');
+    this._refreshTokenTTL = this._configService.get<number>(
       'app.refreshTokenTTL',
     );
-    this._mailTokenTTL = this.configService.get<number>('app.mailTokenTTL');
+    this._mailTokenTTL = this._configService.get<number>('app.mailTokenTTL');
   }
 
   get publicKey() {
@@ -98,7 +96,7 @@ export class AuthenticationService {
     dto: ChangePasswordDto,
   ): Promise<void> {
     if (dto instanceof Array) {
-      this.logger.log(
+      this._logger.log(
         `changeUserPassword Data Invalid, username: ${dto.username}`,
       );
       throw new BadRequestException({ message: 'Request Data Invalid' });
@@ -109,7 +107,7 @@ export class AuthenticationService {
       forbidUnknownValues: false,
     });
     if (errors.length > 0) {
-      this.logger.log(
+      this._logger.log(
         `changeUserPassword validation failed, username: ${dto.username}, errors: ${errors}`,
       );
 
@@ -122,14 +120,14 @@ export class AuthenticationService {
     const tokenPayload = await this.authTokenValidation(token, false);
     let tokenEntity;
     try {
-      tokenEntity = await this.tokenRepository.findOne({
+      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: tokenPayload.sub },
         },
       });
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `changeUserPassword tokenRepository.findOne failed, userId: ${tokenPayload.sub}`,
         error,
       );
@@ -140,14 +138,14 @@ export class AuthenticationService {
 
     const user = tokenEntity.user;
     if (!user.isActive) {
-      this.logger.log(
+      this._logger.log(
         `changeUserPassword failed, user inactivated, username: ${user.username}`,
       );
       throw new ForbiddenException({ message: '' });
     }
 
     if (user.username !== dto.username) {
-      this.logger.warn(
+      this._logger.warn(
         `requested username doesn't match with user auth token, token user: ${user.username}, dto: ${dto.username}`,
       );
       throw new ForbiddenException({ message: '' });
@@ -157,14 +155,14 @@ export class AuthenticationService {
     try {
       isPassVerify = await argon2.verify(user.password, dto.oldPassword);
     } catch (err) {
-      this.logger.error(`argon2.hash failed, username: ${user.username}`, err);
+      this._logger.error(`argon2.hash failed, username: ${user.username}`, err);
       throw new InternalServerErrorException({
         message: 'Something went wrong',
       });
     }
 
     if (!isPassVerify) {
-      this.logger.log(
+      this._logger.log(
         `user password verification failed, username: ${user.username}`,
       );
       throw new ForbiddenException({ message: 'Password Invalid' });
@@ -174,7 +172,7 @@ export class AuthenticationService {
     try {
       hashPassword = await argon2.hash(dto.newPassword);
     } catch (err) {
-      this.logger.error(`argon2.hash failed, username: ${dto.username}`, err);
+      this._logger.error(`argon2.hash failed, username: ${dto.username}`, err);
       throw new HttpException(
         { message: 'Internal Server Error' },
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -182,14 +180,14 @@ export class AuthenticationService {
     }
 
     user.password = hashPassword;
-    await this.userService.updateEntity(user);
+    await this._userService.updateEntity(user);
 
     // tokenEntity.isRevoked = true;
     // try {
-    //   return this.tokenRepository.save(tokenEntity);
+    //   return this._tokenRepository.save(tokenEntity);
     // } catch (error) {
-    //   this.logger.error(
-    //     `tokenRepository.save failed, tokenEntity Id: ${tokenEntity.id}, userId: ${user.id}`,
+    //   this._logger.error(
+    //     `_tokenRepository.save failed, tokenEntity Id: ${tokenEntity.id}, userId: ${user.id}`,
     //     error,
     //   );
     //   throw new InternalServerErrorException({
@@ -200,7 +198,7 @@ export class AuthenticationService {
 
   public async userAuthentication(dto: LoginDto, res: Response): Promise<void> {
     if (dto instanceof Array) {
-      this.logger.log(
+      this._logger.log(
         `userAuthentication Data Invalid, username: ${dto.username}`,
       );
       res
@@ -214,7 +212,7 @@ export class AuthenticationService {
       forbidUnknownValues: false,
     });
     if (errors.length > 0) {
-      this.logger.log(
+      this._logger.log(
         `userAuthentication data validation failed, username: ${dto.username}, errors: ${errors}`,
       );
 
@@ -224,10 +222,10 @@ export class AuthenticationService {
       return;
     }
 
-    const user = await this.userService.findByName(dto.username);
+    const user = await this._userService.findByName(dto.username);
 
     if (!user) {
-      this.logger.log(`user not found, username: ${dto.username}`);
+      this._logger.log(`user not found, username: ${dto.username}`);
       res
         .status(HttpStatus.NOT_FOUND)
         .send({ message: 'Username Or Password Invalid' });
@@ -235,7 +233,7 @@ export class AuthenticationService {
     }
 
     if (!user.isActive) {
-      this.logger.log(
+      this._logger.log(
         `userAuthentication failed, user inactivated, username: ${dto.username}`,
       );
       res
@@ -248,7 +246,7 @@ export class AuthenticationService {
     try {
       isPassVerify = await argon2.verify(user.password, dto.password);
     } catch (err) {
-      this.logger.error(`argon2.hash failed, username: ${dto.username}`, err);
+      this._logger.error(`argon2.hash failed, username: ${dto.username}`, err);
       res
         .status(HttpStatus.INTERNAL_SERVER_ERROR)
         .send({ message: 'Something went wrong' });
@@ -256,7 +254,7 @@ export class AuthenticationService {
     }
 
     if (!isPassVerify) {
-      this.logger.log(
+      this._logger.log(
         `user password verification failed, username: ${dto.username}`,
       );
       res
@@ -292,10 +290,10 @@ export class AuthenticationService {
     userDto.password = dto.password;
     userDto.email = dto.email;
     userDto.group = 'GHOST';
-    const user = await this.userService.create(userDto);
+    const user = await this._userService.create(userDto);
     const authMailEntity = await this.createOrGetAuthMailEntity(user, true);
 
-    this.mailService.sendCodeConfirmation(
+    this._mailService.sendCodeConfirmation(
       userDto.username,
       userDto.email,
       Number(authMailEntity.verificationId),
@@ -315,14 +313,14 @@ export class AuthenticationService {
     const authMailToken = await this.authTokenValidation(token, false);
     let authMail;
     try {
-      authMail = await this.authMailRepository.findOne({
+      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
         where: {
           id: authMailToken.jti,
           mailType: AuthMailType.USER_VERIFICATION,
         },
       });
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `authMailRepository.findOne of resendMailVerification failed, id: ${authMailToken.jti}`,
         error,
       );
@@ -332,7 +330,7 @@ export class AuthenticationService {
     }
 
     if (!authMail) {
-      this.logger.warn(
+      this._logger.warn(
         `authMail entity of token invalid, authMail id: ${authMailToken.jti}`,
       );
       throw new ForbiddenException({ message: '' });
@@ -348,7 +346,7 @@ export class AuthenticationService {
     }
 
     if (user.isEmailConfirmed) {
-      this.logger.warn(
+      this._logger.warn(
         `user try again to resend mail verification, userId: ${user.id}`,
       );
       throw new BadRequestException({
@@ -359,7 +357,7 @@ export class AuthenticationService {
     const authMailEntity = await this.createOrGetAuthMailEntity(user);
 
     if (authMailEntity.isEmailSent) {
-      this.logger.log(
+      this._logger.log(
         `mail verification already send to user, userId: ${user.id}, sendTo: ${authMailEntity.sendTo}`,
       );
       return;
@@ -368,16 +366,16 @@ export class AuthenticationService {
     authMailEntity.isEmailSent = true;
     authMailEntity.mailSentAt = new Date();
     try {
-      await this.authMailRepository.save(authMailEntity);
+      await this._entityManager.getRepository(AuthMailEntity).save(authMailEntity);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `authMailRepository.save of resendMailVerification failed, userId: ${user.id}, 
                  authMail Id: ${authMailEntity.id}`,
         error,
       );
     }
 
-    this.mailService.sendCodeConfirmation(
+    this._mailService.sendCodeConfirmation(
       user.username,
       user.email,
       Number(authMailEntity.verificationId),
@@ -388,9 +386,9 @@ export class AuthenticationService {
     let authMail;
     let userEntity;
     try {
-      userEntity = await this.userService.findByEmail(email);
+      userEntity = await this._userService.findByEmail(email);
     } catch (err) {
-      this.logger.error(`userService.findByEmail failed, email: ${email}`, err);
+      this._logger.error(`userService.findByEmail failed, email: ${email}`, err);
       throw new HttpException(
         { message: 'Something went wrong' },
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -398,14 +396,14 @@ export class AuthenticationService {
     }
 
     if (!userEntity) {
-      this.logger.debug(
+      this._logger.debug(
         `forget password failed, email not found, email: ${email}`,
       );
       throw new NotFoundException({ message: 'Email Not Found' });
     }
 
     if (!userEntity.isEmailConfirmed) {
-      this.logger.warn(
+      this._logger.warn(
         `user try reset password mean while didn't confirmed, 
         userId: ${userEntity.id}, email: ${userEntity.email}`,
       );
@@ -413,7 +411,7 @@ export class AuthenticationService {
     }
 
     try {
-      authMail = await this.authMailRepository.findOne({
+      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: userEntity.id },
@@ -423,7 +421,7 @@ export class AuthenticationService {
         },
       });
     } catch (err) {
-      this.logger.error(`authMailRepository.find failed, email: ${email}`, err);
+      this._logger.error(`authMailRepository.find failed, email: ${email}`, err);
       throw new HttpException(
         { message: 'Something went wrong' },
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -431,14 +429,14 @@ export class AuthenticationService {
     }
 
     if (authMail) {
-      this.logger.warn(`already sent forget password email, 
+      this._logger.warn(`already sent forget password email, 
       username: ${authMail.user.username}, email: ${email}, date: ${authMail.mailSentAt} `);
       return;
     }
 
     authMail = new AuthMailEntity();
     authMail.user = userEntity;
-    authMail.from = this.configService.get<string>('mail.from');
+    authMail.from = this._configService.get<string>('mail.from');
     authMail.sendTo = userEntity.email;
     authMail.verificationId = uuidv4();
     authMail.expiredAt = new Date(Date.now() + this._mailTokenTTL);
@@ -449,9 +447,9 @@ export class AuthenticationService {
     authMail.mailType = AuthMailType.FORGOTTEN_PASSWORD;
 
     try {
-      await this.authMailRepository.save(authMail);
+      await this._entityManager.getRepository(AuthMailEntity).save(authMail);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `authMailRepository.save failed, userId: ${authMail.user.id}`,
         error,
       );
@@ -462,13 +460,13 @@ export class AuthenticationService {
 
     const absoluteUrl =
       'https://' +
-      this.configService.get<string>('http.domain') +
+      this._configService.get<string>('http.domain') +
       '/api/auth/mail/password/reset/' +
       userEntity.id +
       '/' +
       authMail.verificationId;
 
-    this.mailService.sendForgetPassword(
+    this._mailService.sendForgetPassword(
       userEntity.username,
       userEntity.email,
       absoluteUrl,
@@ -482,7 +480,7 @@ export class AuthenticationService {
   ): Promise<any> {
     let authMail;
     try {
-      authMail = await this.authMailRepository.findOne({
+      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: userId },
@@ -492,7 +490,7 @@ export class AuthenticationService {
         },
       });
     } catch (err) {
-      this.logger.error(
+      this._logger.error(
         `authMailRepository.findOne failed, userId: ${userId}`,
         err,
       );
@@ -503,7 +501,7 @@ export class AuthenticationService {
     }
 
     if (!authMail) {
-      this.logger.debug(
+      this._logger.debug(
         `reset password failed, auth mail entity not found, userId: ${userId}, resetId: ${resetId}`,
       );
       throw new NotFoundException({ message: 'User Not Found' });
@@ -513,7 +511,7 @@ export class AuthenticationService {
     try {
       hashPassword = await argon2.hash(resetPasswordDto.newPassword);
     } catch (err) {
-      this.logger.error(
+      this._logger.error(
         `argon2.hash failed, username: ${authMail.user.username}`,
         err,
       );
@@ -524,7 +522,7 @@ export class AuthenticationService {
     }
 
     authMail.user.password = hashPassword;
-    await this.userService.updateEntity(authMail.user);
+    await this._userService.updateEntity(authMail.user);
   }
 
   public async getUserResetPasswordReq(
@@ -533,7 +531,7 @@ export class AuthenticationService {
   ): Promise<GetResetPasswordDto> {
     let authMail;
     try {
-      authMail = await this.authMailRepository.findOne({
+      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: userId },
@@ -543,7 +541,7 @@ export class AuthenticationService {
         },
       });
     } catch (err) {
-      this.logger.error(
+      this._logger.error(
         `authMailRepository.findOne failed, userId: ${userId}`,
         err,
       );
@@ -554,7 +552,7 @@ export class AuthenticationService {
     }
 
     if (!authMail) {
-      this.logger.debug(
+      this._logger.debug(
         `reset password failed, auth mail entity not found, userId: ${userId}, resetId: ${resetId}`,
       );
       throw new NotFoundException({ message: 'User Not Found' });
@@ -570,14 +568,14 @@ export class AuthenticationService {
   public async revokeAuthToken(userId: string): Promise<TokenEntity> {
     let tokenEntity;
     try {
-      tokenEntity = await this.tokenRepository.findOne({
+      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: userId },
         },
       });
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `tokenRepository.findOne failed, userId: ${userId}`,
         error,
       );
@@ -587,7 +585,7 @@ export class AuthenticationService {
     }
 
     if (!tokenEntity) {
-      this.logger.error(
+      this._logger.error(
         `user token for revokeAuthToken not found, userId: ${userId}`,
       );
       throw new InternalServerErrorException({
@@ -597,9 +595,9 @@ export class AuthenticationService {
 
     tokenEntity.isRevoked = true;
     try {
-      return this.tokenRepository.save(tokenEntity);
+      return this._entityManager.getRepository(TokenEntity).save(tokenEntity);
     } catch (error) {
-      this.logger.error(`user token not found, userId: ${userId}`, error);
+      this._logger.error(`user token not found, userId: ${userId}`, error);
       throw new InternalServerErrorException({
         message: 'Something went wrong',
       });
@@ -616,14 +614,14 @@ export class AuthenticationService {
 
     let authMail;
     try {
-      authMail = await this.authMailRepository.findOne({
+      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
         where: {
           id: authMailToken.jti,
           mailType: AuthMailType.USER_VERIFICATION,
         },
       });
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `authMailRepository.findOne failed, id: ${authMailToken.jti}`,
         error,
       );
@@ -633,22 +631,22 @@ export class AuthenticationService {
     }
 
     if (authMail.verificationId !== verifyCode) {
-      this.logger.warn(
+      this._logger.warn(
         `verify code invalid, userId: ${authMailToken.sub}, code: ${verifyCode}`,
       );
       throw new UnauthorizedException({ message: '' });
     }
 
     if (!authMail.user.isActive) {
-      this.logger.warn(`user inactivated, userId: ${authMailToken.sub}`);
+      this._logger.warn(`user inactivated, userId: ${authMailToken.sub}`);
       throw new UnauthorizedException({ message: '' });
     }
 
     let memberGroup;
     try {
-      memberGroup = await this.groupService.findByName('MEMBER');
+      memberGroup = await this._groupService.findByName('MEMBER');
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `groupService.findByName for MEMBER group failed, userId: ${authMail.user.id}`,
         error,
       );
@@ -660,9 +658,9 @@ export class AuthenticationService {
     try {
       authMail.user.isEmailConfirmed = true;
       authMail.user.group = memberGroup;
-      return await this.authMailRepository.save(authMail);
+      return await this._entityManager.getRepository(AuthMailEntity).save(authMail);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `mailVerificationRepository.save failed, userId: ${authMail.user.id}`,
         error,
       );
@@ -676,20 +674,29 @@ export class AuthenticationService {
     payload: TokenPayload,
   ): Promise<UserEntity | HttpStatus> {
     if (!payload.sub) {
-      this.logger.log(`payload.sub invalid, payload: ${payload}`);
+      this._logger.log(`payload.sub invalid, payload: ${payload}`);
       throw new UnauthorizedException({ message: 'Illegal Auth Token' });
     }
 
     let tokenEntity;
     try {
-      tokenEntity = await this.tokenRepository.findOne({
+      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
         relations: ['user'],
+        join: {
+          alias: "token",
+          innerJoinAndSelect: {
+            user: "token.user",
+            group: "user.group",
+            role: "group.role"
+          },
+        },
+        loadEagerRelations: true,
         where: {
           user: { id: payload.sub },
         },
       });
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `tokenRepository.findOne failed, userId: ${payload.sub}`,
         error,
       );
@@ -724,9 +731,9 @@ export class AuthenticationService {
       ignoreExpiration: ignoreExpiration,
     };
     try {
-      return await this.jwt.verifyAsync(token, option);
+      return await this._jwt.verifyAsync(token, option);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `authTokenValidation jwt.verifyAsync failed, token: ${token}`,
         error,
       );
@@ -745,7 +752,7 @@ export class AuthenticationService {
     );
 
     if (!tokenEntity) {
-      this.logger.log(
+      this._logger.log(
         `tokenEntity not found, payload: ${JSON.stringify(payload)}`,
       );
       throw new UnauthorizedException({ message: '' });
@@ -756,7 +763,7 @@ export class AuthenticationService {
       Date.now() >= tokenEntity.refreshTokenExpiredAt.getTime() ||
       payload.jti !== tokenEntity.refreshTokenId
     ) {
-      this.logger.log(
+      this._logger.log(
         `tokenEntity is revoked or expired or invalid, token userId: ${
           tokenEntity.user.id
         }, payload: ${JSON.stringify(payload)}`,
@@ -766,7 +773,7 @@ export class AuthenticationService {
 
     const user = tokenEntity.user;
     if (!user || !user.isEmailConfirmed || !user.isActive) {
-      this.logger.log(
+      this._logger.log(
         `user not found or deactivated or not email confirmed, userId: ${payload.sub}`,
       );
       throw new UnauthorizedException({ message: '' });
@@ -792,9 +799,9 @@ export class AuthenticationService {
       privateKey: this._privateKey,
     };
     try {
-      return await this.jwt.signAsync(payload, option);
+      return await this._jwt.signAsync(payload, option);
     } catch (error) {
-      this.logger.error(`jwt.signAsync failed, payload: ${payload}`, error);
+      this._logger.error(`jwt.signAsync failed, payload: ${payload}`, error);
       throw new InternalServerErrorException({
         message: 'Something went wrong',
       });
@@ -818,9 +825,9 @@ export class AuthenticationService {
       privateKey: this._privateKey,
     };
     try {
-      return await this.jwt.signAsync(payload, option);
+      return await this._jwt.signAsync(payload, option);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `accessToken jwt.signAsync failed, payload: ${payload}`,
         error,
       );
@@ -851,9 +858,9 @@ export class AuthenticationService {
 
     let refreshToken;
     try {
-      refreshToken = await this.jwt.signAsync(payload, option);
+      refreshToken = await this._jwt.signAsync(payload, option);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `refreshToken jwt.signAsync failed, payload: ${payload}`,
         error,
       );
@@ -867,14 +874,14 @@ export class AuthenticationService {
   public async createTokenEntity(user: UserEntity): Promise<TokenEntity> {
     let tokenEntity;
     try {
-      tokenEntity = await this.tokenRepository.findOne({
+      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: user.id },
         },
       });
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `tokenRepository.findOne failed, userId: ${user.id}`,
         error,
       );
@@ -900,9 +907,9 @@ export class AuthenticationService {
     });
 
     try {
-      return await this.tokenRepository.save(tokenEntity);
+      return await this._entityManager.getRepository(TokenEntity).save(tokenEntity);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `tokenRepository.save of createTokenEntity failed, token userId: ${tokenEntity.user.id}`,
         error,
       );
@@ -921,9 +928,9 @@ export class AuthenticationService {
     });
 
     try {
-      tokenEntity = await this.tokenRepository.save(tokenEntity);
+      tokenEntity = await this._entityManager.getRepository(TokenEntity).save(tokenEntity);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `tokenRepository.save for createAccessTokenFromRefreshToken failed, token userId: ${tokenEntity.user.id}`,
         error,
       );
@@ -942,7 +949,7 @@ export class AuthenticationService {
     let authMail;
     if (!isCreateForce) {
       try {
-        authMail = await this.authMailRepository.findOne({
+        authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
           relations: ['user'],
           where: {
             user: { id: userEntity.id },
@@ -951,7 +958,7 @@ export class AuthenticationService {
           },
         });
       } catch (error) {
-        this.logger.error(
+        this._logger.error(
           `authMailRepository.findOne failed, userId: ${userEntity.id}`,
           error,
         );
@@ -967,7 +974,7 @@ export class AuthenticationService {
 
     authMail = new AuthMailEntity();
     authMail.user = userEntity;
-    authMail.from = this.configService.get<string>('mail.from');
+    authMail.from = this._configService.get<string>('mail.from');
     authMail.sendTo = userEntity.email;
     authMail.verificationId = String(
       Math.floor(100000 + Math.random() * 900000),
@@ -985,9 +992,9 @@ export class AuthenticationService {
     }
 
     try {
-      return await this.authMailRepository.save(authMail);
+      return await this._entityManager.getRepository(AuthMailEntity).save(authMail);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `authMailRepository.save failed, userId: ${authMail.user.id}`,
         error,
       );
@@ -1003,13 +1010,13 @@ export class AuthenticationService {
     const refreshTokenId = payload.jti;
     const userId = payload.sub;
     if (!refreshTokenId || !userId) {
-      this.logger.log(`payload invalid, payload: ${payload}`);
+      this._logger.log(`payload invalid, payload: ${payload}`);
       throw new UnauthorizedException({ message: '' });
     }
 
     let tokenEntity;
     try {
-      tokenEntity = await this.tokenRepository.findOne({
+      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: userId },
@@ -1017,7 +1024,7 @@ export class AuthenticationService {
         },
       });
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `tokenRepository.findOne failed, refreshTokenId: ${refreshTokenId}, userId; ${userId}`,
         error,
       );

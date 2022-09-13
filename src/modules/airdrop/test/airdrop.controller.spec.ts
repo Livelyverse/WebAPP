@@ -1,17 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AirdropController } from '../controllers/airdrop.controller';
+import { SocialLivelyController } from '../controllers/socialLively.controller';
 import { SocialLivelyService } from '../services/socialLively.service';
 
 describe('AirdropController', () => {
-  let controller: AirdropController;
+  let controller: SocialLivelyController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [AirdropController],
+      controllers: [SocialLivelyController],
       providers: [SocialLivelyService],
     }).compile();
 
-    controller = module.get<AirdropController>(AirdropController);
+    controller = module.get<SocialLivelyController>(SocialLivelyController);
   });
 
   it('should be defined', () => {

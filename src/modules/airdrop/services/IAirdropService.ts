@@ -2,15 +2,21 @@ import { BaseEntity } from "../../profile/domain/entity";
 import * as RxJS from "rxjs";
 import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
 
-export type FindAllResult<T extends BaseEntity> = { data: Array<T>; total: number }
+export type FindAllType<T extends BaseEntity> = { data: Array<T>; total: number }
+
+export enum SortBy {
+  TIMESTAMP = 'createdAt',
+}
+
+export type SortType = 'ASC' | 'DESC'
 
 export interface IAirdropService<T extends BaseEntity> {
   findAll(
     offset: number,
     limit: number,
-    sortType: string,
-    sortBy: string,
-  ): RxJS.Observable< FindAllResult<T>>;
+    sortType: SortType,
+    sortBy: SortBy,
+  ): RxJS.Observable<FindAllType<T>>;
 
   findTotal(): RxJS.Observable<number>;
 

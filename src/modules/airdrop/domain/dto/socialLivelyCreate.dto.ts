@@ -35,7 +35,8 @@ export class SocialLivelyCreateDto {
   @ApiProperty()
   socialType: SocialType
 
-  @IsString({ message: 'Username must be string' })
+  @IsNotEmpty({ message: 'UserId must not empty' })
+  @IsString({ message: 'UserId must be string' })
   @IsOptional()
   @ApiPropertyOptional()
   userId?: string

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiResponseProperty } from "@nestjs/swagger";
 import { GroupEntity } from '../entity';
 
 export class GroupViewDto {
@@ -17,27 +17,27 @@ export class GroupViewDto {
     return null;
   }
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public id: string;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public name: string;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public role: string;
 
-  @ApiPropertyOptional()
+  @ApiResponseProperty()
   public description?: string;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public createdAt: Date;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public updatedAt: Date;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public isActive: boolean;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public isUpdatable: boolean;
 }

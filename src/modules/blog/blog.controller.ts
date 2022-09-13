@@ -36,7 +36,7 @@ export class BlogController {
     description: 'data sort type can be one of ASC or DESC',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.' })
+  @ApiResponse({ status: 200, description: 'The record is found.', type: FindAllViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
@@ -74,19 +74,4 @@ export class BlogController {
     const totalPage = Math.ceil(total / offset);
     return FindAllViewDto.from(page, offset, total, totalPage, data)
   }
-
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.blogService.findOne(+id);
-  // }
-  //
-  // @Patch(':id')
-  // update(@Param('id') id: string, @Body() updateBlogDto: MediumRssViewDto) {
-  //   return this.blogService.update(+id, updateBlogDto);
-  // }
-  //
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.blogService.remove(+id);
-  // }
 }

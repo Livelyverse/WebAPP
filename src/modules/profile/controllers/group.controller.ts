@@ -22,9 +22,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { GroupService } from '../services/group.service';
-import { GroupCreateDto } from '../domain/dto/groupCreate.dto';
-import { GroupViewDto } from '../domain/dto/groupView.dto';
-import { GroupUpdateDto } from '../domain/dto/groupUpdate.dto';
+import { GroupCreateDto, GroupViewDto, GroupUpdateDto } from "../domain/dto";
 import { GroupEntity } from '../domain/entity';
 import { isUUID } from './uuid.validate';
 import { JwtAuthGuard } from '../../authentication/domain/gurad/jwt-auth.guard';
@@ -45,16 +43,17 @@ export class GroupController {
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully created.',
+    type: GroupViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async create(@Body() groupDto: GroupCreateDto): Promise<string> {
+  async create(@Body() groupDto: GroupCreateDto): Promise<GroupViewDto> {
     const dto = GroupCreateDto.from(groupDto);
     const group = await this.groupService.create(dto);
-    return group.id;
+    return GroupViewDto.from(group);
   }
 
   @Post('update')
@@ -64,6 +63,7 @@ export class GroupController {
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully updated.',
+    type: GroupViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -87,7 +87,7 @@ export class GroupController {
       'either an uuid for the group id or a string for the group name',
     schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.' })
+  @ApiResponse({ status: 200, description: 'The record is found.', type: GroupViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'The requested record not found.' })
@@ -144,7 +144,7 @@ export class GroupController {
     description: 'data sort type can be one of ASC or DESC',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.' })
+  @ApiResponse({ status: 200, description: 'The record is found.', type: FindAllViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })

@@ -51,16 +51,17 @@ export class UserController {
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully created.',
+    type: UserViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async create(@Body() userDto: UserCreateDto): Promise<string> {
+  async create(@Body() userDto: UserCreateDto): Promise<UserViewDto> {
     const dto = UserCreateDto.from(userDto);
     const user = await this.userService.create(dto);
-    return user.id;
+    return UserViewDto.from(user);
   }
 
   @Post('update')
@@ -69,6 +70,7 @@ export class UserController {
   @ApiResponse({
     status: 200,
     description: 'The record has been successfully updated.',
+    type: UserViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -148,7 +150,7 @@ export class UserController {
     description: 'data sort type can be one of ASC or DESC',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.' })
+  @ApiResponse({ status: 200, description: 'The record is found.' , type: FindAllViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })

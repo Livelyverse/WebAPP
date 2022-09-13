@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiResponseProperty } from "@nestjs/swagger";
 import { RoleEntity } from '../entity';
 
 export class RoleViewDto {
@@ -16,24 +16,24 @@ export class RoleViewDto {
     return null;
   }
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public id: string;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public name: string;
 
-  @ApiPropertyOptional()
+  @ApiResponseProperty()
   public description?: string;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public createdAt: Date;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public updatedAt: Date;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public isActive: boolean;
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public isUpdatable: boolean;
 }

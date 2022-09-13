@@ -22,7 +22,7 @@ export class UserViewDto {
     return null;
   }
 
-  @ApiProperty()
+  @ApiResponseProperty()
   public id: string;
 
   @ApiResponseProperty()
