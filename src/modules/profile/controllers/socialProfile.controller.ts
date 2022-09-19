@@ -1,3 +1,4 @@
+import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import {
   Body,
   Controller,
@@ -5,43 +6,38 @@ import {
   HttpCode,
   HttpException,
   HttpStatus,
-  Logger,
-  Param,
-  Post,
-  Query,
+  Logger, Param,
+  Post, Query,
   UseGuards,
   UsePipes
 } from "@nestjs/common";
-import { SocialLivelyService } from "../services/socialLively.service";
-import * as RxJS from "rxjs";
-import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ContextType, ValidationPipe } from "../../airdrop/domain/pipe/validationPipe";
 import RoleGuard from "../../authentication/domain/gurad/role.guard";
 import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
-import { SocialLivelyCreateDto } from "../domain/dto/socialLivelyCreate.dto";
-import { SocialLivelyUpdateDto } from "../domain/dto/socialLivelyUpdate.dto";
-import { SocialLivelyViewDto } from "../domain/dto/socialLivelyView.dto";
+import * as RxJS from "rxjs";
+import { isEnum, isUUID } from "class-validator";
+import { FindAllType, SocialProfileService, SortBy, SortType } from "../services/socialProfile.service";
+import { SocialProfileCreateDto, SocialProfileUpdateDto, SocialProfileViewDto } from "../domain/dto";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
-import { FindAllType, SortBy, SortType } from "../services/IAirdropService";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SortTypePipe } from "../domain/pipe/sortTypePipe";
 import { SortByPipe } from "../domain/pipe/sortByPipe";
-import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
-import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
-import { isEnum, isUUID } from "class-validator";
-import { ContextType, ValidationPipe } from "../domain/pipe/validationPipe";
+import { SocialProfileEntity } from "../domain/entity";
+import { SocialType } from "../domain/entity/socialProfile.entity";
+import { EnumPipe } from "../../blockchain/domain/pipe/enumPipe";
+import { TxStatus } from "../../blockchain/domain/entity/blockchainTx.entity";
 
 @ApiBearerAuth()
-@ApiTags('/api/lively/social/profile')
-@Controller('/api/lively/social/profile')
-export class SocialLivelyController {
+@ApiTags('/api/profile/user/social')
+@Controller('/api/profile/user/social')
+export class SocialProfileController {
 
-  private readonly _logger = new Logger(SocialLivelyController.name);
-  constructor(private readonly _socialLivelyService: SocialLivelyService) {}
+  private readonly _logger = new Logger(SocialProfileController.name);
+  constructor(private readonly _socialProfileService: SocialProfileService) {}
 
   @Post('create')
   @UsePipes(new ValidationPipe({
     transform: true,
-    validationContext: ContextType.CREATE,
     skipMissingProperties: true,
     validationError: { target: false }
   }))
@@ -50,17 +46,17 @@ export class SocialLivelyController {
   @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
-    description: 'The record has been created successfully.',
-    type: SocialLivelyViewDto
+    description: 'Record Created Successfully.',
+    type: SocialProfileViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  create(@Body() socialLivelyDto: SocialLivelyCreateDto): RxJS.Observable<SocialLivelyViewDto> {
-    return RxJS.from(this._socialLivelyService.create(socialLivelyDto)).pipe(
-      RxJS.map(entity => SocialLivelyViewDto.from(entity)),
+  create(@Body() socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileViewDto> {
+    return RxJS.from(this._socialProfileService.create(socialProfileDto)).pipe(
+      RxJS.map(entity => SocialProfileViewDto.from(entity)),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -87,7 +83,6 @@ export class SocialLivelyController {
   @Post('update')
   @UsePipes(new ValidationPipe({
     transform: true,
-    validationContext: ContextType.UPDATE,
     skipMissingProperties: true,
     validationError: { target: false }
   }))
@@ -95,18 +90,18 @@ export class SocialLivelyController {
   @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
-    description: 'The record has been updated successfully.',
-    type: SocialLivelyViewDto
+    description: 'Record Updated Successfully.',
+    type: SocialProfileViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  update(@Body() socialLivelyDto: SocialLivelyUpdateDto): RxJS.Observable<SocialLivelyViewDto> {
+  update(@Body() socialProfileDto: SocialProfileUpdateDto): RxJS.Observable<SocialProfileViewDto> {
 
-    return RxJS.from(this._socialLivelyService.update(socialLivelyDto)).pipe(
-      RxJS.map(entity => SocialLivelyViewDto.from(entity)),
+    return RxJS.from(this._socialProfileService.update(socialProfileDto)).pipe(
+      RxJS.map(entity => SocialProfileViewDto.from(entity)),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -158,7 +153,13 @@ export class SocialLivelyController {
     description: 'data sort field can be one of the timestamp fields',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto})
+  @ApiQuery({
+    name: 'filterBy',
+    required: false,
+    description: 'filterBy can be socialType field',
+    schema: { enum: Object.values(SocialType) },
+  })
+  @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
@@ -170,15 +171,16 @@ export class SocialLivelyController {
     @Query('offset', new PaginationPipe()) offset: number,
     @Query('sortType', new SortTypePipe()) sortType: SortType,
     @Query('sortBy', new SortByPipe(SortBy)) sortBy: SortBy,
-  ): RxJS.Observable<FindAllViewDto<SocialLivelyViewDto>> {
-    return RxJS.from(this._socialLivelyService.findAll((page - 1) * offset, offset, sortType, sortBy)).pipe(
-      RxJS.mergeMap((result: FindAllType<SocialLivelyEntity>) =>
+    @Query('filterBy', new EnumPipe(SocialType)) filterBy: SocialType,
+  ): RxJS.Observable<FindAllViewDto> {
+    return RxJS.from(this._socialProfileService.findAll((page - 1) * offset, offset, sortType, sortBy, filterBy)).pipe(
+      RxJS.mergeMap((result: FindAllType<SocialProfileEntity>) =>
         RxJS.merge(
           RxJS.of(result).pipe(
             RxJS.filter((findAllResult) => findAllResult.total === 0),
             RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                 statusCode: '404',
-                message: 'SocialLively Not Found',
+                message: 'SocialProfile Not Found',
                 error: 'Not Found'
               }, HttpStatus.NOT_FOUND))
             )
@@ -187,7 +189,7 @@ export class SocialLivelyController {
             RxJS.filter((findAllResult) => findAllResult.total >= 0),
             RxJS.map(findAllResult =>
               FindAllViewDto.from(page, offset, findAllResult.total,
-                Math.ceil(findAllResult.total / offset), findAllResult.data) as FindAllViewDto<SocialLivelyViewDto> ,
+                Math.ceil(findAllResult.total / offset), findAllResult.data) as FindAllViewDto,
             ),
             RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
               {
@@ -202,37 +204,93 @@ export class SocialLivelyController {
     )
   }
 
-  @Get('/find/:param')
+  @Get('/findByUser/:userId')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
   @ApiParam({
-    name: 'param',
+    name: 'userId',
     required: true,
-    description: `either an uuid or one of the ${Object.values(SocialType)}`,
-    schema: { oneOf: [{ enum: Object.values(SocialType) }, { type: 'uuid' }] },
+    description: 'user Id',
+    schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.', type: SocialLivelyViewDto})
+  @ApiResponse({ status: 200, description: 'Record Found.', type: SocialProfileViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findSocialLively(@Param() params): RxJS.Observable<SocialLivelyViewDto> {
+  findByUserId(@Param() params): RxJS.Observable<SocialProfileViewDto[]> {
     return RxJS.merge(
       RxJS.of(params).pipe(
-        RxJS.filter(pathParam => isUUID(pathParam.param)),
-        RxJS.mergeMap(pathParam => this._socialLivelyService.findById(pathParam.param)),
-        RxJS.map(entity => SocialLivelyViewDto.from(entity)),
+        RxJS.filter(pathParam => isUUID(pathParam.userId)),
+        RxJS.mergeMap(pathParam => this._socialProfileService.find({
+          user: { id: pathParam.userId }
+        })),
+        RxJS.switchMap(entities =>
+          RxJS.from(entities).pipe(
+            RxJS.map(entity => SocialProfileViewDto.from(entity)),
+            RxJS.reduce( (acc,dto) => [...acc, dto], [])
+          )
+        ),
       ),
       RxJS.of(params).pipe(
-        RxJS.filter(pathParam => isEnum(pathParam.param, SocialType)),
-        RxJS.mergeMap(pathParam => this._socialLivelyService.findOne( { socialType: pathParam.param } )),
-        RxJS.map(entity => SocialLivelyViewDto.from(entity)),
+        RxJS.filter(pathParam => !isUUID(pathParam.userId)),
+        RxJS.mergeMap(pathParam => RxJS.throwError(() => new HttpException({
+          statusCode: '400',
+          message: 'Invalid Path Param',
+          error: 'Bad Request'
+        }, HttpStatus.BAD_REQUEST)))
+      ).pipe(
+        RxJS.catchError(error =>
+          RxJS.merge(
+            RxJS.of(error).pipe(
+              RxJS.filter(err => err instanceof HttpException),
+              RxJS.mergeMap(err => RxJS.throwError(err)),
+            ),
+            RxJS.of(error).pipe(
+              RxJS.filter(err => !(err instanceof HttpException)),
+              RxJS.mergeMap(err =>
+                RxJS.throwError(() => new HttpException(
+                  {
+                    statusCode: '500',
+                    message: 'Internal Server Error',
+                    error: 'Internal Server Error'
+                  }, HttpStatus.INTERNAL_SERVER_ERROR)
+                )
+              )
+            )
+          )
+        ),
+      )
+    )
+  }
+
+  @Get('/findById/:id')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiParam({
+    name: 'id',
+    required: true,
+    description: 'social profile Id',
+    schema: { type: 'string' },
+  })
+  @ApiResponse({ status: 200, description: 'Record Found.', type: SocialProfileViewDto })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Record Not Found.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  findById(@Param() params): RxJS.Observable<SocialProfileViewDto> {
+    return RxJS.merge(
+      RxJS.of(params).pipe(
+        RxJS.filter(pathParam => isUUID(pathParam.id, "all")),
+        RxJS.mergeMap(pathParam => this._socialProfileService.findById(pathParam.id)),
+        RxJS.map(entity => SocialProfileViewDto.from(entity))
       ),
       RxJS.of(params).pipe(
-        RxJS.filter(pathParam => !isUUID(pathParam.param) && !isEnum(pathParam.param, SocialType)),
+        RxJS.filter(pathParam => !isUUID(pathParam.id, "all")),
         RxJS.mergeMap(pathParam => RxJS.throwError(() => new HttpException({
           statusCode: '400',
           message: 'Invalid Path Param',
@@ -267,14 +325,14 @@ export class SocialLivelyController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Record Found.'})
+  @ApiResponse({ status: 200, description: 'Record Found.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   findTotalCount(): RxJS.Observable<object> {
-    return this._socialLivelyService.findTotal().pipe(
+    return this._socialProfileService.findTotal().pipe(
       RxJS.map(total => ({total}))
     )
   }

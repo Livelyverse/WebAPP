@@ -7,9 +7,9 @@ import {
   IsEnum
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
+import { SocialType } from "../entity/socialProfile.entity";
 
-export class SocialLivelyCreateDto {
+export class SocialProfileCreateDto {
   @IsNotEmpty({ message: 'Username must not empty' })
   @IsDefined({ message: 'Username must be defined' })
   @IsString({ message: 'Username must be string' })
@@ -23,20 +23,31 @@ export class SocialLivelyCreateDto {
   socialType: SocialType
 
   @IsNotEmpty({ message: 'UserId must not empty' })
+  @IsDefined({ message: 'UserId must be defined' })
   @IsString({ message: 'UserId must be string' })
-  @IsOptional()
-  @ApiPropertyOptional()
-  userId?: string
+  @ApiProperty()
+  userId: string
 
   @IsNotEmpty({ message: 'ProfileName must not empty' })
   @IsDefined({ message: 'ProfileName must be defined' })
   @IsString({ message: 'ProfileName must be string' })
   @ApiProperty()
-  profileName: string
+  socialName?: string
 
   @Matches(/(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/,
     { message: 'ProfileUrl must be valid url'})
   @IsOptional()
   @ApiPropertyOptional()
   profileUrl?: string
+
+  @Matches(/(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/,
+    { message: 'Website must be valid url'})
+  @IsOptional()
+  @ApiPropertyOptional()
+  website?: string
+
+  @IsString({ message: 'Location must be string' })
+  @IsOptional()
+  @ApiPropertyOptional()
+  location?: string
 }

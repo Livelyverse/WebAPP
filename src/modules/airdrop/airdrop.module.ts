@@ -34,7 +34,7 @@ import { AirdropRuleController } from "./controllers/airdropRule.controller";
     ]),
   ],
   controllers: [SocialLivelyController, AirdropRuleController],
-  // providers: [SocialLivelyService, TwitterFollowerJob, TweetTrackerJob, SocialAirdropJob]
-  providers: [SocialLivelyService, AirdropRuleService, TwitterFollowerJob, TweetTrackerJob, SocialAirdropJob]
+  providers: [SocialLivelyService, AirdropRuleService]
+  // providers: [SocialLivelyService, AirdropRuleService, TwitterFollowerJob, TweetTrackerJob, SocialAirdropJob]
 })
 export class AirdropModule {}

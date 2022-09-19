@@ -38,8 +38,8 @@ export class SocialLivelyViewDto {
   profileUrl?: string
 
   @ApiResponseProperty()
-  public createdAt: Date;
+  createdAt: Date;
 
   @ApiResponseProperty()
-  public updatedAt: Date;
+  updatedAt: Date;
 }

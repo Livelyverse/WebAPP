@@ -8,3 +8,6 @@ export { UserCreateDto } from './userCreate.dto';
 export { UserUpdateDto } from './userUpdate.dto';
 export { UserViewDto } from './userView.dto';
 export { ContactDto } from './contact.dto';
+export { SocialProfileCreateDto } from './socialProfileCreate.dto';
+export { SocialProfileUpdateDto } from './socialProfileUpdate.dto';
+export { SocialProfileViewDto } from './socialProfileView.dto';

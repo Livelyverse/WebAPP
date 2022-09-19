@@ -271,13 +271,15 @@ export class AirdropRuleController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'The record is found.'})
+  @ApiResponse({ status: 200, description: 'Record Found.'})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findTotalCount(): RxJS.Observable<number> {
-    return this._airdropRuleService.findTotal();
+  findTotalCount(): RxJS.Observable<object> {
+    return this._airdropRuleService.findTotal().pipe(
+      RxJS.map(total => ({total}))
+    );
   }
 }
