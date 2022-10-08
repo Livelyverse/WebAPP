@@ -21,7 +21,7 @@ import { SocialLivelyCreateDto } from "../domain/dto/socialLivelyCreate.dto";
 import { SocialLivelyUpdateDto } from "../domain/dto/socialLivelyUpdate.dto";
 import { SocialLivelyViewDto } from "../domain/dto/socialLivelyView.dto";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
-import { FindAllType, SortBy, SortType } from "../services/IAirdropService";
+import { FindAllType, SortBy, SortType } from "../services/IAirdrop.service";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SortTypePipe } from "../domain/pipe/sortTypePipe";
 import { SortByPipe } from "../domain/pipe/sortByPipe";

@@ -20,7 +20,7 @@ import { SocialLivelyCreateDto } from "../domain/dto/socialLivelyCreate.dto";
 import { SocialLivelyUpdateDto } from "../domain/dto/socialLivelyUpdate.dto";
 import { SocialLivelyViewDto } from "../domain/dto/socialLivelyView.dto";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
-import { FindAllType, SortBy, SortType } from "../services/IAirdropService";
+import { FindAllType, SortBy, SortType } from "../services/IAirdrop.service";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SortTypePipe } from "../domain/pipe/sortTypePipe";
 import { SortByPipe } from "../domain/pipe/sortByPipe";
@@ -193,16 +193,29 @@ export class AirdropRuleController {
               FindAllViewDto.from(page, offset, findAllResult.total,
                 Math.ceil(findAllResult.total / offset), findAllResult.data) as FindAllViewDto<AirdropRuleViewDto> ,
             ),
-            RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
-              {
-                statusCode: '500',
-                message: 'Internal Server Error',
-                error: 'Internal Server Error'
-              }, HttpStatus.INTERNAL_SERVER_ERROR))
+          )
+        )
+      ),
+      RxJS.catchError(error =>
+        RxJS.merge(
+          RxJS.of(error).pipe(
+            RxJS.filter(err => err instanceof HttpException),
+            RxJS.mergeMap(err => RxJS.throwError(err)),
+          ),
+          RxJS.of(error).pipe(
+            RxJS.filter(err => !(err instanceof HttpException)),
+            RxJS.mergeMap(err =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '500',
+                  message: 'Internal Server Error',
+                  error: 'Internal Server Error'
+                }, HttpStatus.INTERNAL_SERVER_ERROR)
+              )
             )
           )
         )
-      )
+      ),
     )
   }
 
@@ -216,7 +229,7 @@ export class AirdropRuleController {
     description: `either an uuid or one of the ${Object.values(SocialType)}`,
     schema: { oneOf: [{ enum: Object.values(SocialType) }, { type: 'uuid' }] },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.', type: SocialLivelyViewDto})
+  @ApiResponse({ status: 200, description: 'Record Found.', type: SocialLivelyViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })

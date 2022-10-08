@@ -1,7 +1,7 @@
 import { Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialLivelyEntity } from "./socialLively.entity";
-import { SocialProfileEntity } from "../../../profile/domain/entity/socialProfile.entity";
+import { SocialProfileEntity } from "../../../profile/domain/entity";
 import { SocialTrackerEntity } from "./socialTracker.entity";
 
 @Entity({ name: 'social_follower' })

@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
-import { FindAllType, IAirdropService, SortBy, SortType } from "./IAirdropService";
+import { FindAllType, IAirdropService, SortBy, SortType } from "./IAirdrop.service";
 import * as RxJS from "rxjs";
 import { InjectEntityManager } from "@nestjs/typeorm";
 import { EntityManager } from "typeorm";
