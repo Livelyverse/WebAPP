@@ -1,5 +1,5 @@
-import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { Controller, Get, HttpCode, HttpException, HttpStatus, Logger, Param, Query, UseGuards } from "@nestjs/common";
+import { ApiBearerAuth, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Controller, Get, HttpCode, HttpException, HttpStatus, Logger, Query, UseGuards } from "@nestjs/common";
 import RoleGuard from "../../authentication/domain/gurad/role.guard";
 import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
 import * as RxJS from "rxjs";

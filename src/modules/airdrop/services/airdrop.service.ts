@@ -1,17 +1,19 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { FindAllType, IAirdropService, SortBy, SortType } from "./IAirdrop.service";
 import { InjectEntityManager } from "@nestjs/typeorm";
-import { EntityManager } from "typeorm";
+import { EntityManager, IsNull, Not } from "typeorm";
 import { SocialAirdropEntity } from "../domain/entity/socialAirdrop.entity";
 import * as RxJS from "rxjs";
 import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
 import { AirdropFilterType } from "../domain/dto/airdropInfoView.dto";
 import { SocialAirdropRuleEntity } from "../domain/entity/socialAirdropRule.entity";
-import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
+import { SocialProfileEntity, SocialType } from "../../profile/domain/entity/socialProfile.entity";
 import { SocialActionType } from "../domain/entity/enums";
 import { BaseEntity, UserEntity } from "../../profile/domain/entity";
 import { AirdropBalance, AirdropBalanceViewDto } from "../domain/dto/airdropBalanceView.dto";
 import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
+import { SocialTrackerEntity } from "../domain/entity/socialTracker.entity";
+import { SocialEventEntity } from "../domain/entity/socialEvent.entity";
 
 export type FindAllBalanceType = { data: Array<AirdropBalance>; total: number }
 
@@ -27,158 +29,468 @@ export class AirdropService {
     limit: number,
     sortType: SortType,
     sortBy: SortBy,
-    filterBy: AirdropFilterType,
+    isSettlement: boolean | null,
+    filterBy: AirdropFilterType | null,
     filter: unknown,
   ): RxJS.Observable<FindAllType<SocialAirdropEntity>> {
     return RxJS.merge(
       RxJS.of(filterBy).pipe(
         RxJS.filter(filterByType => filterByType == AirdropFilterType.USER_ID),
         RxJS.concatMap(_ =>
-          RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
-            .findAndCount({
-              relations: [
-                'airdropRule',
-                'socialTracker',
-                'blockchainTx'
-              ],
-              join: {
-                alias: "airdrop",
-                innerJoinAndSelect: {
-                  airdropRule: "airdrop.airdropRule",
-                  socialTracker: "airdrop.socialTracker",
-                  blockchainTx: "airdrop.blockchainTx",
-                  socialEvent: "socialTracker.socialEvent",
-                  socialProfile: "socialTracker.socialProfile",
-                  user: "socialProfile.user",
-                  socialLively: "socialEvent.socialLively",
-                },
-              },
-              loadEagerRelations: true,
-              where: {
-                socialTracker: {
-                  socialProfile: {
-                    user: {
-                      id: filter as string
+          RxJS.merge(
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx == null),
+              RxJS.switchMap(_ => RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                .findAndCount({
+                  relations: [
+                    'airdropRule',
+                    'socialTracker',
+                    'blockchainTx'
+                  ],
+                  join: {
+                    alias: "airdrop",
+                    leftJoinAndSelect: {
+                      airdropRule: "airdrop.airdropRule",
+                      socialTracker: "airdrop.socialTracker",
+                      blockchainTx: "airdrop.blockchainTx",
+                      socialEvent: "socialTracker.socialEvent",
+                      socialProfile: "socialTracker.socialProfile",
+                      user: "socialProfile.user",
+                    },
+                  },
+                  loadEagerRelations: true,
+                  where: {
+                    socialTracker: {
+                      socialProfile: {
+                        user: {
+                          id: filter as string
+                        }
+                      }
                     }
-                  }
-                }
-              },
-              skip: offset,
-              take: limit,
-              order: {
-                [sortBy]: sortType,
-              },
-            })
+                  },
+                  skip: offset,
+                  take: limit,
+                  order: {
+                    [sortBy]: sortType,
+                  },
+                })
+              ))
+            ),
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === true),
+              RxJS.switchMap(_ => RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                .findAndCount({
+                  relations: [
+                    'airdropRule',
+                    'socialTracker',
+                    'blockchainTx'
+                  ],
+                  join: {
+                    alias: "airdrop",
+                    innerJoinAndSelect: {
+                      airdropRule: "airdrop.airdropRule",
+                      blockchainTx: "airdrop.blockchainTx",
+                    },
+                    leftJoinAndSelect: {
+                      socialTracker: "airdrop.socialTracker",
+                      socialEvent: "socialTracker.socialEvent",
+                      socialProfile: "socialTracker.socialProfile",
+                      user: "socialProfile.user",
+                    }
+                  },
+                  loadEagerRelations: true,
+                  where: {
+                    socialTracker: {
+                      socialProfile: {
+                        user: {
+                          id: filter as string
+                        }
+                      }
+                    },
+                  },
+                  skip: offset,
+                  take: limit,
+                  order: {
+                    [sortBy]: sortType,
+                  },
+                })
+              ))
+            ),
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === false),
+              RxJS.switchMap(_ => RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                .findAndCount({
+                  relations: [
+                    'airdropRule',
+                    'socialTracker',
+                    'blockchainTx'
+                  ],
+                  join: {
+                    alias: "airdrop",
+                    leftJoinAndSelect: {
+                      airdropRule: "airdrop.airdropRule",
+                      socialTracker: "airdrop.socialTracker",
+                      blockchainTx: "airdrop.blockchainTx",
+                      socialEvent: "socialTracker.socialEvent",
+                      socialProfile: "socialTracker.socialProfile",
+                      user: "socialProfile.user",
+                    },
+                  },
+                  loadEagerRelations: true,
+                  where: {
+                    socialTracker: {
+                      socialProfile: {
+                        user: {
+                          id: filter as string
+                        }
+                      }
+                    },
+                    blockchainTx: IsNull()
+                  },
+                  skip: offset,
+                  take: limit,
+                  order: {
+                    [sortBy]: sortType,
+                  },
+                })
+              ))
+            )
           )
         )
       ),
       RxJS.of(filterBy).pipe(
         RxJS.filter(filterByType => filterByType == AirdropFilterType.SOCIAL_TYPE),
         RxJS.concatMap(_ =>
-          RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
-            .findAndCount({
-              relations: [
-                'airdropRule',
-                'socialTracker',
-                'blockchainTx'
-              ],
-              join: {
-                alias: "airdrop",
-                innerJoinAndSelect: {
-                  airdropRule: "airdrop.airdropRule",
-                  socialTracker: "airdrop.socialTracker",
-                  blockchainTx: "airdrop.blockchainTx",
-                  socialEvent: "socialTracker.socialEvent",
-                  socialProfile: "socialTracker.socialProfile",
-                  user: "socialProfile.user",
-                  socialLively: "socialEvent.socialLively"
-                },
-              },
-              loadEagerRelations: true,
-              where: {
-                socialTracker: {
-                  socialEvent: {
-                    socialLively: {
-                      socialType: filter as SocialType
-                    }
-                  }
-                }
-              },
-              skip: offset,
-              take: limit,
-              order: {
-                [sortBy]: sortType,
-              },
-            })
+          RxJS.merge(
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === null),
+              RxJS.switchMap( _ =>
+                RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                  .findAndCount({
+                    relations: [
+                      'airdropRule',
+                      'socialTracker',
+                      'blockchainTx'
+                    ],
+                    join: {
+                      alias: "airdrop",
+                      leftJoinAndSelect: {
+                        airdropRule: "airdrop.airdropRule",
+                        socialTracker: "airdrop.socialTracker",
+                        blockchainTx: "airdrop.blockchainTx",
+                        socialEvent: "socialTracker.socialEvent",
+                        socialProfile: "socialTracker.socialProfile",
+                        user: "socialProfile.user",
+                      },
+                    },
+                    loadEagerRelations: true,
+                    where: {
+                      airdropRule: {
+                        socialType: filter as SocialType
+                      }
+                    },
+                    skip: offset,
+                    take: limit,
+                    order: {
+                      [sortBy]: sortType,
+                    },
+                  })
+                )
+              )
+            ),
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === true),
+              RxJS.switchMap( _ =>
+                RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                  .findAndCount({
+                    relations: [
+                      'airdropRule',
+                      'socialTracker',
+                      'blockchainTx'
+                    ],
+                    join: {
+                      alias: "airdrop",
+                      innerJoinAndSelect: {
+                        airdropRule: "airdrop.airdropRule",
+                        socialTracker: "airdrop.socialTracker",
+                        blockchainTx: "airdrop.blockchainTx",
+                        socialEvent: "socialTracker.socialEvent",
+                        socialProfile: "socialTracker.socialProfile",
+                        user: "socialProfile.user",
+                      },
+                    },
+                    loadEagerRelations: true,
+                    where: {
+                      airdropRule: {
+                        socialType: filter as SocialType
+                      }
+                    },
+                    skip: offset,
+                    take: limit,
+                    order: {
+                      [sortBy]: sortType,
+                    },
+                  })
+                )
+              )
+            ),
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === false),
+              RxJS.switchMap( _ =>
+                RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                  .findAndCount({
+                    relations: [
+                      'airdropRule',
+                      'socialTracker',
+                      'blockchainTx'
+                    ],
+                    join: {
+                      alias: "airdrop",
+                      leftJoinAndSelect: {
+                        airdropRule: "airdrop.airdropRule",
+                        socialTracker: "airdrop.socialTracker",
+                        blockchainTx: "airdrop.blockchainTx",
+                        socialEvent: "socialTracker.socialEvent",
+                        socialProfile: "socialTracker.socialProfile",
+                        user: "socialProfile.user",
+                      },
+                    },
+                    loadEagerRelations: true,
+                    where: {
+                      airdropRule: {
+                        socialType: filter as SocialType
+                      },
+                      blockchainTx: IsNull()
+                    },
+                    skip: offset,
+                    take: limit,
+                    order: {
+                      [sortBy]: sortType,
+                    },
+                  })
+                )
+              )
+            )
           )
         )
       ),
       RxJS.of(filterBy).pipe(
         RxJS.filter(filterByType => filterByType == AirdropFilterType.SOCIAL_ACTION),
         RxJS.concatMap(_ =>
-          RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
-            .findAndCount({
-              relations: [
-                'airdropRule',
-                'socialTracker',
-                'blockchainTx'
-              ],
-              join: {
-                alias: "airdrop",
-                innerJoinAndSelect: {
-                  airdropRule: "airdrop.airdropRule",
-                  socialTracker: "airdrop.socialTracker",
-                  blockchainTx: "airdrop.blockchainTx",
-                  socialEvent: "socialTracker.socialEvent",
-                  socialProfile: "socialTracker.socialProfile",
-                  user: "socialProfile.user",
-                  socialLively: "socialEvent.socialLively"
-                },
-              },
-              loadEagerRelations: true,
-              where: {
-                socialTracker: {
-                  actionType: filter as SocialActionType
-                }
-              },
-              skip: offset,
-              take: limit,
-              order: {
-                [sortBy]: sortType,
-              },
-            })
+          RxJS.merge(
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === null),
+              RxJS.switchMap( _ =>
+                RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                  .findAndCount({
+                    relations: [
+                      'airdropRule',
+                      'socialTracker',
+                      'blockchainTx'
+                    ],
+                    join: {
+                      alias: "airdrop",
+                      leftJoinAndSelect: {
+                        airdropRule: "airdrop.airdropRule",
+                        socialTracker: "airdrop.socialTracker",
+                        blockchainTx: "airdrop.blockchainTx",
+                        socialEvent: "socialTracker.socialEvent",
+                        socialProfile: "socialTracker.socialProfile",
+                        user: "socialProfile.user",
+                      },
+                    },
+                    loadEagerRelations: true,
+                    where: {
+                      socialTracker: {
+                        actionType: filter as SocialActionType
+                      }
+                    },
+                    skip: offset,
+                    take: limit,
+                    order: {
+                      [sortBy]: sortType,
+                    },
+                  })
+                )
+              )
+            ),
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === true),
+              RxJS.switchMap( _ =>
+                RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                  .findAndCount({
+                    relations: [
+                      'airdropRule',
+                      'socialTracker',
+                      'blockchainTx'
+                    ],
+                    join: {
+                      alias: "airdrop",
+                      leftJoinAndSelect: {
+                        airdropRule: "airdrop.airdropRule",
+                        socialTracker: "airdrop.socialTracker",
+                        blockchainTx: "airdrop.blockchainTx",
+                        socialEvent: "socialTracker.socialEvent",
+                        socialProfile: "socialTracker.socialProfile",
+                        user: "socialProfile.user",
+                      },
+                    },
+                    loadEagerRelations: true,
+                    where: {
+                      socialTracker: {
+                        actionType: filter as SocialActionType
+                      },
+                      blockchainTx: Not(IsNull())
+                    },
+                    skip: offset,
+                    take: limit,
+                    order: {
+                      [sortBy]: sortType,
+                    },
+                  })
+                )
+              )
+            ),
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === false),
+              RxJS.switchMap( _ =>
+                RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                  .findAndCount({
+                    relations: [
+                      'airdropRule',
+                      'socialTracker',
+                      'blockchainTx'
+                    ],
+                    join: {
+                      alias: "airdrop",
+                      leftJoinAndSelect: {
+                        airdropRule: "airdrop.airdropRule",
+                        socialTracker: "airdrop.socialTracker",
+                        blockchainTx: "airdrop.blockchainTx",
+                        socialEvent: "socialTracker.socialEvent",
+                        socialProfile: "socialTracker.socialProfile",
+                        user: "socialProfile.user",
+                      },
+                    },
+                    loadEagerRelations: true,
+                    where: {
+                      socialTracker: {
+                        actionType: filter as SocialActionType
+                      },
+                      blockchainTx: IsNull()
+                    },
+                    skip: offset,
+                    take: limit,
+                    order: {
+                      [sortBy]: sortType,
+                    },
+                  })
+                )
+              )
+            )
           )
         )
       ),
       RxJS.of(filterBy).pipe(
         RxJS.filter(filterByType => !!!filterByType),
         RxJS.concatMap(_ =>
-          RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
-            .findAndCount({
-              relations: [
-                'airdropRule',
-                'socialTracker',
-                'blockchainTx'
-              ],
-              join: {
-                alias: "airdrop",
-                innerJoinAndSelect: {
-                  airdropRule: "airdrop.airdropRule",
-                  socialTracker: "airdrop.socialTracker",
-                  blockchainTx: "airdrop.blockchainTx",
-                  socialEvent: "socialTracker.socialEvent",
-                  socialProfile: "socialTracker.socialProfile",
-                  user: "socialProfile.user",
-                  socialLively: "socialEvent.socialLively"
-                },
-              },
-              loadEagerRelations: true,
-              skip: offset,
-              take: limit,
-              order: {
-                [sortBy]: sortType,
-              },
-            })
+          RxJS.merge(
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx == null),
+              RxJS.switchMap( _ =>
+                RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                  .findAndCount({
+                    relations: [
+                      'airdropRule',
+                      'socialTracker',
+                      'blockchainTx'
+                    ],
+                    join: {
+                      alias: "airdrop",
+                      leftJoinAndSelect: {
+                        airdropRule: "airdrop.airdropRule",
+                        socialTracker: "airdrop.socialTracker",
+                        blockchainTx: "airdrop.blockchainTx",
+                        socialEvent: "socialTracker.socialEvent",
+                        socialProfile: "socialTracker.socialProfile",
+                        user: "socialProfile.user",
+                      },
+                    },
+                    loadEagerRelations: true,
+                    skip: offset,
+                    take: limit,
+                    order: {
+                      [sortBy]: sortType,
+                    },
+                  })
+                )
+              )
+            ),
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === true),
+              RxJS.switchMap( _ =>
+                RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                  .findAndCount({
+                    relations: [
+                      'airdropRule',
+                      'socialTracker',
+                      'blockchainTx'
+                    ],
+                    join: {
+                      alias: "airdrop",
+                      innerJoinAndSelect: {
+                        airdropRule: "airdrop.airdropRule",
+                        socialTracker: "airdrop.socialTracker",
+                        blockchainTx: "airdrop.blockchainTx",
+                        socialEvent: "socialTracker.socialEvent",
+                        socialProfile: "socialTracker.socialProfile",
+                        user: "socialProfile.user",
+                      },
+                    },
+                    loadEagerRelations: true,
+                    skip: offset,
+                    take: limit,
+                    order: {
+                      [sortBy]: sortType,
+                    },
+                  })
+                )
+              )
+            ),
+            RxJS.of(isSettlement).pipe(
+              RxJS.filter(isSettlementTx => isSettlementTx === false),
+              RxJS.switchMap( _ =>
+                RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
+                  .findAndCount({
+                    relations: [
+                      'airdropRule',
+                      'socialTracker',
+                      'blockchainTx'
+                    ],
+                    join: {
+                      alias: "airdrop",
+                      leftJoinAndSelect: {
+                        airdropRule: "airdrop.airdropRule",
+                        socialTracker: "airdrop.socialTracker",
+                        blockchainTx: "airdrop.blockchainTx",
+                        socialEvent: "socialTracker.socialEvent",
+                        socialProfile: "socialTracker.socialProfile",
+                        user: "socialProfile.user",
+                      },
+                    },
+                    loadEagerRelations: true,
+                    where: {
+                      blockchainTx: IsNull(),
+                    },
+                    skip: offset,
+                    take: limit,
+                    order: {
+                      [sortBy]: sortType,
+                    },
+                  })
+                )
+              )
+            )
           )
         )
       )
@@ -237,10 +549,10 @@ export class AirdropService {
                         .innerJoin("social_profile", "profile",  '"profile"."id" = "tracker"."socialProfileId"')
                         .innerJoin('"public"."user"' , "users" ,'"users"."id" = "profile"."userId"')
                         .where('"airdrop"."blockchainTxId" IS NOT NULL')
-                        .andWhere('"users"."id" = :userid', {userid: filter})
+                        .andWhere('"users"."id" = :userid', {userid: filterVal})
                         .groupBy('"users"."id"')
                     , "sub2", '"sub2"."userId" = "users"."id"')
-                  .where('"users"."id" = :userid', {userid: filter})
+                  .where('"users"."id" = :userid', {userid: filterVal})
                   .getRawOne()
                 ).pipe(
                   RxJS.tap( {
@@ -544,7 +856,7 @@ export class AirdropService {
       RxJS.of(filterBy).pipe(
         RxJS.filter(filterByType => !!!filterByType),
         RxJS.concatMap(_ =>
-          RxJS.from(this._entityManager.createQueryBuilder(SocialAirdropRuleEntity, "airdropRule")
+          RxJS.from(this._entityManager.createQueryBuilder()
             .select(qb =>
                 qb.select('sum("airdropRule"."amount") as "airdrops"')
                   .from(SocialAirdropEntity, "airdrop")
@@ -559,6 +871,7 @@ export class AirdropService {
                   .where('"airdrop"."blockchainTxId" IS NOT NULL')
                   .groupBy('"airdrop"."isActive"')
               , "settlement")
+            .from(SocialAirdropRuleEntity, "airdropRule")
             .getRawOne()
           ).pipe(
             RxJS.tap( {
@@ -579,11 +892,11 @@ export class AirdropService {
                     next: (queryResult) => this._logger.debug(`findAllBalance found, result: ${JSON.stringify(queryResult)}`),
                   }),
                   RxJS.map(queryResult => {
-                    const total = queryResult[0] + queryResult[1]
+                    const total = BigInt(queryResult.pending) + BigInt(queryResult.settlement)
                     return {
                       data: [{
-                        pending: queryResult[0],
-                        settlement: queryResult[1],
+                        pending: queryResult.pending,
+                        settlement: queryResult.settlement,
                         total
                       }],
                       total: 1

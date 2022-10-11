@@ -15,8 +15,8 @@ export class AirdropBalanceViewDto {
       balanceDto.total = entity.total.toString();
       balanceDto.pending = entity.pending.toString();
       balanceDto.settlement = entity.settlement.toString();
-      balanceDto.username = entity?.username;
-      balanceDto.userId = entity?.userId;
+      balanceDto.username = entity?.username ? entity.username : null;
+      balanceDto.userId = entity?.userId ? entity.userId : null;
       return balanceDto;
     }
     return null;
@@ -32,8 +32,8 @@ export class AirdropBalanceViewDto {
   settlement: string;
 
   @ApiResponseProperty()
-  username?: string;
+  username: string;
 
   @ApiResponseProperty()
-  userId?: string;
+  userId: string;
 }

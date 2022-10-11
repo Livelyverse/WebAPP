@@ -14,6 +14,7 @@ export class AirdropInfoViewDto {
       const airdropDto = new AirdropInfoViewDto();
       airdropDto.id = entity.id;
       airdropDto.username = entity.socialTracker.socialProfile.user.username;
+      airdropDto.userId = entity.socialTracker.socialProfile.user.id;
       airdropDto.socialName = entity.socialTracker.socialProfile.socialName;
       airdropDto.socialUsername = entity.socialTracker.socialProfile.username;
       airdropDto.socialAction = entity.socialTracker.actionType;
@@ -21,12 +22,12 @@ export class AirdropInfoViewDto {
       airdropDto.wallet = entity.socialTracker.socialProfile.user.walletAddress;
       airdropDto.amount = entity.airdropRule.amount.toString();
       airdropDto.unit = entity.airdropRule.unit;
-      airdropDto.txHash = entity?.blockchainTx?.txHash;
-      airdropDto.txTimestamp = entity?.blockchainTx?.createdAt?.toString();
-      airdropDto.timestamp = entity.createdAt.toString();
-      airdropDto.contentId = entity.socialTracker?.socialEvent?.contentId;
-      airdropDto.contentUrl = entity.socialTracker?.socialEvent?.contentUrl;
-      airdropDto.contentPublishedAt = entity.socialTracker?.socialEvent?.publishedAt?.toString();
+      airdropDto.txHash = entity?.blockchainTx?.txHash ? entity.blockchainTx.txHash : null;
+      airdropDto.txTimestamp = entity?.blockchainTx?.createdAt ? entity.blockchainTx.createdAt : null;
+      airdropDto.timestamp = entity.createdAt;
+      airdropDto.contentId = entity.socialTracker?.socialEvent?.contentId ? entity.socialTracker.socialEvent.contentId : null;
+      airdropDto.contentUrl = entity.socialTracker?.socialEvent?.contentUrl ? entity.socialTracker.socialEvent.contentUrl : null;
+      airdropDto.contentPublishedAt = entity.socialTracker?.socialEvent?.publishedAt ? entity.socialTracker.socialEvent.publishedAt : null;
       return airdropDto;
     }
 
@@ -38,6 +39,9 @@ export class AirdropInfoViewDto {
 
   @ApiResponseProperty()
   username: string;
+
+  @ApiResponseProperty()
+  userId: string;
 
   @ApiResponseProperty()
   socialName: string;
@@ -64,17 +68,17 @@ export class AirdropInfoViewDto {
   txHash: string;
 
   @ApiResponseProperty()
-  txTimestamp: string;
+  txTimestamp: Date;
 
   @ApiResponseProperty()
-  contentId?: string;
+  contentId: string;
 
   @ApiResponseProperty()
-  contentUrl?: string;
+  contentUrl: string;
 
   @ApiResponseProperty()
-  contentPublishedAt?: string;
+  contentPublishedAt: Date;
 
   @ApiResponseProperty()
-  timestamp: string;
+  timestamp: Date;
 }

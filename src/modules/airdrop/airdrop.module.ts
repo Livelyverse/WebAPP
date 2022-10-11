@@ -17,6 +17,10 @@ import { SocialFollowerEntity } from "./domain/entity/socialFollower.entity";
 import { SocialAirdropJob } from "./domain/jobs/twitter/socialAirdrop.job";
 import { AirdropRuleService } from "./services/airdropRule.service";
 import { AirdropRuleController } from "./controllers/airdropRule.controller";
+import { AirdropService } from "./services/airdrop.service";
+import { FollowerService } from "./services/follower.service";
+import { AirdropController } from "./controllers/airdrop.controller";
+import { FollowerController } from "./controllers/follower.controller";
 
 @Module({
   imports: [
@@ -33,8 +37,8 @@ import { AirdropRuleController } from "./controllers/airdropRule.controller";
       SocialAirdropRuleEntity
     ]),
   ],
-  controllers: [SocialLivelyController, AirdropRuleController],
-  providers: [SocialLivelyService, AirdropRuleService]
+  controllers: [SocialLivelyController, AirdropRuleController, AirdropController, FollowerController],
+  providers: [SocialLivelyService, AirdropRuleService, AirdropService, FollowerService]
   // providers: [SocialLivelyService, AirdropRuleService, TwitterFollowerJob, TweetTrackerJob, SocialAirdropJob]
 })
 export class AirdropModule {}

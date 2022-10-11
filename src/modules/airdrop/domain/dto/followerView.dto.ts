@@ -9,11 +9,11 @@ export class FollowerViewDto {
       followerDto.username = entity.socialProfile.user.username;
       followerDto.socialType = entity.socialProfile.socialType.toString();
       followerDto.socialUsername = entity.socialProfile.username;
-      followerDto.socialName = entity.socialProfile?.socialName;
-      followerDto.socialId = entity.socialProfile?.socialId;
-      followerDto.profileUrl = entity.socialProfile?.profileUrl;
-      followerDto.website = entity.socialProfile?.website;
-      followerDto.location = entity.socialProfile?.location;
+      followerDto.socialName = entity.socialProfile?.socialName ? entity.socialProfile.socialName : null;
+      followerDto.socialId = entity.socialProfile?.socialId ? entity.socialProfile.socialId : null;
+      followerDto.profileUrl = entity.socialProfile?.profileUrl ? entity.socialProfile.profileUrl : null;
+      followerDto.website = entity.socialProfile?.website ? entity.socialProfile.website : null;
+      followerDto.location = entity.socialProfile?.location ? entity.socialProfile.location : null;
       return followerDto;
     }
     return null;
@@ -29,17 +29,17 @@ export class FollowerViewDto {
   socialUsername: string
 
   @ApiResponseProperty()
-  socialName?: string
+  socialName: string
 
   @ApiResponseProperty()
-  socialId?: string
+  socialId: string
 
   @ApiResponseProperty()
-  profileUrl?: string
+  profileUrl: string
 
   @ApiResponseProperty()
-  website?: string
+  website: string
 
   @ApiResponseProperty()
-  location?: string
+  location: string
 }

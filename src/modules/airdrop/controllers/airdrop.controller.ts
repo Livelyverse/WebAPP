@@ -1,5 +1,16 @@
 import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { Controller, Get, HttpCode, HttpException, HttpStatus, Logger, Param, Query, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Param,
+  ParseBoolPipe,
+  Query,
+  UseGuards
+} from "@nestjs/common";
 import RoleGuard from "../../authentication/domain/gurad/role.guard";
 import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
 import * as RxJS from "rxjs";
@@ -17,6 +28,7 @@ import { AirdropService, FindAllBalanceType } from "../services/airdrop.service"
 import { isUUID } from "class-validator";
 import { SocialAirdropEntity } from "../domain/entity/socialAirdrop.entity";
 import { FindAllBalanceViewDto } from "../domain/dto/findAllBalanceView.dto";
+import { BooleanPipe } from "../domain/pipe/booleanPipe";
 
 
 @ApiBearerAuth()
@@ -34,7 +46,7 @@ export class AirdropController {
     name: 'uuid',
     required: true,
     description: `user id`,
-    schema: { type: 'uuid' },
+    schema: { type: 'string' },
   })
   @ApiQuery({
     name: 'page',
@@ -60,6 +72,12 @@ export class AirdropController {
     description: 'data sort field can be one of the timestamp fields',
     schema: { type: 'string' },
   })
+  @ApiQuery({
+    name: 'settlement',
+    required: false,
+    description: 'airdrop tx settlement',
+    schema: { type: 'boolean' },
+  })
   @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -72,20 +90,21 @@ export class AirdropController {
     @Query('offset', new PaginationPipe()) offset: number,
     @Query('sortType', new SortTypePipe()) sortType: SortType,
     @Query('sortBy', new SortByPipe(SortBy)) sortBy: SortBy,
+    @Query('settlement', new BooleanPipe()) isSettlement: boolean,
   ): RxJS.Observable<FindAllViewDto<AirdropInfoViewDto>> {
     const filterBy = AirdropFilterType.USER_ID;
     return RxJS.merge(
       RxJS.of(params).pipe(
-        RxJS.filter(pathParam => isUUID(pathParam.param)),
+        RxJS.filter(pathParam => isUUID(pathParam.uuid)),
         RxJS.mergeMap(pathParam => this._airdropService.findAll(
-          (page - 1) * offset, offset, sortType, sortBy, filterBy, pathParam.param)),
+          (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, pathParam.uuid)),
         RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
           RxJS.merge(
             RxJS.of(result).pipe(
               RxJS.filter((findAllResult) => findAllResult.total === 0),
               RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                   statusCode: '404',
-                  message: 'SocialLively Not Found',
+                  message: 'SocialAirdrop Not Found',
                   error: 'Not Found'
                 }, HttpStatus.NOT_FOUND))
               )
@@ -101,7 +120,7 @@ export class AirdropController {
         ),
       ),
       RxJS.of(params).pipe(
-        RxJS.filter(pathParam => !isUUID(pathParam.param)),
+        RxJS.filter(pathParam => !isUUID(pathParam.uuid)),
         RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
           statusCode: '400',
           message: 'Invalid Path Param',
@@ -139,7 +158,7 @@ export class AirdropController {
     name: 'uuid',
     required: true,
     description: `user id`,
-    schema: { type: 'uuid' },
+    schema: { type: 'string' },
   })
   @ApiResponse({ status: 200, description: 'Record Found.', type: AirdropBalanceViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
@@ -152,16 +171,16 @@ export class AirdropController {
     const filterBy = AirdropFilterType.USER_ID;
     return RxJS.merge(
       RxJS.of(params).pipe(
-        RxJS.filter(pathParam => isUUID(pathParam.param)),
+        RxJS.filter(pathParam => isUUID(pathParam.uuid)),
         RxJS.mergeMap(pathParam => this._airdropService.findAllBalance(
-          null, null, null, null, filterBy, pathParam.param)),
+          null, null, null, null, filterBy, pathParam.uuid)),
         RxJS.mergeMap((result: FindAllBalanceType) =>
           RxJS.merge(
             RxJS.of(result).pipe(
               RxJS.filter((findAllResult) => findAllResult.total === 0),
               RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                   statusCode: '404',
-                  message: 'SocialLively Not Found',
+                  message: 'SocialAirdrop Balance Not Found',
                   error: 'Not Found'
                 }, HttpStatus.NOT_FOUND))
               )
@@ -174,7 +193,7 @@ export class AirdropController {
         ),
       ),
       RxJS.of(params).pipe(
-        RxJS.filter(pathParam => !isUUID(pathParam.param)),
+        RxJS.filter(pathParam => !isUUID(pathParam.uuid)),
         RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
           statusCode: '400',
           message: 'Invalid Path Param',
@@ -234,6 +253,12 @@ export class AirdropController {
     schema: { type: 'string' },
   })
   @ApiQuery({
+    name: 'settlement',
+    required: false,
+    description: 'airdrop tx settlement',
+    schema: { type: 'boolean' },
+  })
+  @ApiQuery({
     name: 'filterBy',
     required: false,
     description: `filter by one of ${Object.values(AirdropFilterType)}`,
@@ -263,6 +288,7 @@ export class AirdropController {
     @Query('offset', new PaginationPipe()) offset: number,
     @Query('sortType', new SortTypePipe()) sortType: SortType,
     @Query('sortBy', new SortByPipe(SortBy)) sortBy: SortBy,
+    @Query('settlement', new BooleanPipe()) isSettlement: boolean,
     @Query('filterBy', new EnumPipe(AirdropFilterType)) filterBy: AirdropFilterType,
     @Query('filter') filter: string
   ): RxJS.Observable<FindAllViewDto<AirdropInfoViewDto>> {
@@ -274,14 +300,14 @@ export class AirdropController {
             RxJS.of(filter).pipe(
               RxJS.filter(filterVal => isUUID(filterVal)),
               RxJS.mergeMap(filterVal => this._airdropService.findAll(
-                (page - 1) * offset, offset, sortType, sortBy, filterBy, filterVal)),
+                (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, filterVal)),
               RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
                 RxJS.merge(
                   RxJS.of(result).pipe(
                     RxJS.filter((findAllResult) => findAllResult.total === 0),
                     RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                         statusCode: '404',
-                        message: 'SocialLively Not Found',
+                        message: 'SocialAirdrop Not Found',
                         error: 'Not Found'
                       }, HttpStatus.NOT_FOUND))
                     )
@@ -300,7 +326,7 @@ export class AirdropController {
               RxJS.filter(filterVal => !isUUID(filterVal)),
               RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                 statusCode: '400',
-                message: 'Invalid Path Param',
+                message: 'Invalid filter Query String',
                 error: 'Bad Request'
               }, HttpStatus.BAD_REQUEST)))
             )
@@ -314,14 +340,14 @@ export class AirdropController {
           RxJS.of(filter).pipe(
             RxJS.filter(filterVal => Object.hasOwn(SocialType, filterVal)),
             RxJS.mergeMap(filterVal => this._airdropService.findAll(
-              (page - 1) * offset, offset, sortType, sortBy, filterBy, filterVal as SocialType)),
+              (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, filterVal as SocialType)),
             RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
               RxJS.merge(
                 RxJS.of(result).pipe(
                   RxJS.filter((findAllResult) => findAllResult.total === 0),
                   RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                       statusCode: '404',
-                      message: 'SocialLively Not Found',
+                      message: 'SocialAirdrop Not Found',
                       error: 'Not Found'
                     }, HttpStatus.NOT_FOUND))
                   )
@@ -354,14 +380,14 @@ export class AirdropController {
             RxJS.of(filter).pipe(
               RxJS.filter(filterVal => Object.hasOwn(SocialActionType, filterVal)),
               RxJS.mergeMap(filterVal => this._airdropService.findAll(
-                (page - 1) * offset, offset, sortType, sortBy, filterBy, filterVal as SocialActionType)),
+                (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, filterVal as SocialActionType)),
               RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
                 RxJS.merge(
                   RxJS.of(result).pipe(
                     RxJS.filter((findAllResult) => findAllResult.total === 0),
                     RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                         statusCode: '404',
-                        message: 'SocialLively Not Found',
+                        message: 'SocialAirdrop Not Found',
                         error: 'Not Found'
                       }, HttpStatus.NOT_FOUND))
                     )
@@ -390,14 +416,14 @@ export class AirdropController {
       RxJS.of(filterBy).pipe(
         RxJS.filter(filterType => !!!filterType),
         RxJS.mergeMap(_ => this._airdropService.findAll(
-          (page - 1) * offset, offset, sortType, sortBy, null, null)),
+          (page - 1) * offset, offset, sortType, sortBy,  isSettlement,null, null)),
         RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
           RxJS.merge(
             RxJS.of(result).pipe(
               RxJS.filter((findAllResult) => findAllResult.total === 0),
               RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                   statusCode: '404',
-                  message: 'SocialLively Not Found',
+                  message: 'SocialAirdrop Not Found',
                   error: 'Not Found'
                 }, HttpStatus.NOT_FOUND))
               )
@@ -512,7 +538,7 @@ export class AirdropController {
                     RxJS.filter((findAllResult) => findAllResult.total === 0),
                     RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                         statusCode: '404',
-                        message: 'SocialLively Not Found',
+                        message: 'SocialAirdrop Balance Not Found',
                         error: 'Not Found'
                       }, HttpStatus.NOT_FOUND))
                     )
@@ -531,7 +557,7 @@ export class AirdropController {
               RxJS.filter(filterVal => !isUUID(filterVal)),
               RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                 statusCode: '400',
-                message: 'Invalid Path Param',
+                message: 'Invalid filter QueryString',
                 error: 'Bad Request'
               }, HttpStatus.BAD_REQUEST)))
             )
@@ -552,7 +578,7 @@ export class AirdropController {
                     RxJS.filter((findAllResult) => findAllResult.total === 0),
                     RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                         statusCode: '404',
-                        message: 'SocialLively Not Found',
+                        message: 'SocialAirdrop Balance Not Found',
                         error: 'Not Found'
                       }, HttpStatus.NOT_FOUND))
                     )
@@ -592,7 +618,7 @@ export class AirdropController {
                     RxJS.filter((findAllResult) => findAllResult.total === 0),
                     RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                         statusCode: '404',
-                        message: 'SocialLively Not Found',
+                        message: 'SocialAirdrop Balance Not Found',
                         error: 'Not Found'
                       }, HttpStatus.NOT_FOUND))
                     )
@@ -628,7 +654,7 @@ export class AirdropController {
               RxJS.filter((findAllResult) => findAllResult.total === 0),
               RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                   statusCode: '404',
-                  message: 'SocialLively Not Found',
+                  message: 'SocialAirdrop Balance Not Found',
                   error: 'Not Found'
                 }, HttpStatus.NOT_FOUND))
               )
