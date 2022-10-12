@@ -18,7 +18,7 @@ import { AirdropFilterType, AirdropInfoViewDto } from "../domain/dto/airdropInfo
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SortTypePipe } from "../domain/pipe/sortTypePipe";
-import { FindAllType, SortBy, SortType } from "../services/IAirdrop.service";
+import { BalanceSortBy, FindAllType, SortBy, SortType } from "../services/IAirdrop.service";
 import { SortByPipe } from "../domain/pipe/sortByPipe";
 import { EnumPipe } from "../domain/pipe/enumPipe";
 import { AirdropBalanceViewDto } from "../domain/dto/airdropBalanceView.dto";
@@ -196,7 +196,7 @@ export class AirdropController {
         RxJS.filter(pathParam => !isUUID(pathParam.uuid)),
         RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
           statusCode: '400',
-          message: 'Invalid Path Param',
+          message: 'Invalid UUID Path Param',
           error: 'Bad Request'
         }, HttpStatus.BAD_REQUEST)))
       )
@@ -481,14 +481,14 @@ export class AirdropController {
   @ApiQuery({
     name: 'sortType',
     required: false,
-    description: 'data sort type can be one of ASC or DESC',
+    description: 'sortType can be one of ASC or DESC',
     schema: { type: 'string' },
   })
   @ApiQuery({
     name: 'sortBy',
     required: false,
-    description: 'data sort field can be one of the timestamp fields',
-    schema: { type: 'string' },
+    description: `sortBy field can be one of ${Object.values(BalanceSortBy)}`,
+    schema: { enum: Object.values(BalanceSortBy) },
   })
   @ApiQuery({
     name: 'filterBy',
@@ -519,7 +519,7 @@ export class AirdropController {
     @Query('page', new PaginationPipe()) page: number,
     @Query('offset', new PaginationPipe()) offset: number,
     @Query('sortType', new SortTypePipe()) sortType: SortType,
-    @Query('sortBy', new SortByPipe(SortBy)) sortBy: SortBy,
+    @Query('sortBy', new SortByPipe(BalanceSortBy)) sortBy: BalanceSortBy,
     @Query('filterBy', new EnumPipe(AirdropFilterType)) filterBy: AirdropFilterType,
     @Query('filter') filter: string
   ): RxJS.Observable<FindAllBalanceViewDto> {
@@ -529,7 +529,7 @@ export class AirdropController {
         RxJS.mergeMap(_ =>
           RxJS.merge(
             RxJS.of(filter).pipe(
-              RxJS.filter(filterVal => isUUID(filterVal)),
+              RxJS.filter(filterVal => filterVal && isUUID(filterVal)),
               RxJS.mergeMap(filterVal => this._airdropService.findAllBalance(
                 (page - 1) * offset, offset, sortType, sortBy, filterBy, filterVal)),
               RxJS.mergeMap((result: FindAllBalanceType) =>
@@ -544,7 +544,7 @@ export class AirdropController {
                     )
                   ),
                   RxJS.of(result).pipe(
-                    RxJS.filter((findAllResult) => findAllResult.total >= 0),
+                    RxJS.filter((findAllResult) => findAllResult.total > 0),
                     RxJS.map(findAllResult =>
                       FindAllBalanceViewDto.from(page, offset, findAllResult.total,
                         Math.ceil(findAllResult.total / offset), findAllResult.data) ,
@@ -554,7 +554,32 @@ export class AirdropController {
               ),
             ),
             RxJS.of(filter).pipe(
-              RxJS.filter(filterVal => !isUUID(filterVal)),
+              RxJS.filter(filterVal => !!!filterVal),
+              RxJS.mergeMap(_ => this._airdropService.findAllBalance(
+                (page - 1) * offset, offset, sortType, sortBy, filterBy, null)),
+              RxJS.mergeMap((result: FindAllBalanceType) =>
+                RxJS.merge(
+                  RxJS.of(result).pipe(
+                    RxJS.filter((findAllResult) => findAllResult.total === 0),
+                    RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
+                        statusCode: '404',
+                        message: 'SocialAirdrop Balance Not Found',
+                        error: 'Not Found'
+                      }, HttpStatus.NOT_FOUND))
+                    )
+                  ),
+                  RxJS.of(result).pipe(
+                    RxJS.filter((findAllResult) => findAllResult.total > 0),
+                    RxJS.map(findAllResult =>
+                      FindAllBalanceViewDto.from(page, offset, findAllResult.total,
+                        Math.ceil(findAllResult.total / offset), findAllResult.data) ,
+                    ),
+                  )
+                )
+              ),
+            ),
+            RxJS.of(filter).pipe(
+              RxJS.filter(filterVal => filterVal && !isUUID(filterVal)),
               RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                 statusCode: '400',
                 message: 'Invalid filter QueryString',
@@ -569,7 +594,7 @@ export class AirdropController {
         RxJS.mergeMap(_ =>
           RxJS.merge(
             RxJS.of(filter).pipe(
-              RxJS.filter(filterVal => Object.hasOwn(SocialType, filterVal)),
+              RxJS.filter(filterVal => filterVal && Object.hasOwn(SocialType, filterVal)),
               RxJS.mergeMap(filterVal => this._airdropService.findAllBalance(
                 (page - 1) * offset, offset, sortType, sortBy, filterBy, filterVal as SocialType)),
               RxJS.mergeMap((result: FindAllBalanceType) =>
@@ -584,7 +609,7 @@ export class AirdropController {
                     )
                   ),
                   RxJS.of(result).pipe(
-                    RxJS.filter((findAllResult) => findAllResult.total >= 0),
+                    RxJS.filter((findAllResult) => findAllResult.total > 0),
                     RxJS.map(findAllResult =>
                       FindAllBalanceViewDto.from(page, offset, findAllResult.total,
                         Math.ceil(findAllResult.total / offset), findAllResult.data),
@@ -594,10 +619,35 @@ export class AirdropController {
               ),
             ),
             RxJS.of(filter).pipe(
-              RxJS.filter(filterVal => !Object.hasOwn(SocialType, filterVal)),
+              RxJS.filter(filterVal => !!!filterVal),
+              RxJS.mergeMap(_ => this._airdropService.findAllBalance(
+                (page - 1) * offset, offset, sortType, sortBy, filterBy, null)),
+              RxJS.mergeMap((result: FindAllBalanceType) =>
+                RxJS.merge(
+                  RxJS.of(result).pipe(
+                    RxJS.filter((findAllResult) => findAllResult.total === 0),
+                    RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
+                        statusCode: '404',
+                        message: 'SocialAirdrop Balance Not Found',
+                        error: 'Not Found'
+                      }, HttpStatus.NOT_FOUND))
+                    )
+                  ),
+                  RxJS.of(result).pipe(
+                    RxJS.filter((findAllResult) => findAllResult.total > 0),
+                    RxJS.map(findAllResult =>
+                      FindAllBalanceViewDto.from(page, offset, findAllResult.total,
+                        Math.ceil(findAllResult.total / offset), findAllResult.data),
+                    ),
+                  )
+                )
+              ),
+            ),
+            RxJS.of(filter).pipe(
+              RxJS.filter(filterVal => filterVal && !Object.hasOwn(SocialType, filterVal)),
               RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                 statusCode: '400',
-                message: 'Invalid Path Param',
+                message: 'Invalid filter QueryString',
                 error: 'Bad Request'
               }, HttpStatus.BAD_REQUEST)))
             )
@@ -609,7 +659,7 @@ export class AirdropController {
         RxJS.mergeMap(_ =>
           RxJS.merge(
             RxJS.of(filter).pipe(
-              RxJS.filter(filterVal => Object.hasOwn(SocialActionType, filterVal)),
+              RxJS.filter(filterVal => filterVal && Object.hasOwn(SocialActionType, filterVal)),
               RxJS.mergeMap(filterVal => this._airdropService.findAllBalance(
                 (page - 1) * offset, offset, sortType, sortBy, filterBy, filterVal as SocialActionType)),
               RxJS.mergeMap((result: FindAllBalanceType) =>
@@ -624,7 +674,7 @@ export class AirdropController {
                     )
                   ),
                   RxJS.of(result).pipe(
-                    RxJS.filter((findAllResult) => findAllResult.total >= 0),
+                    RxJS.filter((findAllResult) => findAllResult.total > 0),
                     RxJS.map(findAllResult =>
                       FindAllBalanceViewDto.from(page, offset, findAllResult.total,
                         Math.ceil(findAllResult.total / offset), findAllResult.data),
@@ -634,10 +684,35 @@ export class AirdropController {
               ),
             ),
             RxJS.of(filter).pipe(
-              RxJS.filter(filterVal => !Object.hasOwn(SocialActionType, filterVal)),
+              RxJS.filter(filterVal => !filterVal),
+              RxJS.mergeMap(_ => this._airdropService.findAllBalance(
+                (page - 1) * offset, offset, sortType, sortBy, filterBy, null)),
+              RxJS.mergeMap((result: FindAllBalanceType) =>
+                RxJS.merge(
+                  RxJS.of(result).pipe(
+                    RxJS.filter((findAllResult) => findAllResult.total === 0),
+                    RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
+                        statusCode: '404',
+                        message: 'SocialAirdrop Balance Not Found',
+                        error: 'Not Found'
+                      }, HttpStatus.NOT_FOUND))
+                    )
+                  ),
+                  RxJS.of(result).pipe(
+                    RxJS.filter((findAllResult) => findAllResult.total > 0),
+                    RxJS.map(findAllResult =>
+                      FindAllBalanceViewDto.from(page, offset, findAllResult.total,
+                        Math.ceil(findAllResult.total / offset), findAllResult.data),
+                    ),
+                  )
+                )
+              ),
+            ),
+            RxJS.of(filter).pipe(
+              RxJS.filter(filterVal => filterVal && !Object.hasOwn(SocialActionType, filterVal)),
               RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                 statusCode: '400',
-                message: 'Invalid Path Param',
+                message: 'Invalid Filter QueryString',
                 error: 'Bad Request'
               }, HttpStatus.BAD_REQUEST)))
             )
@@ -660,7 +735,7 @@ export class AirdropController {
               )
             ),
             RxJS.of(result).pipe(
-              RxJS.filter((findAllResult) => findAllResult.total >= 0),
+              RxJS.filter((findAllResult) => findAllResult.total > 0),
               RxJS.map(findAllResult =>
                 FindAllBalanceViewDto.from(page, offset, findAllResult.total,
                   Math.ceil(findAllResult.total / offset), findAllResult.data),

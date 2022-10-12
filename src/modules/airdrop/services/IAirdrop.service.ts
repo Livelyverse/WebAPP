@@ -8,6 +8,13 @@ export enum SortBy {
   TIMESTAMP = 'createdAt',
 }
 
+export enum BalanceSortBy {
+  PENDING = 'PENDING',
+  SETTLEMENT = 'SETTLEMENT',
+  TOTAL = 'TOTAL'
+}
+
+
 export type SortType = 'ASC' | 'DESC'
 
 export interface IAirdropService<T extends BaseEntity> {

@@ -6,6 +6,8 @@ export interface AirdropBalance {
   settlement: bigint;
   username?: string;
   userId?: string;
+  actionType?: string;
+  socialType?: string;
 }
 
 export class AirdropBalanceViewDto {
@@ -17,6 +19,8 @@ export class AirdropBalanceViewDto {
       balanceDto.settlement = entity.settlement.toString();
       balanceDto.username = entity?.username ? entity.username : null;
       balanceDto.userId = entity?.userId ? entity.userId : null;
+      balanceDto.actionType = entity?.actionType ? entity.actionType : null;
+      balanceDto.socialType = entity?.socialType ? entity.socialType : null;
       return balanceDto;
     }
     return null;
@@ -36,4 +40,10 @@ export class AirdropBalanceViewDto {
 
   @ApiResponseProperty()
   userId: string;
+
+  @ApiResponseProperty()
+  actionType: string;
+
+  @ApiResponseProperty()
+  socialType: string;
 }

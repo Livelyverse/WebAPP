@@ -1,19 +1,16 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
-import { FindAllType, IAirdropService, SortBy, SortType } from "./IAirdrop.service";
+import { BalanceSortBy, FindAllType, SortBy, SortType } from "./IAirdrop.service";
 import { InjectEntityManager } from "@nestjs/typeorm";
 import { EntityManager, IsNull, Not } from "typeorm";
 import { SocialAirdropEntity } from "../domain/entity/socialAirdrop.entity";
 import * as RxJS from "rxjs";
-import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
 import { AirdropFilterType } from "../domain/dto/airdropInfoView.dto";
 import { SocialAirdropRuleEntity } from "../domain/entity/socialAirdropRule.entity";
-import { SocialProfileEntity, SocialType } from "../../profile/domain/entity/socialProfile.entity";
+import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
 import { SocialActionType } from "../domain/entity/enums";
-import { BaseEntity, UserEntity } from "../../profile/domain/entity";
-import { AirdropBalance, AirdropBalanceViewDto } from "../domain/dto/airdropBalanceView.dto";
+import { UserEntity } from "../../profile/domain/entity";
+import { AirdropBalance } from "../domain/dto/airdropBalanceView.dto";
 import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
-import { SocialTrackerEntity } from "../domain/entity/socialTracker.entity";
-import { SocialEventEntity } from "../domain/entity/socialEvent.entity";
 
 export type FindAllBalanceType = { data: Array<AirdropBalance>; total: number }
 
@@ -514,7 +511,7 @@ export class AirdropService {
     offset: number,
     limit: number,
     sortType: SortType,
-    sortBy: SortBy,
+    sortBy: BalanceSortBy,
     filterBy: AirdropFilterType,
     filter: unknown,
   ): RxJS.Observable<FindAllBalanceType> {
@@ -528,26 +525,26 @@ export class AirdropService {
               RxJS.concatMap(filterVal =>
                 RxJS.from(this._entityManager.createQueryBuilder(UserEntity, "users")
                   .select('"users"."id" as "userId", "users"."username" as "username"')
-                  .addSelect('"sub1"."airdrops" as "pending", "sub2"."airdrops" as "settlement"')
+                  .addSelect('COALESCE("sub1"."airdrops", 0) as "pending", COALESCE("sub2"."airdrops", 0) as "settlement"')
                   .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('"users"."id" as "userId", sum("airdropRule"."amount") as "airdrops"')
                         .from(SocialAirdropEntity, "airdrop")
                         .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
                         .innerJoin("social_tracker", "tracker", '"tracker"."id" = "airdrop"."socialTrackerId"')
                         .innerJoin("social_profile", "profile",  '"profile"."id" = "tracker"."socialProfileId"')
-                        .innerJoin('"public"."user"' , "users" ,'"users"."id" = "profile"."userId"')
+                        .innerJoin("user" , "users" ,'"users"."id" = "profile"."userId"')
                         .where('"airdrop"."blockchainTxId" IS NULL')
                         .andWhere('"users"."id" = :userid', {userid: filterVal})
                         .groupBy('"users"."id"')
                     , "sub1", '"sub1"."userId" = "users"."id"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('"users"."id" as "userId", sum("airdropRule"."amount") as "airdrops"')
                         .from(SocialAirdropEntity, "airdrop")
                         .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
                         .innerJoin("social_tracker", "tracker", '"tracker"."id" = "airdrop"."socialTrackerId"')
                         .innerJoin("social_profile", "profile",  '"profile"."id" = "tracker"."socialProfileId"')
-                        .innerJoin('"public"."user"' , "users" ,'"users"."id" = "profile"."userId"')
+                        .innerJoin("user" , "users" ,'"users"."id" = "profile"."userId"')
                         .where('"airdrop"."blockchainTxId" IS NOT NULL')
                         .andWhere('"users"."id" = :userid', {userid: filterVal})
                         .groupBy('"users"."id"')
@@ -565,7 +562,7 @@ export class AirdropService {
                         RxJS.tap( {
                           next: (_) => this._logger.debug(`findAllBalance by userId filter not found, userId: ${filterVal}`),
                         }),
-                        RxJS.mergeMap((_) => RxJS.EMPTY)
+                        RxJS.map(_ => ({data: null, total: 0}) )
                       ),
                       RxJS.of(queryResult).pipe(
                         RxJS.filter((queryResult) => !!queryResult ),
@@ -582,30 +579,37 @@ export class AirdropService {
             RxJS.of(filter).pipe(
               RxJS.filter(filterVal => !!!filterVal),
               RxJS.concatMap(_ =>
-                RxJS.from(this._entityManager.createQueryBuilder(UserEntity, "users")
-                  .select('"users"."id" as "userId"')
-                  .addSelect('"sub1"."airdrops" as "pending", "sub2"."airdrops" as "settlement"')
-                  .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
-                  .innerJoin(qb =>
-                      qb.select('"users"."id" as "userId", sum("airdropRule"."amount") as "airdrops"')
-                        .from(SocialAirdropEntity, "airdrop")
-                        .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
-                        .innerJoin("social_tracker", "tracker", '"tracker"."id" = "airdrop"."socialTrackerId"')
-                        .innerJoin("social_profile", "profile",  '"profile"."id" = "tracker"."socialProfileId"')
-                        .innerJoin('"public"."user"' , "users" ,'"users"."id" = "profile"."userId"')
-                        .where('"airdrop"."blockchainTxId" IS NULL')
-                        .groupBy('"users"."id"')
-                    , "sub1", '"sub1"."userId" = "users"."id"')
-                  .innerJoin(qb =>
-                      qb.select('"users"."id" as "userId", sum("airdropRule"."amount") as "airdrops"')
-                        .from(SocialAirdropEntity, "airdrop")
-                        .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
-                        .innerJoin("social_tracker", "tracker", '"tracker"."id" = "airdrop"."socialTrackerId"')
-                        .innerJoin("social_profile", "profile",  '"profile"."id" = "tracker"."socialProfileId"')
-                        .innerJoin('"public"."user"' , "users" ,'"users"."id" = "profile"."userId"')
-                        .where('"airdrop"."blockchainTxId" IS NOT NULL')
-                        .groupBy('"users"."id"')
-                    , "sub2", '"sub2"."userId" = "users"."id"')
+                RxJS.from(this._entityManager.createQueryBuilder()
+                  .select("*")
+                  .from(subQuery => subQuery.select('"users"."id" as "userId", "users"."username" as "username"')
+                      .addSelect('COALESCE("sub1"."airdrops", 0) as "pending", COALESCE("sub2"."airdrops", 0) as "settlement"')
+                      .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
+                      .leftJoin(qb =>
+                          qb.select('"users"."id" as "userId", sum("airdropRule"."amount") as "airdrops"')
+                            .from(SocialAirdropEntity, "airdrop")
+                            .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
+                            .innerJoin("social_tracker", "tracker", '"tracker"."id" = "airdrop"."socialTrackerId"')
+                            .innerJoin("social_profile", "profile",  '"profile"."id" = "tracker"."socialProfileId"')
+                            .innerJoin("user" , "users" ,'"users"."id" = "profile"."userId"')
+                            .where('"airdrop"."blockchainTxId" IS NULL')
+                            .groupBy('"users"."id"')
+                        , "sub1", '"sub1"."userId" = "users"."id"')
+                      .leftJoin(qb =>
+                          qb.select('"users"."id" as "userId", sum("airdropRule"."amount") as "airdrops"')
+                            .from(SocialAirdropEntity, "airdrop")
+                            .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
+                            .innerJoin("social_tracker", "tracker", '"tracker"."id" = "airdrop"."socialTrackerId"')
+                            .innerJoin("social_profile", "profile",  '"profile"."id" = "tracker"."socialProfileId"')
+                            .innerJoin("user" , "users" ,'"users"."id" = "profile"."userId"')
+                            .where('"airdrop"."blockchainTxId" IS NOT NULL')
+                            .groupBy('"users"."id"')
+                        , "sub2", '"sub2"."userId" = "users"."id"')
+                      .from(UserEntity, "users")
+                  , "balance")
+                  .where('"balance"."total" > 0')
+                  .skip(offset)
+                  .limit(limit)
+                  .orderBy(sortBy ? sortBy.toLowerCase(): null, sortType)
                   .getRawMany()
                 ).pipe(
                   RxJS.tap( {
@@ -618,14 +622,14 @@ export class AirdropService {
                         RxJS.tap( {
                           next: (_) => this._logger.debug(`findAllBalance group by userId filter not found`),
                         }),
-                        RxJS.mergeMap((_) => RxJS.EMPTY)
+                        RxJS.map(_ => ({data: null, total: 0}) )
                       ),
                       RxJS.of(queryResult).pipe(
                         RxJS.filter((queryResult) => !!queryResult ),
                         RxJS.tap( {
-                          next: (queryResult) => this._logger.debug(`findAllBalance group by userId filter success, total: ${queryResult[1]}`),
+                          next: (queryResult) => this._logger.debug(`findAllBalance group by userId filter success, total: ${queryResult.length}`),
                         }),
-                        RxJS.map(queryResult => ({data: queryResult[0], total: queryResult[1]}) )
+                        RxJS.map(queryResult => ({data: queryResult, total: queryResult.length}) )
                       ),
                     )
                   ),
@@ -644,9 +648,9 @@ export class AirdropService {
               RxJS.concatMap(filterVal =>
                 RxJS.from(this._entityManager.createQueryBuilder(SocialLivelyEntity, "lively")
                   .select('"lively"."socialType" as "socialType"')
-                  .addSelect('"sub1"."airdrops" as "pending", "sub2"."airdrops" as "settlement"')
+                  .addSelect('COALESCE("sub1"."airdrops",0) as "pending", COALESCE("sub2"."airdrops",0) as "settlement"')
                   .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('sum("airdropRule"."amount") as "airdrops"')
                         .addSelect('"airdropRule"."socialType" as "socialType"')
                         .from(SocialAirdropEntity, "airdrop")
@@ -655,7 +659,7 @@ export class AirdropService {
                         .andWhere('"airdropRule"."socialType" = :socialType', {socialType: filterVal})
                         .groupBy('"airdropRule"."socialType"')
                     , "sub1", '"sub1"."socialType" = "lively"."socialType"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('sum("airdropRule"."amount") as "airdrops"')
                         .addSelect('"airdropRule"."socialType" as "socialType"')
                         .from(SocialAirdropEntity, "airdrop")
@@ -664,6 +668,7 @@ export class AirdropService {
                         .andWhere('"airdropRule"."socialType" = :socialType', {socialType: filterVal})
                         .groupBy('"airdropRule"."socialType"')
                     , "sub2", '"sub2"."socialType" = "lively"."socialType"')
+                  .where('"lively"."socialType" = :socialType', {socialType: filterVal})
                   .getRawOne()
                 ).pipe(
                   RxJS.tap( {
@@ -676,7 +681,7 @@ export class AirdropService {
                         RxJS.tap( {
                           next: (_) => this._logger.debug(`findAllBalance by socialType filter not found, socialType: ${filterVal}`),
                         }),
-                        RxJS.mergeMap((_) => RxJS.EMPTY)
+                        RxJS.map(_ => ({data: null, total: 0}) )
                       ),
                       RxJS.of(queryResult).pipe(
                         RxJS.filter((queryResult) => !!queryResult ),
@@ -695,9 +700,9 @@ export class AirdropService {
               RxJS.concatMap(_ =>
                 RxJS.from(this._entityManager.createQueryBuilder(SocialLivelyEntity, "lively")
                   .select('"lively"."socialType" as "socialType"')
-                  .addSelect('"sub1"."airdrops" as "pending", "sub2"."airdrops" as "settlement"')
+                  .addSelect('COALESCE("sub1"."airdrops",0) as "pending", COALESCE("sub2"."airdrops",0) as "settlement"')
                   .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('sum("airdropRule"."amount") as "airdrops"')
                         .addSelect('"airdropRule"."socialType" as "socialType"')
                         .from(SocialAirdropEntity, "airdrop")
@@ -705,7 +710,7 @@ export class AirdropService {
                         .where('"airdrop"."blockchainTxId" IS NULL')
                         .groupBy('"airdropRule"."socialType"')
                     , "sub1", '"sub1"."socialType" = "lively"."socialType"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('sum("airdropRule"."amount") as "airdrops"')
                         .addSelect('"airdropRule"."socialType" as "socialType"')
                         .from(SocialAirdropEntity, "airdrop")
@@ -713,6 +718,9 @@ export class AirdropService {
                         .where('"airdrop"."blockchainTxId" IS NOT NULL')
                         .groupBy('"airdropRule"."socialType"')
                     , "sub2", '"sub2"."socialType" = "lively"."socialType"')
+                  .skip(offset)
+                  .limit(limit)
+                  .orderBy(sortBy ? sortBy.toLowerCase(): null, sortType)
                   .getRawMany()
                 ).pipe(
                   RxJS.tap( {
@@ -725,14 +733,14 @@ export class AirdropService {
                         RxJS.tap( {
                           next: (_) => this._logger.debug(`findAllBalance group by socialType filter not found`),
                         }),
-                        RxJS.mergeMap((_) => RxJS.EMPTY)
+                        RxJS.map(_ => ({data: null, total: 0}) )
                       ),
                       RxJS.of(queryResult).pipe(
                         RxJS.filter((queryResult) => !!queryResult ),
                         RxJS.tap( {
-                          next: (queryResult) => this._logger.debug(`findAllBalance by socialType filter found, total: ${queryResult[1]}`),
+                          next: (queryResult) => this._logger.debug(`findAllBalance by socialType filter found, total: ${queryResult.length}`),
                         }),
-                        RxJS.map(queryResult => ({data: queryResult[0], total: queryResult[1]}) )
+                        RxJS.map(queryResult => ({data: queryResult, total: queryResult.length}) )
                       ),
                     )
                   ),
@@ -751,9 +759,9 @@ export class AirdropService {
               RxJS.concatMap(filterVal =>
                 RxJS.from(this._entityManager.createQueryBuilder(SocialAirdropRuleEntity, "airdropRule")
                   .select('"airdropRule"."actionType" as "actionType"')
-                  .addSelect('"sub1"."airdrops" as "pending", "sub2"."airdrops" as "settlement"')
+                  .addSelect('COALESCE("sub1"."airdrops",0) as "pending", COALESCE("sub2"."airdrops",0) as "settlement"')
                   .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('sum("airdropRule"."amount") as "airdrops"')
                         .addSelect('"tracker"."actionType" as "actionType"')
                         .from(SocialAirdropEntity, "airdrop")
@@ -763,7 +771,7 @@ export class AirdropService {
                         .andWhere('"tracker"."actionType" = :actionType', {actionType: filterVal})
                         .groupBy('"tracker"."actionType"')
                     , "sub1", '"sub1"."actionType" = "airdropRule"."actionType"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('sum("airdropRule"."amount") as "airdrops"')
                         .addSelect('"tracker"."actionType" as "actionType"')
                         .from(SocialAirdropEntity, "airdrop")
@@ -773,6 +781,7 @@ export class AirdropService {
                         .andWhere('"tracker"."actionType" = :actionType', {actionType: filterVal})
                         .groupBy('"tracker"."actionType"')
                     , "sub2", '"sub2"."actionType" = "airdropRule"."actionType"')
+                  .where('"airdropRule"."actionType" = :actionType', {actionType: filterVal})
                   .getRawOne()
                 ).pipe(
                   RxJS.tap( {
@@ -785,7 +794,7 @@ export class AirdropService {
                         RxJS.tap( {
                           next: (_) => this._logger.debug(`findAllBalance by actionType filter not found, socialType: ${filterVal}`),
                         }),
-                        RxJS.mergeMap((_) => RxJS.EMPTY)
+                        RxJS.map(_ => ({data: null, total: 0}) )
                       ),
                       RxJS.of(queryResult).pipe(
                         RxJS.filter((queryResult) => !!queryResult ),
@@ -804,9 +813,9 @@ export class AirdropService {
               RxJS.concatMap(_ =>
                 RxJS.from(this._entityManager.createQueryBuilder(SocialAirdropRuleEntity, "airdropRule")
                   .select('"airdropRule"."actionType" as "actionType"')
-                  .addSelect('"sub1"."airdrops" as "pending", "sub2"."airdrops" as "settlement"')
+                  .addSelect('COALESCE("sub1"."airdrops", 0) as "pending", COALESCE("sub2"."airdrops",0) as "settlement"')
                   .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('sum("airdropRule"."amount") as "airdrops"')
                         .addSelect('"tracker"."actionType" as "actionType"')
                         .from(SocialAirdropEntity, "airdrop")
@@ -815,7 +824,7 @@ export class AirdropService {
                         .where('"airdrop"."blockchainTxId" IS NULL')
                         .groupBy('"tracker"."actionType"')
                     , "sub1", '"sub1"."actionType" = "airdropRule"."actionType"')
-                  .innerJoin(qb =>
+                  .leftJoin(qb =>
                       qb.select('sum("airdropRule"."amount") as "airdrops"')
                         .addSelect('"tracker"."actionType" as "actionType"')
                         .from(SocialAirdropEntity, "airdrop")
@@ -824,7 +833,10 @@ export class AirdropService {
                         .where('"airdrop"."blockchainTxId" IS NOT NULL')
                         .groupBy('"tracker"."actionType"')
                     , "sub2", '"sub2"."actionType" = "airdropRule"."actionType"')
-                  .getRawOne()
+                  .skip(offset)
+                  .limit(limit)
+                  .orderBy(sortBy ? sortBy.toLowerCase(): null, sortType)
+                  .getRawMany()
                 ).pipe(
                   RxJS.tap( {
                     error: (error) => this._logger.error(`findAllBalance group by actionType filter failed`, error),
@@ -836,14 +848,14 @@ export class AirdropService {
                         RxJS.tap( {
                           next: (_) => this._logger.debug(`findAllBalance group by actionType filter not found`),
                         }),
-                        RxJS.mergeMap((_) => RxJS.EMPTY)
+                        RxJS.map(_ => ({data: null, total: 0}) )
                       ),
                       RxJS.of(queryResult).pipe(
                         RxJS.filter((queryResult) => !!queryResult ),
                         RxJS.tap( {
-                          next: (queryResult) => this._logger.debug(`findAllBalance by actionType filter found, total: ${queryResult[1]}`),
+                          next: (queryResult) => this._logger.debug(`findAllBalance by actionType filter found, total: ${queryResult.length}`),
                         }),
-                        RxJS.map(queryResult => ({data: queryResult[0], total: queryResult[1]}) )
+                        RxJS.map(queryResult => ({data: queryResult, total: queryResult.length}) )
                       ),
                     )
                   ),
@@ -857,7 +869,9 @@ export class AirdropService {
         RxJS.filter(filterByType => !!!filterByType),
         RxJS.concatMap(_ =>
           RxJS.from(this._entityManager.createQueryBuilder()
-            .select(qb =>
+            .select('COALESCE("balance"."pending", 0) as "pending", COALESCE("balance"."settlement", 0) as "settlement"')
+            .addSelect('COALESCE("balance"."pending",0) + COALESCE("balance"."settlement",0) as "total"')
+            .from(subQuery => subQuery.select(qb =>
                 qb.select('sum("airdropRule"."amount") as "airdrops"')
                   .from(SocialAirdropEntity, "airdrop")
                   .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
@@ -872,6 +886,7 @@ export class AirdropService {
                   .groupBy('"airdrop"."isActive"')
               , "settlement")
             .from(SocialAirdropRuleEntity, "airdropRule")
+            , "balance")
             .getRawOne()
           ).pipe(
             RxJS.tap( {
@@ -891,17 +906,7 @@ export class AirdropService {
                   RxJS.tap( {
                     next: (queryResult) => this._logger.debug(`findAllBalance found, result: ${JSON.stringify(queryResult)}`),
                   }),
-                  RxJS.map(queryResult => {
-                    const total = BigInt(queryResult.pending) + BigInt(queryResult.settlement)
-                    return {
-                      data: [{
-                        pending: queryResult.pending,
-                        settlement: queryResult.settlement,
-                        total
-                      }],
-                      total: 1
-                    }
-                  })
+                  RxJS.map(queryResult => ({data: [queryResult], total: 1}) )
                 ),
               )
             ),
@@ -909,6 +914,9 @@ export class AirdropService {
         )
       )
     ).pipe(
+      RxJS.tap( {
+        error: (error) => this._logger.error(`findAllBalance failed, filterBy: ${filterBy} filter: ${filter} `, error),
+      }),
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',

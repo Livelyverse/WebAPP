@@ -84,7 +84,7 @@ export class FollowerController {
             )
           ),
           RxJS.of(result).pipe(
-            RxJS.filter((findAllResult) => findAllResult.total >= 0),
+            RxJS.filter((findAllResult) => findAllResult.total > 0),
             RxJS.map(findAllResult =>
               FindAllViewDto.from(page, offset, findAllResult.total,
                 Math.ceil(findAllResult.total / offset), findAllResult.data) as FindAllViewDto<FollowerViewDto> ,
