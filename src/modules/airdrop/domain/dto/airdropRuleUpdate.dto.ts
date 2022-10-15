@@ -6,8 +6,7 @@ import {
   IsDefined,
   IsEnum, IsNumberString, IsInt, IsUUID
 } from "class-validator";
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
+import { ApiProperty } from '@nestjs/swagger';
 import { SocialActionType, UnitType } from "../entity/enums";
 
 export class AirdropRuleUpdateDto {

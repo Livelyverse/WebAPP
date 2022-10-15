@@ -48,11 +48,7 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({
-    status: 200,
-    description: 'The record has been successfully created.',
-    type: UserViewDto
-  })
+  @ApiResponse({ status: 200, description: 'Record Created Successfully .', type: UserViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
@@ -67,14 +63,10 @@ export class UserController {
   @Post('update')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({
-    status: 200,
-    description: 'The record has been successfully updated.',
-    type: UserViewDto
-  })
+  @ApiResponse({ status: 200, description: 'Record Updated Successfully.', type: UserViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async update(@Body() userDto: UserUpdateDto): Promise<UserViewDto> {
@@ -83,7 +75,7 @@ export class UserController {
     return UserViewDto.from(user);
   }
 
-  @Get('/get/:param')
+  @Get('/find/:param')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiParam({
@@ -92,10 +84,10 @@ export class UserController {
     description: 'either an uuid for the user id or a string for the user name',
     schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.' , type: UserViewDto})
+  @ApiResponse({ status: 200, description: 'Record Found.' , type: UserViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async getUser(@Param() params): Promise<UserViewDto> {
@@ -121,7 +113,7 @@ export class UserController {
     return UserViewDto.from(user);
   }
 
-  @Get('/getAll')
+  @Get('/findAll')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
@@ -150,11 +142,11 @@ export class UserController {
     description: 'data sort type can be one of ASC or DESC',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'The record is found.' , type: FindAllViewDto})
+  @ApiResponse({ status: 200, description: 'Records Found.' , type: FindAllViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async getAllUsers(
@@ -221,14 +213,11 @@ export class UserController {
     description: 'either an uuid for the userId or a string for the username',
     schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
   })
-  @ApiResponse({
-    status: 200,
-    description: 'The record has been successfully deleted.',
-  })
+  @ApiResponse({ status: 200, description: 'Record Deleted Successfully.'})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param() params) {
@@ -254,14 +243,11 @@ export class UserController {
     description: 'either an uuid for the userId or a string for the username',
     schema: { oneOf: [{ type: 'string' }, { type: 'uuid' }] },
   })
-  @ApiResponse({
-    status: 200,
-    description: 'The record has been successfully removed.',
-  })
+  @ApiResponse({ status: 200, description: 'Record Removed Successfully.'})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 404, description: 'The requested record not found.' })
+  @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async remove(@Param() params) {
@@ -292,7 +278,7 @@ export class UserController {
       },
     },
   })
-  @ApiResponse({ status: 200, description: 'Image Upload Success.' })
+  @ApiResponse({ status: 200, description: 'Image Upload Success.', type: URL})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
@@ -318,22 +304,5 @@ export class UserController {
   ) {
     const file = createReadStream(this.userService.getImage(image));
     file.pipe(response);
-
-    // response.sendFile(
-    //   ,
-    //   (error) => {
-    //     if (error) {
-    //       this.logger.error(
-    //         `could not read file ${image} for user: ${request.user.username}`,
-    //         error,
-    //       );
-    //       throw new HttpException(
-    //         { message: 'Something went wrong' },
-    //         HttpStatus.INTERNAL_SERVER_ERROR,
-    //       );
-    //     }
-    //   },
-    // );
-    // await this.userService.getImage(request.user, image);
   }
 }

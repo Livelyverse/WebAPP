@@ -49,6 +49,6 @@ export class UserEntity extends BaseEntity {
   @JoinColumn({ name: 'groupId' })
   group: GroupEntity;
 
-  @OneToOne((type) => TokenEntity, (token) => token.user)
-  token: TokenEntity;
+  // @OneToOne((type) => TokenEntity, (token) => token.user)
+  // token: TokenEntity;
 }

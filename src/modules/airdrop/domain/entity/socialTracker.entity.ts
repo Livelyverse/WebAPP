@@ -1,7 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialActionType } from "./enums";
-import { SocialProfileEntity } from "../../../profile/domain/entity/socialProfile.entity";
+import { SocialProfileEntity } from "../../../profile/domain/entity";
 import { SocialAirdropEntity } from "./socialAirdrop.entity";
 import { SocialEventEntity } from "./socialEvent.entity";
 import { SocialFollowerEntity } from "./socialFollower.entity";

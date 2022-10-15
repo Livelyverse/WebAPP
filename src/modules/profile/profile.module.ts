@@ -14,7 +14,9 @@ import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { memoryStorage } from 'multer';
 import { BackofficeController } from './controllers/dashboard.controller';
-import { SocialProfileEntity } from "./domain/entity/socialProfile.entity";
+import { SocialProfileEntity } from "./domain/entity";
+import { SocialProfileController } from "./controllers/socialProfile.controller";
+import { SocialProfileService } from "./services/socialProfile.service";
 
 @Module({
   imports: [
@@ -57,9 +59,10 @@ import { SocialProfileEntity } from "./domain/entity/socialProfile.entity";
     GroupController,
     UserController,
     ContactController,
+    SocialProfileController,
     BackofficeController,
   ],
-  providers: [RoleService, GroupService, UserService],
-  exports: [RoleService, GroupService, UserService],
+  providers: [RoleService, GroupService, UserService, SocialProfileService],
+  exports: [RoleService, GroupService, UserService, SocialProfileService],
 })
 export class ProfileModule {}

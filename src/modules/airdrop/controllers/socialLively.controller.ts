@@ -21,7 +21,7 @@ import { SocialLivelyCreateDto } from "../domain/dto/socialLivelyCreate.dto";
 import { SocialLivelyUpdateDto } from "../domain/dto/socialLivelyUpdate.dto";
 import { SocialLivelyViewDto } from "../domain/dto/socialLivelyView.dto";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
-import { FindAllType, SortBy, SortType } from "../services/IAirdropService";
+import { FindAllType, SortBy, SortType } from "../services/IAirdrop.service";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SortTypePipe } from "../domain/pipe/sortTypePipe";
 import { SortByPipe } from "../domain/pipe/sortByPipe";
@@ -267,13 +267,15 @@ export class SocialLivelyController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'The record is found.'})
+  @ApiResponse({ status: 200, description: 'Record Found.'})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findTotalCount(): RxJS.Observable<number> {
-    return this._socialLivelyService.findTotal();
+  findTotalCount(): RxJS.Observable<object> {
+    return this._socialLivelyService.findTotal().pipe(
+      RxJS.map(total => ({total}))
+    )
   }
 }

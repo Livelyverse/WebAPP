@@ -1,6 +1,5 @@
 import { ApiResponseProperty } from "@nestjs/swagger";
 import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
-import { SocialLivelyEntity } from "../entity/socialLively.entity";
 import { SocialAirdropRuleEntity } from "../entity/socialAirdropRule.entity";
 import { SocialActionType, UnitType } from "../entity/enums";
 

@@ -1,43 +1,66 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
-import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
-import { FindAllType, IAirdropService, SortBy, SortType } from "./IAirdrop.service";
 import * as RxJS from "rxjs";
 import { InjectEntityManager } from "@nestjs/typeorm";
 import { EntityManager } from "typeorm";
-import { SocialLivelyCreateDto } from "../domain/dto/socialLivelyCreate.dto";;
-import { SocialLivelyUpdateDto } from "../domain/dto/socialLivelyUpdate.dto";
 import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
+import { BaseEntity, SocialProfileEntity, UserEntity } from "../domain/entity";
+import { SocialProfileCreateDto, SocialProfileUpdateDto } from "../domain/dto";
+import { SocialType } from "../domain/entity/socialProfile.entity";
+
+export type FindAllType<T extends BaseEntity> = { data: Array<T>; total: number }
+
+export enum SortBy {
+  TIMESTAMP = 'createdAt',
+}
+
+export type SortType = 'ASC' | 'DESC'
 
 @Injectable()
-export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
+export class SocialProfileService {
 
-  private readonly _logger = new Logger(SocialLivelyService.name);
+  private readonly _logger = new Logger(SocialProfileService.name);
 
-  constructor(
-    @InjectEntityManager()
-    private readonly _entityManager: EntityManager,
-  ) {
-
-  }
+  constructor(@InjectEntityManager() private readonly _entityManager: EntityManager) {}
 
   findAll(
     offset: number,
     limit: number,
     sortType: SortType,
     sortBy: SortBy,
-  ): RxJS.Observable<FindAllType<SocialLivelyEntity>> {
-    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity)
-      .findAndCount({
-        skip: offset,
-        take: limit,
-        order: {
-          [sortBy]: sortType,
-        },
-      })
+    filterBy: SocialType
+  ): RxJS.Observable<FindAllType<SocialProfileEntity>> {
+    return RxJS.merge(
+      RxJS.of(filterBy).pipe(
+        RxJS.filter(filter => !!filter),
+        RxJS.switchMap(filter => RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
+            .findAndCount({
+              skip: offset,
+              take: limit,
+              order: {
+                [sortBy]: sortType,
+              },
+              where: { socialType: filter }
+            })
+          )
+        )
+      ),
+      RxJS.of(filterBy).pipe(
+        RxJS.filter(filter => !filter),
+        RxJS.switchMap(filter => RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
+            .findAndCount({
+              skip: offset,
+              take: limit,
+              order: {
+                [sortBy]: sortType,
+              },
+            })
+          )
+        )
+      )
     ).pipe(
       RxJS.tap({
-        next: result => this._logger.debug(`findAll SocialLively success, total: ${result[1]}`),
-        error: err => this._logger.error(`findAll SocialLively failed`, err)
+        next: result => this._logger.debug(`findAll SocialProfile success, total: ${result[1]}`),
+        error: err => this._logger.error(`findAll SocialProfile failed`, err)
       }),
       RxJS.map(result => ({data: result[0], total: result[1]})),
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
@@ -51,12 +74,12 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
   }
 
   findTotal(): RxJS.Observable<number> {
-    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity)
+    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
       .count()
     ).pipe(
       RxJS.tap({
-        next: result => this._logger.debug(`findTotal SocialLively success, total: ${result}`),
-        error: err => this._logger.error(`findTotal SocialLively failed`, err)
+        next: result => this._logger.debug(`findTotal SocialProfile success, total: ${result}`),
+        error: err => this._logger.error(`findTotal SocialProfile failed`, err)
       }),
       RxJS.identity,
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
@@ -69,14 +92,14 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
     )
   }
 
-  findById(id: string): RxJS.Observable<SocialLivelyEntity> {
-    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity)
+  findById(id: string): RxJS.Observable<SocialProfileEntity> {
+    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
       .findOne({
         where: { id: id }
       })
     ).pipe(
       RxJS.tap({
-        error: err => this._logger.error(`findById SocialLively failed, id: ${id}`, err)
+        error: err => this._logger.error(`findById SocialProfile failed, id: ${id}`, err)
       }),
       RxJS.catchError(error => RxJS.throwError(() => new HttpException(
         {
@@ -104,10 +127,10 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
     )
   }
 
-  find(option: FindOptionsWhere<SocialLivelyEntity>): RxJS.Observable<SocialLivelyEntity[]> {
-    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity).findBy(option)).pipe(
+  find(option: FindOptionsWhere<SocialProfileEntity>): RxJS.Observable<SocialProfileEntity[]> {
+    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity).findBy(option)).pipe(
       RxJS.tap({
-        error: err => this._logger.error(`findOne SocialLively failed, option: ${JSON.stringify(option)}`, err)
+        error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
       }),
       RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
         {
@@ -135,10 +158,10 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
     )
   }
 
-  findOne(option: FindOptionsWhere<SocialLivelyEntity>): RxJS.Observable<SocialLivelyEntity> {
-    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity).findOneBy(option)).pipe(
+  findOne(option: FindOptionsWhere<SocialProfileEntity>): RxJS.Observable<SocialProfileEntity> {
+    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity).findOneBy(option)).pipe(
       RxJS.tap({
-        error: err => this._logger.error(`findOne SocialLively failed, option: ${JSON.stringify(option)}`, err)
+        error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
       }),
       RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
         {
@@ -166,25 +189,31 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
     )
   }
 
-  create(socialLivelyDto: SocialLivelyCreateDto): RxJS.Observable<SocialLivelyEntity> {
-    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity)
-                  .findOne({ where: { socialType: socialLivelyDto.socialType } })
+  create(socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileEntity> {
+    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
+        .findOne({
+          relations: ['user'],
+          where: {
+            user: { id:  socialProfileDto.userId },
+            socialType: socialProfileDto.socialType
+          }
+        })
       ).pipe(
         RxJS.tap({
-          error: err => this._logger.error(`findOne socialLively failed, username ${socialLivelyDto.username}, socialType: ${socialLivelyDto.socialType}`, err)
+          error: err => this._logger.error(`findOne SocialProfile failed, username ${socialProfileDto.username}, socialType: ${socialProfileDto.socialType}`, err)
         }),
         RxJS.mergeMap(result =>
           RxJS.merge(
             RxJS.of(result).pipe(
               RxJS.filter(socialFindResult => !!socialFindResult),
               RxJS.tap({
-                next: socialFindResult => this._logger.debug(`request new SocialLively profile already exist, request: ${JSON.stringify(socialLivelyDto)}, id: ${socialFindResult.id}`),
+                next: socialFindResult => this._logger.debug(`request new SocialProfile already exist, request: ${JSON.stringify(socialProfileDto)}, id: ${socialFindResult.id}`),
               }),
               RxJS.mergeMap(_ =>
                 RxJS.throwError(() =>
                     new HttpException({
                       statusCode: '400',
-                      message: 'SocialLively Already Exist',
+                      message: 'SocialProfile Already Exist',
                       error: 'Bad Request'
                     }, HttpStatus.BAD_REQUEST)
                 )
@@ -192,21 +221,25 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
             ),
             RxJS.of(result).pipe(
               RxJS.filter(socialFindResult => !!!socialFindResult),
-              RxJS.map(_ => socialLivelyDto),
-              RxJS.map(socialLivelyDto => {
-                const entity = new SocialLivelyEntity();
-                entity.userId = socialLivelyDto.userId;
-                entity.socialType = socialLivelyDto.socialType;
-                entity.username = socialLivelyDto.username;
-                entity.profileName = socialLivelyDto.profileName;
-                entity.profileUrl = socialLivelyDto.profileUrl;
+              RxJS.map(_ => socialProfileDto),
+              RxJS.map(socialProfileDto => {
+                const user = new UserEntity();
+                const entity = new SocialProfileEntity();
+                user.id = socialProfileDto.userId;
+                entity.user = user;
+                entity.socialType = socialProfileDto.socialType;
+                entity.username = socialProfileDto.username;
+                entity.socialName = socialProfileDto?.socialName;
+                entity.profileUrl = socialProfileDto?.profileUrl;
+                entity.website = socialProfileDto?.website;
+                entity.location = socialProfileDto?.location;
                 return entity
               }),
               RxJS.mergeMap(entity =>
-                RxJS.from(this._entityManager.getRepository(SocialLivelyEntity).save(entity)).pipe(
+                RxJS.from(this._entityManager.getRepository(SocialProfileEntity).save(entity)).pipe(
                   RxJS.tap({
-                    next: result => this._logger.debug(`create socialLively success, id: ${result.id}, username: ${result.username}, socialType: ${result.socialType}`),
-                    error: err => this._logger.error(`create socialLively failed, username ${entity.username}, socialType: ${entity.socialType}`, err)
+                    next: result => this._logger.debug(`create SocialProfile success, id: ${result.id}, username: ${result.username}, socialType: ${result.socialType}`),
+                    error: err => this._logger.error(`create SocialProfile failed, username ${entity.username}, socialType: ${entity.socialType}`, err)
                   }),
                   RxJS.catchError(_ => RxJS.throwError(() =>
                     new HttpException({
@@ -243,11 +276,11 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
       )
   }
 
-  update(dto: SocialLivelyUpdateDto): RxJS.Observable<SocialLivelyEntity> {
+  update(dto: SocialProfileUpdateDto): RxJS.Observable<SocialProfileEntity> {
     return RxJS.of(dto).pipe(
-      RxJS.mergeMap(socialLivelyDto => RxJS.from(this.findById(dto.id)).pipe(
+      RxJS.mergeMap(socialProfileDto => RxJS.from(this.findById(dto.id)).pipe(
           RxJS.tap({
-            error: err => this._logger.error(`findById socialLively failed, username ${dto.username}, Id: ${dto.id}`, err)
+            error: err => this._logger.error(`findById SocialProfile failed, social username ${dto.username}, Id: ${dto.id}`, err)
           }),
           RxJS.mergeMap(result =>
             RxJS.merge(
@@ -265,23 +298,24 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
               ),
               RxJS.of(result).pipe(
                 RxJS.filter(socialFindResult => !!socialFindResult),
-                RxJS.map(socialFindResult => [socialLivelyDto, socialFindResult])
+                RxJS.map(socialFindResult => [socialProfileDto, socialFindResult])
               )
             )
           ),
         )),
-      RxJS.map(([socialLivelyDto, socialLivelyEntity]) => {
-        socialLivelyEntity.userId = socialLivelyDto.userId ? socialLivelyDto.userId : socialLivelyEntity.userId;
-        socialLivelyEntity.username = socialLivelyDto.username ? socialLivelyDto.username : socialLivelyEntity.username;
-        socialLivelyEntity.profileName = socialLivelyDto.profileName ? socialLivelyDto.profileName : socialLivelyEntity.profileName;
-        socialLivelyEntity.profileUrl = socialLivelyDto.profileUrl ? socialLivelyDto.profileUrl : socialLivelyEntity.profileUrl;
-        return socialLivelyEntity
+      RxJS.map(([socialProfileDto, socialProfileEntity]) => {
+        socialProfileEntity.website = socialProfileDto.website ? socialProfileDto.website : socialProfileEntity?.website;
+        socialProfileEntity.username = socialProfileDto.username ? socialProfileDto.username : socialProfileEntity?.username;
+        socialProfileEntity.socialName = socialProfileDto.socialName ? socialProfileDto.socialName : socialProfileEntity?.socialName;
+        socialProfileEntity.profileUrl = socialProfileDto.profileUrl ? socialProfileDto.profileUrl : socialProfileDto?.profileUrl;
+        socialProfileEntity.location = socialProfileDto.location ? socialProfileDto.location : socialProfileDto?.location;
+        return socialProfileDto
       }),
-      RxJS.mergeMap((entity:SocialLivelyEntity) =>
-        RxJS.from(this._entityManager.getRepository(SocialLivelyEntity).save(entity)).pipe(
+      RxJS.mergeMap((entity:SocialProfileEntity) =>
+        RxJS.from(this._entityManager.getRepository(SocialProfileEntity).save(entity)).pipe(
           RxJS.tap({
-            next: result => this._logger.debug(`update socialLively success, id: ${result.id}, username: ${result.username}, socialType: ${result.socialType}`),
-            error: err => this._logger.error(`update socialLively failed, username ${entity.username}, socialType: ${entity.socialType}`, err)
+            next: result => this._logger.debug(`update SocialProfile success, id: ${result.id}, username: ${result.username}, socialType: ${result.socialType}`),
+            error: err => this._logger.error(`update SocialProfile failed, id: ${entity.id}, username ${entity.username} socialType: ${entity.socialType}`, err)
           }),
           RxJS.catchError(error =>
             RxJS.merge(

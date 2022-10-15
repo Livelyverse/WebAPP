@@ -15,7 +15,7 @@ export class TokenEntity extends BaseEntity {
   @Column({ type: 'timestamptz', unique: false, nullable: false })
   refreshTokenExpiredAt: Date;
 
-  @OneToOne((type) => UserEntity, (user) => user.token)
+  @OneToOne((type) => UserEntity)
   @JoinColumn()
   user: UserEntity;
 }

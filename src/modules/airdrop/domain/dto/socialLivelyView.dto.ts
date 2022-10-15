@@ -8,10 +8,10 @@ export class SocialLivelyViewDto {
       let livelyDto = new SocialLivelyViewDto();
       livelyDto.id = entity.id;
       livelyDto.socialType = entity.socialType;
-      livelyDto.userId = entity?.userId;
+      livelyDto.userId = entity?.userId ? entity.userId : null;
       livelyDto.username = entity.username;
-      livelyDto.profileName = entity?.profileName;
-      livelyDto.profileUrl = entity?.profileUrl;
+      livelyDto.profileName = entity?.profileName ? entity.profileName : null;
+      livelyDto.profileUrl = entity?.profileUrl ? entity.profileUrl : null;
       livelyDto.createdAt = entity.createdAt;
       livelyDto.updatedAt = entity.updatedAt;
       return livelyDto;
@@ -29,17 +29,17 @@ export class SocialLivelyViewDto {
   socialType: SocialType
 
   @ApiResponseProperty()
-  userId?: string
+  userId: string
 
   @ApiResponseProperty()
-  profileName?: string
+  profileName: string
 
   @ApiResponseProperty()
-  profileUrl?: string
+  profileUrl: string
 
   @ApiResponseProperty()
-  public createdAt: Date;
+  createdAt: Date;
 
   @ApiResponseProperty()
-  public updatedAt: Date;
+  updatedAt: Date;
 }

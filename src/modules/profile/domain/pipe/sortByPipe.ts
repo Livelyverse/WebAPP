@@ -1,19 +1,23 @@
 import { ArgumentMetadata, HttpStatus, Injectable, Optional, PipeTransform } from "@nestjs/common";
 import { ErrorHttpStatusCode, HttpErrorByCode } from "@nestjs/common/utils/http-error-by-code.util";
-import { SortType } from "../../services/IAirdrop.service";
+export interface SortByType {
+  [index: string]: string
+}
 
-export interface SortTypePipeOptions {
+export interface SortByPipeOptions {
   errorHttpStatusCode?: ErrorHttpStatusCode;
   exceptionFactory?: (error: string) => any;
 }
 
 @Injectable()
-export class SortTypePipe implements PipeTransform<string, Promise<SortType>> {
+export class SortByPipe<T extends SortByType> implements PipeTransform<string, Promise<string>> {
 
   protected exceptionFactory: (error: string) => any;
+  protected readonly _sortFields: T
 
-  constructor(@Optional() options?: SortTypePipeOptions) {
+  constructor(sortFields: T, @Optional() options?: SortByPipeOptions) {
     options = options || {};
+    this._sortFields = sortFields;
     const { exceptionFactory, errorHttpStatusCode = HttpStatus.BAD_REQUEST } = options;
     this.exceptionFactory = exceptionFactory || (error => new HttpErrorByCode[errorHttpStatusCode](error));
   }
@@ -25,22 +29,23 @@ export class SortTypePipe implements PipeTransform<string, Promise<SortType>> {
    * @param value currently processed route argument
    * @param metadata contains metadata about the currently processed route argument
    */
-  async transform(value: string, metadata: ArgumentMetadata): Promise<SortType> {
-    if (value && !this.isSortType(value)) {
+  async transform(value: string, metadata: ArgumentMetadata): Promise<string> {
+    if (value && !this.isSortBy(value)) {
       throw this.exceptionFactory(
-        'Validation failed (sort type string is expected)',
+        `Validation failed (sortBy string [${Object.keys(this._sortFields).map(value => value.toLowerCase())}] is expected)`,
       );
     } else if(!value) {
-      return 'ASC';
+      return Object.values(this._sortFields)[0];
     }
-    return value.toUpperCase() as SortType
+
+    return this._sortFields[value.toUpperCase()];
   }
 
   /**
    * @param value currently processed route argument
    * @returns `true` if `value` is a valid Sort Type
    */
-  protected isSortType(value: string): boolean {
-    return (['ASC','DESC'].includes(value.toUpperCase()));
+  protected isSortBy(value: string): boolean {
+    return (value.toUpperCase() in this._sortFields);
   }
 }

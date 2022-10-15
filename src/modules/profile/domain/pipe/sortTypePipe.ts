@@ -1,6 +1,6 @@
 import { ArgumentMetadata, HttpStatus, Injectable, Optional, PipeTransform } from "@nestjs/common";
 import { ErrorHttpStatusCode, HttpErrorByCode } from "@nestjs/common/utils/http-error-by-code.util";
-import { SortType } from "../../services/IAirdrop.service";
+import { SortType } from "../../services/socialProfile.service";
 
 export interface SortTypePipeOptions {
   errorHttpStatusCode?: ErrorHttpStatusCode;
