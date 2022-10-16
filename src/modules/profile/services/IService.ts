@@ -1,12 +1,19 @@
-import { BaseEntity } from '../domain/entity';
+import { BaseEntity, UserEntity } from "../domain/entity";
+
+export type FindAllType<T extends BaseEntity> = { data: Array<T>; total: number }
+
+export enum SortType {
+  ASC = 'ASC',
+  DESC = 'DESC'
+}
 
 export interface IService<T extends BaseEntity> {
   findAll(
-    offset,
+    offset: number,
     limit: number,
-    sortType,
-    sortBy: string,
-  ): Promise<{ data: Array<T>; total: number } | null>;
+    sortType: SortType,
+    sortBy: unknown,
+  ): Promise<FindAllType<T>>;
 
   findTotal(): Promise<number>;
 
@@ -18,7 +25,7 @@ export interface IService<T extends BaseEntity> {
 
   create(dto: object): Promise<T>;
 
-  update(dto: object): Promise<T>;
+  update(dto: object, entity?: UserEntity): Promise<T>;
 
   delete(id: string): Promise<void>;
 

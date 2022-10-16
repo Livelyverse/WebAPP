@@ -2,8 +2,8 @@ import { BaseEntity } from './base.entity';
 import { Column, Entity, JoinColumn, ManyToOne, } from "typeorm";
 import { RoleEntity } from './role.entity';
 
-@Entity({ name: 'group' })
-export class GroupEntity extends BaseEntity {
+@Entity({ name: 'user_group' })
+export class UserGroupEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 128, unique: true, nullable: false })
   name: string;
 

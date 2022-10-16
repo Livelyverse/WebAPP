@@ -6,30 +6,27 @@ import {
   HttpCode,
   HttpException,
   HttpStatus,
-  Logger, Param,
-  Post, Query,
+  Logger, Param, ParseUUIDPipe,
+  Post, Query, Req,
   UseGuards,
   UsePipes
 } from "@nestjs/common";
-import { ContextType, ValidationPipe } from "../../airdrop/domain/pipe/validationPipe";
 import RoleGuard from "../../authentication/domain/gurad/role.guard";
 import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
 import * as RxJS from "rxjs";
-import { isEnum, isUUID } from "class-validator";
-import { FindAllType, SocialProfileService, SortBy, SortType } from "../services/socialProfile.service";
+import { SocialProfileService, SocialProfileSortBy } from "../services/socialProfile.service";
 import { SocialProfileCreateDto, SocialProfileUpdateDto, SocialProfileViewDto } from "../domain/dto";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
-import { SortTypePipe } from "../domain/pipe/sortTypePipe";
-import { SortByPipe } from "../domain/pipe/sortByPipe";
 import { SocialProfileEntity } from "../domain/entity";
 import { SocialType } from "../domain/entity/socialProfile.entity";
 import { EnumPipe } from "../../blockchain/domain/pipe/enumPipe";
-import { TxStatus } from "../../blockchain/domain/entity/blockchainTx.entity";
+import { ValidationPipe } from "../domain/pipe/validationPipe";
+import { FindAllType, SortType } from "../services/IService";
 
 @ApiBearerAuth()
-@ApiTags('/api/profile/user/social')
-@Controller('/api/profile/user/social')
+@ApiTags('/api/profiles/users/socials')
+@Controller('/api/profiles/users/socials')
 export class SocialProfileController {
 
   private readonly _logger = new Logger(SocialProfileController.name);
@@ -52,7 +49,7 @@ export class SocialProfileController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   create(@Body() socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileViewDto> {
     return RxJS.from(this._socialProfileService.create(socialProfileDto)).pipe(
@@ -69,7 +66,7 @@ export class SocialProfileController {
               RxJS.throwError(() => new HttpException(
                 {
                   statusCode: '500',
-                  message: 'Internal Server Error',
+                  message: 'Something Went Wrong',
                   error: 'Internal Server Error'
                 }, HttpStatus.INTERNAL_SERVER_ERROR)
               )
@@ -96,11 +93,11 @@ export class SocialProfileController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  update(@Body() socialProfileDto: SocialProfileUpdateDto): RxJS.Observable<SocialProfileViewDto> {
+  update(@Req() req, @Body() socialProfileDto: SocialProfileUpdateDto): RxJS.Observable<SocialProfileViewDto> {
 
-    return RxJS.from(this._socialProfileService.update(socialProfileDto)).pipe(
+    return RxJS.from(this._socialProfileService.update(socialProfileDto, req.user)).pipe(
       RxJS.map(entity => SocialProfileViewDto.from(entity)),
       RxJS.catchError(error =>
         RxJS.merge(
@@ -114,7 +111,7 @@ export class SocialProfileController {
               RxJS.throwError(() => new HttpException(
                 {
                   statusCode: '500',
-                  message: 'Internal Server Error',
+                  message: 'Something Went Wrong',
                   error: 'Internal Server Error'
                 }, HttpStatus.INTERNAL_SERVER_ERROR)
               )
@@ -125,7 +122,7 @@ export class SocialProfileController {
     )
   }
 
-  @Get('findAll')
+  @Get('/find/all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
@@ -150,27 +147,27 @@ export class SocialProfileController {
   @ApiQuery({
     name: 'sortBy',
     required: false,
-    description: 'data sort field can be one of the timestamp fields',
-    schema: { type: 'string' },
+    description: `data sort field can be one of ${Object.keys(SocialProfileSortBy)}`,
+    schema: { enum: Object.keys(SocialProfileSortBy) },
   })
   @ApiQuery({
-    name: 'filterBy',
+    name: 'sortType',
     required: false,
-    description: 'filterBy can be socialType field',
-    schema: { enum: Object.values(SocialType) },
+    description: `data sort type can be one of ${Object.keys(SortType)}`,
+    schema: { enum: Object.keys(SortType) },
   })
   @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   findAll(
     @Query('page', new PaginationPipe()) page: number,
     @Query('offset', new PaginationPipe()) offset: number,
-    @Query('sortType', new SortTypePipe()) sortType: SortType,
-    @Query('sortBy', new SortByPipe(SortBy)) sortBy: SortBy,
+    @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
+    @Query('sortBy', new EnumPipe(SocialProfileSortBy)) sortBy: SocialProfileSortBy,
     @Query('filterBy', new EnumPipe(SocialType)) filterBy: SocialType,
   ): RxJS.Observable<FindAllViewDto> {
     return RxJS.from(this._socialProfileService.findAll((page - 1) * offset, offset, sortType, sortBy, filterBy)).pipe(
@@ -186,7 +183,7 @@ export class SocialProfileController {
             )
           ),
           RxJS.of(result).pipe(
-            RxJS.filter((findAllResult) => findAllResult.total >= 0),
+            RxJS.filter((findAllResult) => findAllResult.total > 0),
             RxJS.map(findAllResult =>
               FindAllViewDto.from(page, offset, findAllResult.total,
                 Math.ceil(findAllResult.total / offset), findAllResult.data) as FindAllViewDto,
@@ -194,23 +191,86 @@ export class SocialProfileController {
             RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
               {
                 statusCode: '500',
-                message: 'Internal Server Error',
+                message: 'Something Went Wrong',
                 error: 'Internal Server Error'
               }, HttpStatus.INTERNAL_SERVER_ERROR))
             )
           )
         )
-      )
+      ),
+      RxJS.catchError(error =>
+        RxJS.merge(
+          RxJS.of(error).pipe(
+            RxJS.filter(err => err instanceof HttpException),
+            RxJS.mergeMap(err => RxJS.throwError(err)),
+          ),
+          RxJS.of(error).pipe(
+            RxJS.filter(err => !(err instanceof HttpException)),
+            RxJS.mergeMap(err =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '500',
+                  message: 'Something Went Wrong',
+                  error: 'Internal Server Error'
+                }, HttpStatus.INTERNAL_SERVER_ERROR)
+              )
+            )
+          )
+        )
+      ),
     )
   }
 
-  @Get('/findByUser/:userId')
+  @Get('/find')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Record Found.', type: SocialProfileViewDto })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Record Not Found.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  findSocialProfileByUserId(@Req() req): RxJS.Observable<SocialProfileViewDto[]> {
+    return RxJS.from(this._socialProfileService.find({
+        user: { id: req.user.id }
+      })).pipe(
+      RxJS.concatMap(entities =>
+        RxJS.from(entities).pipe(
+          RxJS.map(entity => SocialProfileViewDto.from(entity)),
+          RxJS.reduce( (acc,dto) => [...acc, dto], [])
+        )
+      ),
+      RxJS.catchError(error =>
+        RxJS.merge(
+          RxJS.of(error).pipe(
+            RxJS.filter(err => err instanceof HttpException),
+            RxJS.mergeMap(err => RxJS.throwError(err)),
+          ),
+          RxJS.of(error).pipe(
+            RxJS.filter(err => !(err instanceof HttpException)),
+            RxJS.mergeMap(err =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '500',
+                  message: 'Something Went Wrong',
+                  error: 'Internal Server Error'
+                }, HttpStatus.INTERNAL_SERVER_ERROR)
+              )
+            )
+          )
+        )
+      ),
+    )
+  }
+
+  @Get('/find/id/:uuid')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiParam({
-    name: 'userId',
+    name: 'uuid',
     required: true,
-    description: 'user Id',
+    description: 'find by social profile Id',
     schema: { type: 'string' },
   })
   @ApiResponse({ status: 200, description: 'Record Found.', type: SocialProfileViewDto })
@@ -218,105 +278,49 @@ export class SocialProfileController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findByUserId(@Param() params): RxJS.Observable<SocialProfileViewDto[]> {
-    return RxJS.merge(
-      RxJS.of(params).pipe(
-        RxJS.filter(pathParam => isUUID(pathParam.userId)),
-        RxJS.mergeMap(pathParam => this._socialProfileService.find({
-          user: { id: pathParam.userId }
-        })),
-        RxJS.switchMap(entities =>
-          RxJS.from(entities).pipe(
-            RxJS.map(entity => SocialProfileViewDto.from(entity)),
-            RxJS.reduce( (acc,dto) => [...acc, dto], [])
-          )
-        ),
-      ),
-      RxJS.of(params).pipe(
-        RxJS.filter(pathParam => !isUUID(pathParam.userId)),
-        RxJS.mergeMap(pathParam => RxJS.throwError(() => new HttpException({
-          statusCode: '400',
-          message: 'Invalid Path Param',
-          error: 'Bad Request'
-        }, HttpStatus.BAD_REQUEST)))
-      ).pipe(
-        RxJS.catchError(error =>
-          RxJS.merge(
-            RxJS.of(error).pipe(
-              RxJS.filter(err => err instanceof HttpException),
-              RxJS.mergeMap(err => RxJS.throwError(err)),
-            ),
-            RxJS.of(error).pipe(
-              RxJS.filter(err => !(err instanceof HttpException)),
-              RxJS.mergeMap(err =>
-                RxJS.throwError(() => new HttpException(
-                  {
-                    statusCode: '500',
-                    message: 'Internal Server Error',
-                    error: 'Internal Server Error'
-                  }, HttpStatus.INTERNAL_SERVER_ERROR)
-                )
+  findById(@Req() req, @Param('uuid', new ParseUUIDPipe()) uuid): RxJS.Observable<SocialProfileViewDto> {
+    return RxJS.from(this._socialProfileService.findById(uuid)).pipe(
+      RxJS.mergeMap(socialFind =>
+        RxJS.merge(
+          RxJS.of(socialFind).pipe(
+            RxJS.filter(socialProfile => socialProfile.user.id === req.user.id),
+            RxJS.map(socialProfile => SocialProfileViewDto.from(socialProfile)),
+          ),
+          RxJS.of(socialFind).pipe(
+            RxJS.filter(socialProfile => socialProfile.user.id !== req.user.id),
+            RxJS.mergeMap(_ =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '403',
+                  message: 'Update Forbidden',
+                  error: 'FORBIDDEN'
+                }, HttpStatus.FORBIDDEN)
               )
             )
           )
-        ),
-      )
-    )
-  }
-
-  @Get('/findById/:id')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiParam({
-    name: 'id',
-    required: true,
-    description: 'social profile Id',
-    schema: { type: 'string' },
-  })
-  @ApiResponse({ status: 200, description: 'Record Found.', type: SocialProfileViewDto })
-  @ApiResponse({ status: 400, description: 'Bad Request.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findById(@Param() params): RxJS.Observable<SocialProfileViewDto> {
-    return RxJS.merge(
-      RxJS.of(params).pipe(
-        RxJS.filter(pathParam => isUUID(pathParam.id, "all")),
-        RxJS.mergeMap(pathParam => this._socialProfileService.findById(pathParam.id)),
-        RxJS.map(entity => SocialProfileViewDto.from(entity))
+        )
       ),
-      RxJS.of(params).pipe(
-        RxJS.filter(pathParam => !isUUID(pathParam.id, "all")),
-        RxJS.mergeMap(pathParam => RxJS.throwError(() => new HttpException({
-          statusCode: '400',
-          message: 'Invalid Path Param',
-          error: 'Bad Request'
-        }, HttpStatus.BAD_REQUEST)))
-      ).pipe(
-        RxJS.catchError(error =>
-          RxJS.merge(
-            RxJS.of(error).pipe(
-              RxJS.filter(err => err instanceof HttpException),
-              RxJS.mergeMap(err => RxJS.throwError(err)),
-            ),
-            RxJS.of(error).pipe(
-              RxJS.filter(err => !(err instanceof HttpException)),
-              RxJS.mergeMap(err =>
-                RxJS.throwError(() => new HttpException(
-                  {
-                    statusCode: '500',
-                    message: 'Internal Server Error',
-                    error: 'Internal Server Error'
-                  }, HttpStatus.INTERNAL_SERVER_ERROR)
-                )
+      RxJS.catchError(error =>
+        RxJS.merge(
+          RxJS.of(error).pipe(
+            RxJS.filter(err => err instanceof HttpException),
+            RxJS.mergeMap(err => RxJS.throwError(err)),
+          ),
+          RxJS.of(error).pipe(
+            RxJS.filter(err => !(err instanceof HttpException)),
+            RxJS.mergeMap(err =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '500',
+                  message: 'Something Went Wrong',
+                  error: 'Internal Server Error'
+                }, HttpStatus.INTERNAL_SERVER_ERROR)
               )
             )
           )
-        ),
+        )
       )
     )
   }

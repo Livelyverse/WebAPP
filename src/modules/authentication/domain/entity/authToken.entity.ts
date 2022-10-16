@@ -1,8 +1,8 @@
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 import { BaseEntity, UserEntity } from '../../../profile/domain/entity';
 
-@Entity({ name: 'token' })
-export class TokenEntity extends BaseEntity {
+@Entity({ name: 'auth_token' })
+export class AuthTokenEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 512, unique: false, nullable: false })
   refreshTokenId: string;
 

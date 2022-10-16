@@ -9,85 +9,93 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserCreateDto, UserUpdateDto } from '../domain/dto';
 import { validate } from 'class-validator';
-import { IService } from './IService';
+import { FindAllType, IService, SortType } from "./IService";
 import { UserEntity } from '../domain/entity';
-import { GroupService } from './group.service';
+import { UserGroupService } from './userGroup.service';
 import * as argon2 from 'argon2';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
 import { extname, join } from 'path';
 import * as fs from 'fs';
 import {
   AuthMailEntity,
-  TokenEntity,
+  AuthTokenEntity,
 } from '../../authentication/domain/entity';
 import { ConfigService } from '@nestjs/config';
 
+export enum UserSortBy {
+  TIMESTAMP = 'createdAt',
+  USERNAME = 'username'
+}
+
+
 @Injectable()
 export class UserService implements IService<UserEntity> {
-  private readonly logger = new Logger(UserService.name);
-  private readonly uploadPath;
+  private readonly _logger = new Logger(UserService.name);
+  private readonly _uploadPath;
 
   constructor(
-    @InjectRepository(TokenEntity)
-    private readonly tokenRepository: Repository<TokenEntity>,
+    @InjectRepository(AuthTokenEntity)
+    private readonly _tokenRepository: Repository<AuthTokenEntity>,
     @InjectRepository(AuthMailEntity)
-    private readonly authMailRepository: Repository<AuthMailEntity>,
+    private readonly _authMailRepository: Repository<AuthMailEntity>,
     @InjectRepository(UserEntity)
-    private readonly userRepository: Repository<UserEntity>,
-    private readonly groupService: GroupService,
-    private readonly configService: ConfigService,
+    private readonly _userRepository: Repository<UserEntity>,
+    private readonly _userGroupService: UserGroupService,
+    private readonly _configService: ConfigService,
   ) {
-    this.uploadPath =
+    this._uploadPath =
       process.cwd() +
       '/' +
-      this.configService.get<string>('http.upload.path') +
+      this._configService.get<string>('http.upload.path') +
       '/';
   }
 
   async create(userDto: UserCreateDto): Promise<UserEntity> {
-    const errors = await validate(userDto, {
-      validationError: { target: false },
-      forbidUnknownValues: false,
-    });
-    if (errors.length > 0) {
-      this.logger.log(
-        `create user validation failed, dto: ${JSON.stringify(
-          userDto,
-        )}, errors: ${errors}`,
-      );
+    // const errors = await validate(userDto, {
+    //   validationError: { target: false },
+    //   forbidUnknownValues: false,
+    // });
+    // if (errors.length > 0) {
+    //   this._logger.log(
+    //     `create user validation failed, dto: ${JSON.stringify(
+    //       userDto,
+    //     )}, errors: ${errors}`,
+    //   );
+    //
+    //  
+    //  
+    //   throw new HttpException(
+    //     { message: 'Input data validation failed', errors },
+    //     HttpStatus.BAD_REQUEST,
+    //   );
+    // }
 
-      throw new HttpException(
-        { message: 'Input data validation failed', errors },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const groupEntity = await this.groupService.findByName(
-      userDto.group.toUpperCase(),
+    const groupEntity = await this._userGroupService.findByName(
+      userDto.userGroup.toUpperCase(),
     );
     if (!groupEntity) {
-      this.logger.log(
-        `groupService.findByName failed, group not found: ${userDto.group.toUpperCase()}`,
+      this._logger.log(
+        `groupService.findByName failed, group not found: ${userDto.userGroup.toUpperCase()}`,
       );
-      throw new HttpException(
-        {
-          message: `Create user ${
-            userDto.username
-          } failed, group ${userDto.group.toUpperCase()} not found`,
-        },
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException({
+        statusCode: '404',
+        message: `Create user ${
+          userDto.username
+        } failed, group ${userDto.userGroup.toUpperCase()} not found`,
+        error: 'Not Found'
+      }, HttpStatus.NOT_FOUND)
     }
 
     let hashPassword;
     try {
       hashPassword = await argon2.hash(userDto.password);
     } catch (err) {
-      this.logger.error(`argon2.hash failed, userDto: ${userDto}`, err);
-      throw new HttpException(
-        { message: 'Internal Server Error' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`argon2.hash failed, userDto: ${userDto}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
 
     // create new profile
@@ -97,25 +105,27 @@ export class UserService implements IService<UserEntity> {
     newUser.password = hashPassword;
     newUser.firstname = userDto.firstname;
     newUser.lastname = userDto.lastname;
-    newUser.group = groupEntity;
+    newUser.userGroup = groupEntity;
 
     try {
-      newUser = await this.userRepository.save(newUser);
+      newUser = await this._userRepository.save(newUser);
     } catch (error) {
-      this.logger.error(
-        `userRepository.save in user creation failed, username: ${newUser.username}, email: ${newUser.email}, group: ${newUser.group}`,
+      this._logger.error(
+        `userRepository.save in user creation failed, username: ${newUser.username}, email: ${newUser.email}, userGroup: ${newUser.userGroup}`,
         error,
       );
       if (error?.code === PostgresErrorCode.UniqueViolation) {
-        throw new HttpException(
-          { message: 'User already exists' },
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException({
+          statusCode: '400',
+          message: 'User already exists',
+          error: 'Bad Request'
+        }, HttpStatus.BAD_REQUEST)
       }
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
 
     return newUser;
@@ -124,29 +134,31 @@ export class UserService implements IService<UserEntity> {
   async deleteByName(name: string): Promise<void> {
     let deleteResult;
     try {
-      deleteResult = await this.userRepository.softDelete({ username: name });
+      deleteResult = await this._userRepository.softDelete({ username: name });
     } catch (err) {
-      this.logger.error(`userRepository.softDelete failed: ${name}`, err);
-      throw new HttpException(
-        { message: 'Internal Server Error' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`userRepository.softDelete failed: ${name}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
 
     if (!deleteResult.affected) {
-      throw new HttpException(
-        { message: `Username ${name} Not Found` },
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
   async delete(id: string): Promise<void> {
     let deleteResult;
     try {
-      deleteResult = await this.userRepository.softDelete({ id: id });
+      deleteResult = await this._userRepository.softDelete({ id: id });
     } catch (err) {
-      this.logger.error(`userRepository.softDelete failed: ${id}`, err);
+      this._logger.error(`userRepository.softDelete failed: ${id}`, err);
       throw new HttpException(
         { message: 'Something went wrong' },
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -154,10 +166,11 @@ export class UserService implements IService<UserEntity> {
     }
 
     if (!deleteResult.affected) {
-      throw new HttpException(
-        { message: `User Id ${id} Not Found` },
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
@@ -169,7 +182,7 @@ export class UserService implements IService<UserEntity> {
       throw new NotFoundException({ message: `Username ${name} not found` });
     }
 
-    const authMails = await this.authMailRepository.find({
+    const authMails = await this._authMailRepository.find({
       relations: ['user'],
       where: {
         user: { id: user.id },
@@ -179,9 +192,9 @@ export class UserService implements IService<UserEntity> {
     if (authMails && authMails.length > 0) {
       for (let i = 0; i < authMails.length; i++) {
         try {
-          await this.authMailRepository.remove(authMails[i]);
+          await this._authMailRepository.remove(authMails[i]);
         } catch (error) {
-          this.logger.error(
+          this._logger.error(
             `authMailRepository.remove failed: authMail id ${authMails[i].id}`,
             error,
           );
@@ -189,40 +202,34 @@ export class UserService implements IService<UserEntity> {
       }
     }
 
-    const token = await this.tokenRepository.findOne({
+    const authToken = await this._tokenRepository.findOne({
       relations: ['user'],
       where: {
         user: { id: user.id },
       },
     });
 
-    if (token) {
+    if (authToken) {
       try {
-        await this.tokenRepository.remove(token);
+        await this._tokenRepository.remove(authToken);
       } catch (error) {
-        this.logger.error(
-          `tokenRepository.remove failed: token id ${token.id}`,
+        this._logger.error(
+          `tokenRepository.remove failed: authToken id ${authToken.id}`,
           error,
         );
       }
     }
 
     try {
-      await this.userRepository.remove(user);
+      await this._userRepository.remove(user);
     } catch (err) {
-      this.logger.error(`userRepository.remove failed: ${name}`, err);
-      throw new HttpException(
-        { message: 'Internal Server Error' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`userRepository.remove failed: ${name}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
-
-    // if (!deleteResult.affected) {
-    //   throw new HttpException(
-    //     { message: `Username ${name} Not Found` },
-    //     HttpStatus.NOT_FOUND,
-    //   );
-    // }
   }
 
   async removeById(id: string): Promise<void> {
@@ -233,7 +240,7 @@ export class UserService implements IService<UserEntity> {
       throw new NotFoundException({ message: `User Id ${id} not found` });
     }
 
-    const authMails = await this.authMailRepository.find({
+    const authMails = await this._authMailRepository.find({
       relations: ['user'],
       where: {
         user: { id: user.id },
@@ -243,9 +250,9 @@ export class UserService implements IService<UserEntity> {
     if (authMails && authMails.length > 0) {
       for (let i = 0; i < authMails.length; i++) {
         try {
-          await this.authMailRepository.remove(authMails[i]);
+          await this._authMailRepository.remove(authMails[i]);
         } catch (error) {
-          this.logger.error(
+          this._logger.error(
             `authMailRepository.remove failed: authMail id ${authMails[i].id}`,
             error,
           );
@@ -253,66 +260,61 @@ export class UserService implements IService<UserEntity> {
       }
     }
 
-    const token = await this.tokenRepository.findOne({
+    const authToken = await this._tokenRepository.findOne({
       relations: ['user'],
       where: {
         user: { id: user.id },
       },
     });
 
-    if (token) {
+    if (authToken) {
       try {
-        await this.tokenRepository.remove(token);
+        await this._tokenRepository.remove(authToken);
       } catch (error) {
-        this.logger.error(
-          `tokenRepository.remove failed: token id ${token.id}`,
+        this._logger.error(
+          `tokenRepository.remove failed: authToken id ${authToken.id}`,
           error,
         );
       }
     }
 
     try {
-      await this.userRepository.remove(user);
+      await this._userRepository.remove(user);
     } catch (err) {
-      this.logger.error(`userRepository.remove failed: ${id}`, err);
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`userRepository.remove failed: ${id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
-
-    // if (!deleteResult.affected) {
-    //   throw new HttpException(
-    //     { message: `User Id ${id} Not Found` },
-    //     HttpStatus.NOT_FOUND,
-    //   );
-    // }
   }
 
   async findTotal(): Promise<number> {
     try {
-      return await this.userRepository.count();
+      return await this._userRepository.count();
     } catch (err) {
-      this.logger.error(`userRepository.count failed`, err);
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`userRepository.count failed`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
   async findAll(
-    offset,
+    offset: number,
     limit: number,
-    sortType,
-    sortBy: string,
-  ): Promise<{ data: Array<UserEntity>; total: number } | null> {
+    sortType: SortType,
+    sortBy: UserSortBy,
+  ): Promise<FindAllType<UserEntity>> {
     try {
-      const res = await this.userRepository.findAndCount({
+      const res = await this._userRepository.findAndCount({
         skip: offset,
         take: limit,
         order: {
-          [sortBy]: sortType.toUpperCase(),
+          [sortBy]: sortType,
         },
       });
       return {
@@ -320,99 +322,104 @@ export class UserService implements IService<UserEntity> {
         total: res[1],
       };
     } catch (err) {
-      this.logger.error(`userRepository.find failed`, err);
-      throw new HttpException(
-        { message: 'Internal Server Error' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`userRepository.find failed`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
   async findById(id: string): Promise<UserEntity | null> {
     try {
-      return await this.userRepository.findOne({ where: { id: id } });
+      return await this._userRepository.findOne({ where: { id: id } });
     } catch (err) {
-      this.logger.error(`userRepository.findOne failed. id: ${id}`, err);
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`userRepository.findOne failed. id: ${id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
-  async findByName(name: string): Promise<UserEntity> {
+  async findByName(name: string): Promise<UserEntity | null> {
     try {
-      return await this.userRepository.findOne({ where: { username: name } });
+      return await this._userRepository.findOne({ where: { username: name } });
     } catch (err) {
-      this.logger.error(`userRepository.findOne failed, name: ${name}`, err);
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`userRepository.findOne failed, name: ${name}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
-  async findByEmail(email: string): Promise<UserEntity> {
+  async findByEmail(email: string): Promise<UserEntity | null> {
     try {
-      return await this.userRepository.findOne({ where: { email: email } });
+      return await this._userRepository.findOne({ where: { email: email } });
     } catch (err) {
-      this.logger.error(`userRepository.findOne failed, email: ${email}`, err);
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`userRepository.findOne failed, email: ${email}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
   async findOne(options: object): Promise<UserEntity | null> {
     try {
-      return await this.userRepository.findOne(options);
+      return await this._userRepository.findOne(options);
     } catch (err) {
-      this.logger.error(
+      this._logger.error(
         `userRepository.findOne failed, options: ${JSON.stringify(options)}`,
         err,
       );
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
-  async update(userDto: UserUpdateDto): Promise<UserEntity> {
-    const errors = await validate(userDto, {
-      validationError: { target: false },
-      forbidUnknownValues: false,
-    });
-    if (errors.length > 0) {
-      this.logger.log(
-        `user update validation failed, dto: ${userDto}, errors: ${errors}`,
-      );
-      throw new HttpException(
-        { message: 'Input data validation failed', errors },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  async update(userDto: UserUpdateDto, entity: UserEntity): Promise<UserEntity> {
+    // const errors = await validate(userDto, {
+    //   validationError: { target: false },
+    //   forbidUnknownValues: false,
+    // });
+    // if (errors.length > 0) {
+    //   this._logger.log(
+    //     `user update validation failed, dto: ${userDto}, errors: ${errors}`,
+    //   );
+    //   throw new HttpException(
+    //     { message: 'Input data validation failed', errors },
+    //     HttpStatus.BAD_REQUEST,
+    //   );
+    // }
+    //
+    // const user = await this._userRepository.findOne({
+    //   where: { id: userDto.id },
+    // });
+    // if (!user) {
+    //   this._logger.log(
+    //     `_userRepository.findOne failed, group not found: ${userDto.username}`,
+    //   );
+    //   throw new HttpException(
+    //     { message: `Update group failed, ${userDto.username} not found` },
+    //     HttpStatus.NOT_FOUND,
+    //   );
+    // }
 
-    const user = await this.userRepository.findOne({
-      where: { id: userDto.id },
-    });
-    if (!user) {
-      this.logger.log(
-        `userRepository.findOne failed, group not found: ${userDto.username}`,
-      );
-      throw new HttpException(
-        { message: `Update group failed, ${userDto.username} not found` },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    // const groupEntity = await this.groupService.findByName(
+    // const groupEntity = await this._userGroupService.findByName(
     //   userDto.group.toUpperCase(),
     // );
     // if (!groupEntity) {
-    //   this.logger.log(
-    //     `groupService.findByName failed, group '${userDto.group.toUpperCase()}' not found`,
+    //   this._logger.log(
+    //     `_userGroupService.findByName failed, group '${userDto.group.toUpperCase()}' not found`,
     //   );
     //   throw new HttpException(
     //     {
@@ -425,33 +432,33 @@ export class UserService implements IService<UserEntity> {
     // }
 
     try {
-      user.firstname = userDto.firstname;
-      user.lastname = userDto.lastname;
-      // user.group = groupEntity;
-      // user.imageUrl = userDto.imageUrl;
-      user.walletAddress = userDto.walletAddress;
-      return await this.userRepository.save(user);
+      entity.firstname = userDto.firstname;
+      entity.lastname = userDto.lastname;
+      entity.walletAddress = userDto.walletAddress;
+      return await this._userRepository.save(entity);
     } catch (err) {
-      this.logger.error(
+      this._logger.error(
         `userRepository.save failed: ${JSON.stringify(userDto)}`,
         err,
       );
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
   async updateEntity(user: UserEntity): Promise<UserEntity> {
     try {
-      return await this.userRepository.save(user);
+      return await this._userRepository.save(user);
     } catch (err) {
-      this.logger.error(`userRepository.save failed: ${user.username}`, err);
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`userRepository.save failed: ${user.username}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
@@ -462,68 +469,69 @@ export class UserService implements IService<UserEntity> {
     const tmpArray = request.url.split('/');
     const absoluteUrl =
       'https://' +
-      this.configService.get<string>('http.domain') +
+      this._configService.get<string>('http.domain') +
       tmpArray.splice(0, tmpArray.length - 1).join('/') +
       '/get/' +
       filename;
 
     if (user.imageFilename) {
-      const oldImageFile = this.uploadPath + user.imageFilename;
+      const oldImageFile = this._uploadPath + user.imageFilename;
       if (fs.existsSync(oldImageFile)) {
         try {
           fs.rmSync(oldImageFile);
         } catch (error) {
-          this.logger.error(`could not remove file ${oldImageFile}`, error);
+          this._logger.error(`could not remove file ${oldImageFile}`, error);
         }
       }
     }
 
     try {
-      fs.writeFileSync(this.uploadPath + filename, file.buffer);
+      fs.writeFileSync(this._uploadPath + filename, file.buffer);
     } catch (error) {
-      this.logger.error(
-        `could not write file ${this.uploadPath + filename}`,
+      this._logger.error(
+        `could not write file ${this._uploadPath + filename}`,
         error,
       );
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
 
     try {
       user.imageUrl = absoluteUrl;
       user.imageMimeType = file.mimetype;
       user.imageFilename = filename;
-      await this.userRepository.save(user);
+      await this._userRepository.save(user);
     } catch (error) {
-      this.logger.error(
+      this._logger.error(
         `userRepository.save of uploadImage failed: username: ${JSON.stringify(
           user.username,
         )}`,
         error,
       );
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
 
     return new URL(absoluteUrl);
   }
 
   public getImage(image: string): string {
-    const imageFile = this.uploadPath + image;
+    const imageFile = this._uploadPath + image;
     if (fs.existsSync(imageFile)) {
       return imageFile;
     } else {
-      this.logger.error(`could not found file ${imageFile}`);
-      throw new HttpException(
-        { message: 'file not found' },
-        HttpStatus.NOT_FOUND,
-      );
+      this._logger.error(`could not found file ${imageFile}`);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
     }
-
-    // return new StreamableFile(fileStream);
   }
 }

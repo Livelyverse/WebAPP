@@ -15,14 +15,14 @@ import { JwtService } from '@nestjs/jwt';
 import * as fs from 'fs';
 import { Response } from 'express';
 import { UserService } from '../profile/services/user.service';
-import { GroupEntity, RoleEntity, UserEntity } from "../profile/domain/entity";
+import { UserGroupEntity, RoleEntity, UserEntity } from "../profile/domain/entity";
 import { ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { InjectEntityManager, InjectRepository } from "@nestjs/typeorm";
-import { AuthMailEntity, TokenEntity } from './domain/entity';
+import { AuthMailEntity, AuthTokenEntity } from './domain/entity';
 import { EntityManager, MoreThan, Repository } from "typeorm";
 import { RefreshDto } from './domain/dto/refresh.dto';
-import { GroupService } from '../profile/services/group.service';
+import { UserGroupService } from '../profile/services/userGroup.service';
 import * as argon2 from 'argon2';
 import {
   ChangePasswordDto,
@@ -60,7 +60,7 @@ export class AuthenticationService {
     @InjectEntityManager()
     private readonly _entityManager: EntityManager,
     private readonly _userService: UserService,
-    private readonly _groupService: GroupService,
+    private readonly _groupService: UserGroupService,
     private readonly _configService: ConfigService,
     private readonly _jwt: JwtService,
     private readonly _mailService: MailService,
@@ -120,7 +120,7 @@ export class AuthenticationService {
     const tokenPayload = await this.authTokenValidation(token, false);
     let tokenEntity;
     try {
-      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
+      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: tokenPayload.sub },
@@ -289,7 +289,7 @@ export class AuthenticationService {
     userDto.username = dto.username;
     userDto.password = dto.password;
     userDto.email = dto.email;
-    userDto.group = 'GHOST';
+    userDto.userGroup = 'GHOST';
     const user = await this._userService.create(userDto);
     const authMailEntity = await this.createOrGetAuthMailEntity(user, true);
 
@@ -565,10 +565,10 @@ export class AuthenticationService {
     return resetPasswordDto;
   }
 
-  public async revokeAuthToken(userId: string): Promise<TokenEntity> {
+  public async revokeAuthToken(userId: string): Promise<AuthTokenEntity> {
     let tokenEntity;
     try {
-      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
+      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: userId },
@@ -595,7 +595,7 @@ export class AuthenticationService {
 
     tokenEntity.isRevoked = true;
     try {
-      return this._entityManager.getRepository(TokenEntity).save(tokenEntity);
+      return this._entityManager.getRepository(AuthTokenEntity).save(tokenEntity);
     } catch (error) {
       this._logger.error(`user token not found, userId: ${userId}`, error);
       throw new InternalServerErrorException({
@@ -680,7 +680,7 @@ export class AuthenticationService {
 
     let tokenEntity;
     try {
-      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
+      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
         relations: ['user'],
         join: {
           alias: "token",
@@ -745,7 +745,7 @@ export class AuthenticationService {
     }
   }
 
-  public async resolveRefreshToken(encoded: string): Promise<TokenEntity> {
+  public async resolveRefreshToken(encoded: string): Promise<AuthTokenEntity> {
     const payload = await this.authTokenValidation(encoded, false);
     const tokenEntity = await this.getStoredTokenFromRefreshTokenPayload(
       payload,
@@ -810,7 +810,7 @@ export class AuthenticationService {
 
   public async generateAccessToken(
     user: UserEntity,
-    tokenEntity: TokenEntity,
+    tokenEntity: AuthTokenEntity,
   ): Promise<string> {
     const payload = {
       iss: 'https://livelyplanet.io',
@@ -839,7 +839,7 @@ export class AuthenticationService {
 
   public async generateRefreshToken(
     user: UserEntity,
-  ): Promise<{ refreshToken: string; tokenEntity: TokenEntity }> {
+  ): Promise<{ refreshToken: string; tokenEntity: AuthTokenEntity }> {
     const tokenEntity = await this.createTokenEntity(user);
 
     const payload = {
@@ -871,10 +871,10 @@ export class AuthenticationService {
     return { refreshToken, tokenEntity };
   }
 
-  public async createTokenEntity(user: UserEntity): Promise<TokenEntity> {
+  public async createTokenEntity(user: UserEntity): Promise<AuthTokenEntity> {
     let tokenEntity;
     try {
-      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
+      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: user.id },
@@ -891,7 +891,7 @@ export class AuthenticationService {
     }
 
     if (!tokenEntity) {
-      tokenEntity = new TokenEntity();
+      tokenEntity = new AuthTokenEntity();
       tokenEntity.user = user;
     }
 
@@ -907,7 +907,7 @@ export class AuthenticationService {
     });
 
     try {
-      return await this._entityManager.getRepository(TokenEntity).save(tokenEntity);
+      return await this._entityManager.getRepository(AuthTokenEntity).save(tokenEntity);
     } catch (error) {
       this._logger.error(
         `tokenRepository.save of createTokenEntity failed, token userId: ${tokenEntity.user.id}`,
@@ -928,7 +928,7 @@ export class AuthenticationService {
     });
 
     try {
-      tokenEntity = await this._entityManager.getRepository(TokenEntity).save(tokenEntity);
+      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).save(tokenEntity);
     } catch (error) {
       this._logger.error(
         `tokenRepository.save for createAccessTokenFromRefreshToken failed, token userId: ${tokenEntity.user.id}`,
@@ -1006,7 +1006,7 @@ export class AuthenticationService {
 
   private async getStoredTokenFromRefreshTokenPayload(
     payload: TokenPayload,
-  ): Promise<TokenEntity | null> {
+  ): Promise<AuthTokenEntity | null> {
     const refreshTokenId = payload.jti;
     const userId = payload.sub;
     if (!refreshTokenId || !userId) {
@@ -1016,7 +1016,7 @@ export class AuthenticationService {
 
     let tokenEntity;
     try {
-      tokenEntity = await this._entityManager.getRepository(TokenEntity).findOne({
+      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
         relations: ['user'],
         where: {
           user: { id: userId },

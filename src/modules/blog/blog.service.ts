@@ -1,9 +1,8 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
-import { MediumRssCreateDto } from './domain/dto/mediumRssCreate.dto';
-import { MediumRssViewDto } from './domain/dto/mediumRssView.dto';
 import { InjectRepository } from "@nestjs/typeorm";
 import { BlogEntity } from "./domain/entity/blog.entity";
 import { Repository } from "typeorm";
+import { FindAllType, SortType } from "../profile/services/IService";
 
 @Injectable()
 export class BlogService {
@@ -12,10 +11,9 @@ export class BlogService {
 
   constructor(@InjectRepository(BlogEntity) readonly blogRepository) {
     this._blogRepository = blogRepository;
-
   }
 
-  async findAll(offset, limit: number, sortType: "ASC" | "DESC"): Promise<{data: Array<BlogEntity>, total: number} | null> {
+  async findAll(offset, limit: number, sortType: SortType): Promise<FindAllType<BlogEntity>> {
     try {
       const res = await this._blogRepository.findAndCount({
         skip: offset,
@@ -30,20 +28,12 @@ export class BlogService {
         total: res[1],
       }
     } catch (err) {
-      this._logger.error(`blogRepository.findAndCount failed`, err);
-      throw new HttpException("Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR);
+      this._logger.error(`_blogRepository.findAndCount failed`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
-
-  // findOne(id: number) {
-  //   return `This action returns a #${id} blog`;
-  // }
-  //
-  // update(id: number, updateBlogDto: MediumRssViewDto) {
-  //   return `This action updates a #${id} blog`;
-  // }
-  //
-  // remove(id: number) {
-  //   return `This action removes a #${id} blog`;
-  // }
 }

@@ -1,15 +1,15 @@
 import { BadRequestException, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RoleController } from './controllers/role.controller';
-import { GroupController } from './controllers/group.controller';
+import { UserGroupController } from './controllers/userGroup.controller';
 import { UserController } from './controllers/user.controller';
 import { RoleService } from './services/role.service';
-import { GroupService } from './services/group.service';
+import { UserGroupService } from './services/userGroup.service';
 import { UserService } from './services/user.service';
-import { GroupEntity, RoleEntity, UserEntity } from './domain/entity';
+import { UserGroupEntity, RoleEntity, UserEntity } from './domain/entity';
 import { ContactController } from './controllers/contact.controller';
 import { MailModule } from '../mail/mail.module';
-import { AuthMailEntity, TokenEntity } from '../authentication/domain/entity';
+import { AuthMailEntity, AuthTokenEntity } from '../authentication/domain/entity';
 import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { memoryStorage } from 'multer';
@@ -22,10 +22,10 @@ import { SocialProfileService } from "./services/socialProfile.service";
   imports: [
     TypeOrmModule.forFeature([
       RoleEntity,
-      GroupEntity,
+      UserGroupEntity,
       UserEntity,
       AuthMailEntity,
-      TokenEntity,
+      AuthTokenEntity,
       SocialProfileEntity,
     ]),
     MailModule,
@@ -56,13 +56,13 @@ import { SocialProfileService } from "./services/socialProfile.service";
   ],
   controllers: [
     RoleController,
-    GroupController,
+    UserGroupController,
     UserController,
     ContactController,
     SocialProfileController,
     BackofficeController,
   ],
-  providers: [RoleService, GroupService, UserService, SocialProfileService],
-  exports: [RoleService, GroupService, UserService, SocialProfileService],
+  providers: [RoleService, UserGroupService, UserService, SocialProfileService],
+  exports: [RoleService, UserGroupService, UserService, SocialProfileService],
 })
 export class ProfileModule {}

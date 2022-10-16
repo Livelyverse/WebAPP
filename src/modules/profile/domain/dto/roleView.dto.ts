@@ -7,6 +7,7 @@ export class RoleViewDto {
       const roleDto = new RoleViewDto();
       roleDto.id = role.id;
       roleDto.name = role.name;
+      roleDto.description = role.description;
       roleDto.createdAt = role.createdAt;
       roleDto.updatedAt = role.updatedAt;
       roleDto.isActive = role.isActive;
@@ -23,7 +24,7 @@ export class RoleViewDto {
   public name: string;
 
   @ApiResponseProperty()
-  public description?: string;
+  public description: string;
 
   @ApiResponseProperty()
   public createdAt: Date;

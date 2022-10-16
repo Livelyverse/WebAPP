@@ -10,19 +10,19 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UserCreateDto {
-  public static from(dto: UserCreateDto): UserCreateDto | null {
-    if (dto) {
-      const createDto = new UserCreateDto();
-      createDto.username = dto?.username;
-      createDto.password = dto?.password;
-      createDto.email = dto?.email;
-      createDto.group = dto?.group;
-      createDto.firstname = dto?.firstname;
-      createDto.lastname = dto?.lastname;
-      return createDto;
-    }
-    return null;
-  }
+  // public static from(dto: UserCreateDto): UserCreateDto | null {
+  //   if (dto) {
+  //     const createDto = new UserCreateDto();
+  //     createDto.username = dto?.username;
+  //     createDto.password = dto?.password;
+  //     createDto.email = dto?.email;
+  //     createDto.userGroup = dto?.userGroup;
+  //     createDto.firstname = dto?.firstname;
+  //     createDto.lastname = dto?.lastname;
+  //     return createDto;
+  //   }
+  //   return null;
+  // }
 
   @IsNotEmpty({ message: 'Username must not empty' })
   @IsDefined({ message: 'Username must be defined' })
@@ -41,12 +41,12 @@ export class UserCreateDto {
   @ApiProperty()
   public password: string;
 
-  @Length(4, 128, { message: 'Group length at least 4 characters' })
-  @IsNotEmpty({ message: 'Group must not empty' })
-  @IsDefined({ message: 'Group must be defined' })
-  @IsString({ message: 'Group must be string' })
+  @Length(4, 128, { message: 'UserGroup length at least 4 characters' })
+  @IsNotEmpty({ message: 'UserGroup must not empty' })
+  @IsDefined({ message: 'UserGroup must be defined' })
+  @IsString({ message: 'UserGroup must be string' })
   @ApiProperty()
-  public group: string;
+  public userGroup: string;
 
   @IsOptional()
   @IsString({ message: 'firstname must be string' })

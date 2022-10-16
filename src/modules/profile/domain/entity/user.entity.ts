@@ -1,10 +1,6 @@
 import { Entity, Column, ManyToOne, OneToMany, OneToOne, JoinColumn } from "typeorm";
 import { BaseEntity } from './base.entity';
-import { GroupEntity } from './group.entity';
-import {
-  AuthMailEntity,
-  TokenEntity,
-} from '../../../authentication/domain/entity';
+import { UserGroupEntity } from './userGroup.entity';
 
 @Entity({ name: 'user' })
 export class UserEntity extends BaseEntity {
@@ -12,10 +8,10 @@ export class UserEntity extends BaseEntity {
   username: string;
 
   @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
-  firstname?: string;
+  firstname: string;
 
   @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
-  lastname?: string;
+  lastname: string;
 
   @Column({ type: 'varchar', length: 256, unique: true, nullable: false })
   email: string;
@@ -27,18 +23,18 @@ export class UserEntity extends BaseEntity {
   password: string;
 
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: true })
-  imageUrl?: string;
+  imageUrl: string;
 
   @Column({ type: 'varchar', length: 256, unique: false, nullable: true })
-  imageFilename?: string;
+  imageFilename: string;
 
   @Column({ type: 'varchar', length: 32, unique: false, nullable: true })
-  imageMimeType?: string;
+  imageMimeType: string;
 
   @Column({ type: 'varchar', length: 256, unique: true, nullable: true })
-  walletAddress?: string;
+  walletAddress: string;
 
-  @ManyToOne((type) => GroupEntity, {
+  @ManyToOne((type) => UserGroupEntity, {
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
     nullable: false,
@@ -46,9 +42,6 @@ export class UserEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
-  @JoinColumn({ name: 'groupId' })
-  group: GroupEntity;
-
-  // @OneToOne((type) => TokenEntity, (token) => token.user)
-  // token: TokenEntity;
+  @JoinColumn({ name: 'userGroupId' })
+  userGroup: UserGroupEntity;
 }

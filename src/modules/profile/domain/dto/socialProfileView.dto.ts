@@ -9,10 +9,10 @@ export class SocialProfileViewDto {
       socialProfile.socialType = entity.socialType;
       socialProfile.userId = entity.user.id;
       socialProfile.username = entity.username;
-      socialProfile.socialName = entity?.socialName;
-      socialProfile.profileUrl = entity?.profileUrl;
-      socialProfile.website = entity?.website;
-      socialProfile.location = entity?.location;
+      socialProfile.socialName = entity.socialName;
+      socialProfile.profileUrl = entity.profileUrl;
+      socialProfile.website = entity.website;
+      socialProfile.location = entity.location;
       socialProfile.createdAt = entity.createdAt;
       socialProfile.updatedAt = entity.updatedAt;
       return socialProfile;
@@ -33,13 +33,13 @@ export class SocialProfileViewDto {
   userId: string
 
   @ApiResponseProperty()
-  socialName?: string
+  socialName: string
 
   @ApiResponseProperty()
-  profileUrl?: string
+  profileUrl: string
 
   @ApiResponseProperty()
-  website?: string
+  website: string
 
   @ApiResponseProperty()
   location: string
