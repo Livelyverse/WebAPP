@@ -132,6 +132,11 @@ export class AuthenticationController {
 
   @Post('/mail/verify')
   @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({
+    transform: true,
+    skipMissingProperties: false,
+    validationError: { target: false }
+  }))
   @ApiResponse({ status: 200, description: 'Verification Success.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -151,17 +156,17 @@ export class AuthenticationController {
       }, HttpStatus.UNAUTHORIZED);
     }
 
-    const dto = AuthMailDto.from(authMailDto);
-    if (!dto || !dto.verifyCode) {
-      this.logger.warn(
-        `request mail verification invalid, ${JSON.stringify(authMailDto)}`,
-      );
-      throw new HttpException({
-        statusCode: '400',
-        message: 'Invalid Input Date',
-        error: 'Bad Request'
-      }, HttpStatus.BAD_REQUEST);
-    }
+    // const dto = AuthMailDto.from(authMailDto);
+    // if (!dto || !dto.verifyCode) {
+    //   this.logger.warn(
+    //     `request mail verification invalid, ${JSON.stringify(authMailDto)}`,
+    //   );
+    //   throw new HttpException({
+    //     statusCode: '400',
+    //     message: 'Invalid Input Date',
+    //     error: 'Bad Request'
+    //   }, HttpStatus.BAD_REQUEST);
+    // }
 
     const tokenPayload = await this._authenticationService.authTokenValidation(
       token,
@@ -169,7 +174,7 @@ export class AuthenticationController {
     );
     const authMail = await this._authenticationService.authMailCodeConfirmation(
       tokenPayload,
-      dto.verifyCode,
+      authMailDto.verifyCode,
     );
 
     const authTokenEntity = await this._authenticationService.createAuthTokenEntity(authMail.user);

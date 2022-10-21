@@ -86,14 +86,14 @@ export class UserController {
     return UserViewDto.from(user);
   }
 
-  @Get('/find/username/:username')
+  @Get('/find/email/:email')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
   @ApiParam({
-    name: 'username',
+    name: 'email',
     required: true,
-    description: 'find by username',
+    description: 'find by email',
     schema: { type: 'string' },
   })
   @ApiResponse({ status: 200, description: 'Record Found.' , type: UserViewDto})
@@ -102,10 +102,10 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async findByUsername(@Param('username') username): Promise<UserViewDto> {
+  async findByUsername(@Param('email') email): Promise<UserViewDto> {
     let user: UserEntity;
-    if (typeof username === 'string') {
-      user = await this._userService.findByName(username);
+    if (typeof email === 'string') {
+      user = await this._userService.findByEmail(email);
     } else {
       throw new HttpException({
         statusCode: '400',
@@ -244,14 +244,14 @@ export class UserController {
     return await this._userService.delete(uuid);
   }
 
-  @Post('/delete/username/:username')
+  @Post('/delete/email/:email')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
   @ApiParam({
-    name: 'username',
+    name: 'email',
     required: true,
-    description: 'soft delete by username',
+    description: 'soft delete by email',
     schema: { type: 'string' },
   })
   @ApiResponse({ status: 200, description: 'Record Deleted Successfully.'})
@@ -261,9 +261,9 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async deleteById(@Param('username') username) {
-   if (typeof username === 'string') {
-      return await this._userService.deleteByName(username);
+  async deleteById(@Param('email') email) {
+   if (typeof email === 'string') {
+      return await this._userService.deleteByEmail(email);
     } else {
      throw new HttpException({
        statusCode: '400',
@@ -294,14 +294,14 @@ export class UserController {
     return await this._userService.removeById(uuid);
   }
 
-  @Post('/remove/username/:username')
+  @Post('/remove/email/:email')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
   @ApiParam({
-    name: 'username',
+    name: 'email',
     required: true,
-    description: 'hard delete by username',
+    description: 'hard delete by email',
     schema: { type: 'string' },
   })
   @ApiResponse({ status: 200, description: 'Record Removed Successfully.'})
@@ -311,9 +311,9 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async removeByUsername(@Param('username') username) {
-    if (typeof username === 'string') {
-      return await this._userService.removeByName(username);
+  async removeByUsername(@Param('email') email) {
+    if (typeof email === 'string') {
+      return await this._userService.removeByEmail(email);
     } else {
       throw new HttpException({
         statusCode: '400',

@@ -80,7 +80,7 @@ export class UserService implements IService<UserEntity> {
       throw new HttpException({
         statusCode: '404',
         message: `Create user ${
-          userDto.username
+          userDto.email
         } failed, group ${userDto.userGroup.toUpperCase()} not found`,
         error: 'Not Found'
       }, HttpStatus.NOT_FOUND)
@@ -100,7 +100,7 @@ export class UserService implements IService<UserEntity> {
 
     // create new profile
     let newUser = new UserEntity();
-    newUser.username = userDto.username;
+    // newUser.username = userDto.username;
     newUser.email = userDto.email;
     newUser.password = hashPassword;
     newUser.firstname = userDto.firstname;
@@ -111,7 +111,7 @@ export class UserService implements IService<UserEntity> {
       newUser = await this._userRepository.save(newUser);
     } catch (error) {
       this._logger.error(
-        `userRepository.save in user creation failed, username: ${newUser.username}, email: ${newUser.email}, userGroup: ${newUser.userGroup}`,
+        `userRepository.save in user creation failed, email: ${newUser.email}, userGroup: ${newUser.userGroup}`,
         error,
       );
       if (error?.code === PostgresErrorCode.UniqueViolation) {
@@ -131,12 +131,12 @@ export class UserService implements IService<UserEntity> {
     return newUser;
   }
 
-  async deleteByName(name: string): Promise<void> {
+  async deleteByEmail(email: string): Promise<void> {
     let deleteResult;
     try {
-      deleteResult = await this._userRepository.softDelete({ username: name });
+      deleteResult = await this._userRepository.softDelete({ email: email });
     } catch (err) {
-      this._logger.error(`userRepository.softDelete failed: ${name}`, err);
+      this._logger.error(`userRepository.softDelete failed, mail: ${email}`, err);
       throw new HttpException({
         statusCode: '500',
         message: 'Something Went Wrong',
@@ -174,12 +174,16 @@ export class UserService implements IService<UserEntity> {
     }
   }
 
-  async removeByName(name: string): Promise<void> {
+  async removeByEmail(email: string): Promise<void> {
     // let deleteResult;
-    const user = await this.findByName(name);
+    const user = await this.findByEmail(email);
 
     if (!user) {
-      throw new NotFoundException({ message: `Username ${name} not found` });
+      throw new HttpException({
+        statusCode: '404',
+        message: `Email ${email} Not Found`,
+        error: 'Not Found'
+      }, HttpStatus.NOT_FOUND)
     }
 
     const authMails = await this._authMailRepository.find({
@@ -223,7 +227,7 @@ export class UserService implements IService<UserEntity> {
     try {
       await this._userRepository.remove(user);
     } catch (err) {
-      this._logger.error(`userRepository.remove failed: ${name}`, err);
+      this._logger.error(`userRepository.remove failed: ${email}`, err);
       throw new HttpException({
         statusCode: '500',
         message: 'Something Went Wrong',
@@ -344,18 +348,18 @@ export class UserService implements IService<UserEntity> {
     }
   }
 
-  async findByName(name: string): Promise<UserEntity | null> {
-    try {
-      return await this._userRepository.findOne({ where: { username: name } });
-    } catch (err) {
-      this._logger.error(`userRepository.findOne failed, name: ${name}`, err);
-      throw new HttpException({
-        statusCode: '500',
-        message: 'Something Went Wrong',
-        error: 'Internal Server Error'
-      }, HttpStatus.INTERNAL_SERVER_ERROR)
-    }
-  }
+  // async findByName(name: string): Promise<UserEntity | null> {
+  //   try {
+  //     return await this._userRepository.findOne({ where: { username: name } });
+  //   } catch (err) {
+  //     this._logger.error(`userRepository.findOne failed, name: ${name}`, err);
+  //     throw new HttpException({
+  //       statusCode: '500',
+  //       message: 'Something Went Wrong',
+  //       error: 'Internal Server Error'
+  //     }, HttpStatus.INTERNAL_SERVER_ERROR)
+  //   }
+  // }
 
   async findByEmail(email: string): Promise<UserEntity | null> {
     try {
@@ -453,7 +457,7 @@ export class UserService implements IService<UserEntity> {
     try {
       return await this._userRepository.save(user);
     } catch (err) {
-      this._logger.error(`userRepository.save failed: ${user.username}`, err);
+      this._logger.error(`userRepository.save failed, mail: ${user.email}`, err);
       throw new HttpException({
         statusCode: '500',
         message: 'Something Went Wrong',
@@ -506,8 +510,8 @@ export class UserService implements IService<UserEntity> {
       await this._userRepository.save(user);
     } catch (error) {
       this._logger.error(
-        `userRepository.save of uploadImage failed: username: ${JSON.stringify(
-          user.username,
+        `userRepository.save of uploadImage failed, email: ${JSON.stringify(
+          user.email,
         )}`,
         error,
       );

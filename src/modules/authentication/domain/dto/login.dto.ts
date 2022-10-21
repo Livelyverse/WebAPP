@@ -3,8 +3,8 @@ import {
   IsDefined,
   IsString,
   Length,
-  Matches,
-} from 'class-validator';
+  Matches, IsEmail
+} from "class-validator";
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
@@ -18,11 +18,11 @@ export class LoginDto {
   //   return null;
   // }
 
-  @IsNotEmpty({ message: 'Username must not empty' })
-  @IsDefined({ message: 'Username must be defined' })
-  @IsString({ message: 'Username must be string' })
+  @IsNotEmpty({ message: 'Email must not empty' })
+  @IsDefined({ message: 'Email must be defined' })
+  @IsEmail({ message: 'Email must be valid' })
   @ApiProperty()
-  public username: string;
+  public email: string;
 
   @Length(8, 128, { message: 'Password length at least 8 characters' })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)\S+$/, {

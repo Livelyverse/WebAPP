@@ -71,7 +71,7 @@ export class GetResetPasswordDto {
     if (resetPasswordDto) {
       const dto = new GetResetPasswordDto();
       dto.id = resetPasswordDto.id;
-      dto.username = resetPasswordDto.username;
+      dto.email = resetPasswordDto.email;
       dto.resetPasswordId = resetPasswordDto.resetPasswordId;
       return dto;
     }
@@ -82,7 +82,7 @@ export class GetResetPasswordDto {
   public id: string;
 
   @ApiProperty()
-  public username: string;
+  public email: string;
 
   @ApiProperty()
   public resetPasswordId: string;

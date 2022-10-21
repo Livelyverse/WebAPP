@@ -147,7 +147,7 @@ export class AuthenticationService {
     try {
       isPassVerify = await argon2.verify(user.password, dto.oldPassword);
     } catch (err) {
-      this._logger.error(`argon2.hash failed, username: ${user.username}`, err);
+      this._logger.error(`argon2.hash failed, email: ${user.email}`, err);
       throw new HttpException({
         statusCode: '500',
         message: 'Something Went Wrong',
@@ -156,7 +156,7 @@ export class AuthenticationService {
     }
 
     if (!isPassVerify) {
-      this._logger.log(`user password verification failed, username: ${user.username}`);
+      this._logger.log(`user password verification failed, email: ${user.email}`);
       throw new HttpException({
         statusCode: '403',
         message: 'Password Invalid',
@@ -168,7 +168,7 @@ export class AuthenticationService {
     try {
       hashPassword = await argon2.hash(dto.newPassword);
     } catch (err) {
-      this._logger.error(`argon2.hash failed, username: ${user.username}`, err);
+      this._logger.error(`argon2.hash failed, email: ${user.email}`, err);
       throw new HttpException({
         statusCode: '500',
         message: 'Something Went Wrong',
@@ -178,7 +178,7 @@ export class AuthenticationService {
 
     user.password = hashPassword;
     await this._userService.updateEntity(user);
-    await this._cacheManager.set(`USER.USERNAME:${user.username}`, user, 0);
+    await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, 0);
 
     // tokenEntity.isRevoked = true;
     // try {
@@ -220,17 +220,17 @@ export class AuthenticationService {
     //   return;
     // }
 
-    let user = await this._cacheManager.get<UserEntity>(`USER.USERNAME:${dto.username}`);
+    let user = await this._cacheManager.get<UserEntity>(`USER.EMAIL:${dto.email}`);
     if(!user) {
-      user = await this._userService.findByName(dto.username);
+      user = await this._userService.findByEmail(dto.email);
 
       if (!user) {
-        this._logger.log(`user not found, username: ${dto.username}`);
+        this._logger.log(`user not found, email: ${dto.email}`);
         res
           .status(HttpStatus.NOT_FOUND)
           .send({
             statusCode: '404',
-            message: 'Username Or Password Invalid',
+            message: 'Email Or Password Invalid',
             error: 'Not Found'
           });
         return;
@@ -239,13 +239,13 @@ export class AuthenticationService {
 
     if (!user.isActive) {
       this._logger.log(
-        `userAuthentication failed, user inactivated, username: ${dto.username}`,
+        `userAuthentication failed, user inactivated, email: ${dto.email}`,
       );
       res
         .status(HttpStatus.NOT_FOUND)
         .send({
           statusCode: '404',
-          message: 'Username Or Password Invalid' ,
+          message: 'Email Or Password Invalid' ,
           error: 'Not Found'
         });
       return;
@@ -255,7 +255,7 @@ export class AuthenticationService {
     try {
       isPassVerify = await argon2.verify(user.password, dto.password);
     } catch (err) {
-      this._logger.error(`argon2.hash failed, username: ${dto.username}`, err);
+      this._logger.error(`argon2.hash failed, email: ${dto.email}`, err);
       res
         .status(HttpStatus.INTERNAL_SERVER_ERROR)
         .send({
@@ -267,17 +267,18 @@ export class AuthenticationService {
     }
 
     if (!isPassVerify) {
-      this._logger.log(`user password verification failed, username: ${dto.username}`);
+      this._logger.log(`user password verification failed, email: ${dto.email}`);
       res
         .status(HttpStatus.NOT_FOUND)
         .send({
           statusCode: '404',
-          message: 'Username Or Password Invalid' ,
+          message: 'Email Or Password Invalid' ,
           error: 'Not Found'
         });
       return;
     }
 
+    // await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, 0);
     if (user.isEmailConfirmed) {
       let authTokenEntity = await this.getAuthTokenEntity(user);
       if(!authTokenEntity) {
@@ -304,20 +305,18 @@ export class AuthenticationService {
 
   public async userSignUp(dto: SignupDto): Promise<string> {
     const userDto = new UserCreateDto();
-    userDto.username = dto.username;
+    // userDto.username = dto.username;
     userDto.password = dto.password;
     userDto.email = dto.email;
     userDto.userGroup = 'GHOST';
     const user = await this._userService.create(userDto);
-    await this._cacheManager.set(`USER.USERNAME:${dto.username}`, user, 0);
     const authMailEntity = await this.createAuthMailEntity(user, AuthMailType.USER_VERIFICATION, true);
-
     this._mailService.sendCodeConfirmation(
-      userDto.username,
+      // userDto.username,
       userDto.email,
       Number(authMailEntity.verificationId),
     );
-
+    await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, this._mailTokenTTL / 1000);
     return await this.generateAuthMailToken(authMailEntity);
   }
 
@@ -416,6 +415,7 @@ export class AuthenticationService {
       }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    await this._cacheManager.set(`USER.EMAIL:${authMailEntity.user.email}`, authMailEntity.user, 0);
     await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailEntity.user.id}`);
     await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailToken.jti}`);
     return authMailEntity;
@@ -467,7 +467,7 @@ export class AuthenticationService {
       }
     }
 
-    if (!dto || !dto.username) {
+    if (!dto || !dto.email) {
       throw new HttpException({
         statusCode: '400',
         message: 'Input Data Invalid',
@@ -476,7 +476,7 @@ export class AuthenticationService {
     }
 
     const user = authMailEntity.user;
-    if (dto.username !== user.username) {
+    if (dto.email !== user.email) {
       throw new HttpException({
         statusCode: '403',
         message: 'Forbidden',
@@ -499,7 +499,6 @@ export class AuthenticationService {
       authMailEntity = await this.createAuthMailEntity(user,  AuthMailType.USER_VERIFICATION, true);
     }
     this._mailService.sendCodeConfirmation(
-      user.username,
       user.email,
       Number(authMailEntity.verificationId),
     );
@@ -532,7 +531,6 @@ export class AuthenticationService {
       }
     }
 
-    await this._cacheManager.set(`USER.EMAIL:${email}`, userEntity, this._refreshTokenTTL / 1000);
     if (!userEntity.isEmailConfirmed) {
       this._logger.warn(
         `user try reset password mean while didn't confirmed, 
@@ -569,7 +567,7 @@ export class AuthenticationService {
 
     if (authMailEntity) {
       this._logger.warn(`already sent forget password email, 
-      username: ${authMailEntity.user.username}, email: ${email}, date: ${authMailEntity.mailSentAt} `);
+      email: ${email}, date: ${authMailEntity.mailSentAt} `);
       return;
     }
 
@@ -578,10 +576,10 @@ export class AuthenticationService {
       + `${userEntity.id}/${authMailEntity.verificationId}`;
       // this._configService.get<string>('http.domain') +
     this._mailService.sendForgetPassword(
-      userEntity.username,
       userEntity.email,
       absoluteUrl,
     );
+    await this._cacheManager.set(`USER.EMAIL:${email}`, userEntity, this._mailTokenTTL / 1000);
   }
 
   public async postUserResetPasswordHandler(
@@ -630,7 +628,7 @@ export class AuthenticationService {
       hashPassword = await argon2.hash(resetPasswordDto.newPassword);
     } catch (err) {
       this._logger.error(
-        `argon2.hash failed, username: ${authMail.user.username}`,
+        `argon2.hash failed, email: ${authMail.user.email}`,
         err,
       );
       throw new HttpException({
@@ -642,6 +640,7 @@ export class AuthenticationService {
 
     authMail.user.password = hashPassword;
     await this._userService.updateEntity(authMail.user);
+    await this._cacheManager.set(`USER.EMAIL:${authMail.user.email}`, authMail.user, 0);
     await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
   }
 
@@ -688,7 +687,7 @@ export class AuthenticationService {
 
     const resetPasswordDto = new GetResetPasswordDto();
     resetPasswordDto.id = authMailEntity.user.id;
-    resetPasswordDto.username = authMailEntity.user.username;
+    resetPasswordDto.email = authMailEntity.user.email;
     resetPasswordDto.resetPasswordId = authMailEntity.verificationId;
     return resetPasswordDto;
   }

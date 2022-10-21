@@ -24,12 +24,14 @@ export class UserCreateDto {
   //   return null;
   // }
 
-  @IsNotEmpty({ message: 'Username must not empty' })
-  @IsDefined({ message: 'Username must be defined' })
-  @IsString({ message: 'Username must be string' })
-  @ApiProperty()
-  public username: string;
+  // @IsNotEmpty({ message: 'Username must not empty' })
+  // @IsDefined({ message: 'Username must be defined' })
+  // @IsString({ message: 'Username must be string' })
+  // @ApiProperty()
+  // public username: string;
 
+  @IsNotEmpty({ message: 'Email must not empty' })
+  @IsDefined({ message: 'Email must be defined' })
   @IsEmail({ message: 'Email must be valid' })
   @ApiProperty()
   public email: string;

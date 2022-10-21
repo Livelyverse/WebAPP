@@ -18,21 +18,21 @@ export class UserUpdateDto {
   //   return null;
   // }
 
-  @IsOptional()
-  @IsNotEmpty({ message: 'Username must not empty' })
-  @IsString({ message: 'Username must be string' })
-  @ApiPropertyOptional()
-  public username?: string;
+  // @IsOptional()
+  // @IsNotEmpty({ message: 'Username must not empty' })
+  // @IsString({ message: 'Username must be string' })
+  // @ApiPropertyOptional()
+  // public username?: string;
 
   @IsOptional()
   @ApiPropertyOptional()
-  public walletAddress?: string;
+  public walletAddress: string;
 
   @IsOptional()
   @ApiPropertyOptional()
-  public firstname?: string;
+  public firstname: string;
 
   @IsOptional()
   @ApiPropertyOptional()
-  public lastname?: string;
+  public lastname: string;
 }

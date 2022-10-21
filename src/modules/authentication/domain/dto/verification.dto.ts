@@ -1,15 +1,15 @@
-import { IsDefined, IsNotEmpty, IsString } from 'class-validator';
+import { IsDefined, IsEmail, IsNotEmpty, IsString } from "class-validator";
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AuthMailDto {
-  public static from(dto: AuthMailDto): AuthMailDto | null {
-    if (dto) {
-      const authMailDto = new AuthMailDto();
-      authMailDto.verifyCode = dto?.verifyCode;
-      return authMailDto;
-    }
-    return null;
-  }
+  // public static from(dto: AuthMailDto): AuthMailDto | null {
+  //   if (dto) {
+  //     const authMailDto = new AuthMailDto();
+  //     authMailDto.verifyCode = dto?.verifyCode;
+  //     return authMailDto;
+  //   }
+  //   return null;
+  // }
 
   @IsNotEmpty({ message: 'Verify Code is required' })
   @IsDefined({ message: 'Verify Code must be defined' })
@@ -28,9 +28,9 @@ export class ResendAuthMailDto {
   //   return null;
   // }
 
-  @IsNotEmpty({ message: 'Username must not empty' })
-  @IsDefined({ message: 'Username must be defined' })
-  @IsString({ message: 'Username must be string' })
+  @IsNotEmpty({ message: 'Email must not empty' })
+  @IsDefined({ message: 'Email must be defined' })
+  @IsEmail({ message: 'Email must be valid' })
   @ApiProperty()
-  public username: string;
+  public email: string;
 }

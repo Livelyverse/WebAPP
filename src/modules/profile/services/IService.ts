@@ -19,7 +19,7 @@ export interface IService<T extends BaseEntity> {
 
   findById(id: string): Promise<T | null>;
 
-  findByName(name: string): Promise<T | null>;
+  // findByName(name: string): Promise<T | null>;
 
   findOne(options: object): Promise<T | null>;
 
@@ -29,5 +29,5 @@ export interface IService<T extends BaseEntity> {
 
   delete(id: string): Promise<void>;
 
-  deleteByName(name: string): Promise<void>;
+  // deleteByName(name: string): Promise<void>;
 }

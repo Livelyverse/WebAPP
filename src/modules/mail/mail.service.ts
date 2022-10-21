@@ -10,51 +10,51 @@ export class MailService {
     private readonly configService: ConfigService,
   ) {}
 
-  sendCodeConfirmation(username: string, sendTo: string, verifyCode: number) {
+  sendCodeConfirmation(sendTo: string, verifyCode: number) {
     this.mailerService
       .sendMail({
         to: sendTo,
         // from: '"Support Team" <support@example.com>', // override default from
-        subject: 'Welcome to LivelyPlanet Site! Confirm your Email',
+        subject: 'Welcome to LivelyVerse Site! Confirm your Email',
         template: 'codeConfirmation', // `.hbs` extension is appended automatically
         context: {
           // ✏️ filling curly brackets with content
-          name: username,
+          name: sendTo,
           code: verifyCode,
         },
       })
       .then((sendMessageInfo) =>
         this.logger.log(
-          `sendCodeConfirmation mailerService.sendMail done, username: ${username}, sendTo: ${sendTo}, result: ${JSON.stringify(
+          `sendCodeConfirmation mailerService.sendMail done, sendTo: ${sendTo}, result: ${JSON.stringify(
             sendMessageInfo,
           )}`,
         ),
       )
       .catch((error) =>
         this.logger.error(
-          `sendCodeConfirmation mailerService.sendMail failed, username: ${username} sendTo: ${sendTo}`,
+          `sendCodeConfirmation mailerService.sendMail failed, sendTo: ${sendTo}`,
           error,
         ),
       );
   }
 
-  sendForgetPassword(username: string, sendTo: string, resetPassUrl: string) {
+  sendForgetPassword(sendTo: string, resetPassUrl: string) {
     this.mailerService
       .sendMail({
         to: sendTo,
         // from: '"Support Team" <support@example.com>', // override default from
-        subject: 'LivelyPlanet Reset Password!',
+        subject: 'LivelyVerse Reset Password!',
         template: 'forgetPassword', // `.hbs` extension is appended automatically
         context: {
           // ✏️ filling curly brackets with content
-          name: username,
+          name: sendTo,
           url: resetPassUrl,
         },
       })
       .then((sendMessageInfo) =>
         this.logger.log(
           `sendForgetPassword mailerService.sendMail done, 
-           username: ${username}, sendTo: ${sendTo}, url: ${resetPassUrl} result: ${JSON.stringify(
+           sendTo: ${sendTo}, url: ${resetPassUrl} result: ${JSON.stringify(
             sendMessageInfo,
           )}`,
         ),
@@ -62,7 +62,7 @@ export class MailService {
       .catch((error) =>
         this.logger.error(
           `sendForgetPassword mailerService.sendMail failed, 
-          username: ${username} sendTo: ${sendTo}, url: ${resetPassUrl}`,
+          sendTo: ${sendTo}, url: ${resetPassUrl}`,
           error,
         ),
       );

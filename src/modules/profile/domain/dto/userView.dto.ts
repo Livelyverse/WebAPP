@@ -6,7 +6,7 @@ export class UserViewDto {
     if (user) {
       const userDto = new UserViewDto();
       userDto.id = user.id;
-      userDto.username = user.username;
+      // userDto.username = user.username;
       userDto.email = user.email;
       userDto.userGroup = user.userGroup.name;
       userDto.role = user.userGroup.role.name;
@@ -24,8 +24,8 @@ export class UserViewDto {
   @ApiResponseProperty()
   public id: string;
 
-  @ApiResponseProperty()
-  public username: string;
+  // @ApiResponseProperty()
+  // public username: string;
 
   @ApiResponseProperty()
   public userGroup: string;

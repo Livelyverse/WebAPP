@@ -4,8 +4,11 @@ import { UserGroupEntity } from './userGroup.entity';
 
 @Entity({ name: 'user' })
 export class UserEntity extends BaseEntity {
-  @Column({ type: 'varchar', length: 128, unique: true, nullable: false })
-  username: string;
+  // @Column({ type: 'varchar', length: 128, unique: true, nullable: false })
+  // username: string;
+
+  @Column({ type: 'varchar', length: 256, unique: true, nullable: false })
+  email: string;
 
   @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
   firstname: string;
@@ -13,11 +16,8 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
   lastname: string;
 
-  @Column({ type: 'varchar', length: 256, unique: true, nullable: false })
-  email: string;
-
   @Column({ type: 'boolean', default: false })
-  public isEmailConfirmed: boolean;
+  isEmailConfirmed: boolean;
 
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: false })
   password: string;
