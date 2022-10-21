@@ -3,11 +3,11 @@ import { BaseEntity, UserEntity } from '../../../profile/domain/entity';
 
 @Entity({ name: 'auth_token' })
 export class AuthTokenEntity extends BaseEntity {
-  @Column({ type: 'varchar', length: 512, unique: false, nullable: false })
-  refreshTokenId: string;
+  // @Column({ type: 'varchar', length: 512, unique: false, nullable: false })
+  // refreshTokenId: string;
 
-  @Column({ type: 'varchar', length: 512, unique: false, nullable: false })
-  accessTokenId: string;
+  // @Column({ type: 'varchar', length: 512, unique: false, nullable: false })
+  // accessTokenId: string;
 
   @Column({ type: 'boolean', unique: false, nullable: false, default: false })
   isRevoked: boolean;

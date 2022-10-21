@@ -51,9 +51,12 @@ export class SocialProfileController {
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  create(@Body() socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileViewDto> {
+  socialProfileCreate(@Body() socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileViewDto> {
     return RxJS.from(this._socialProfileService.create(socialProfileDto)).pipe(
       RxJS.map(entity => SocialProfileViewDto.from(entity)),
+      RxJS.tap({
+        error: err => this._logger.error(`socialProfileCreate failed, dto: ${JSON.stringify(socialProfileDto)}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -95,10 +98,12 @@ export class SocialProfileController {
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  update(@Req() req, @Body() socialProfileDto: SocialProfileUpdateDto): RxJS.Observable<SocialProfileViewDto> {
-
+  socialProfileUpdate(@Req() req, @Body() socialProfileDto: SocialProfileUpdateDto): RxJS.Observable<SocialProfileViewDto> {
     return RxJS.from(this._socialProfileService.update(socialProfileDto, req.user)).pipe(
       RxJS.map(entity => SocialProfileViewDto.from(entity)),
+      RxJS.tap({
+        error: err => this._logger.error(`socialProfileUpdate failed, dto: ${JSON.stringify(socialProfileDto)}, user id: ${req.user.id}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -141,8 +146,8 @@ export class SocialProfileController {
   @ApiQuery({
     name: 'sortType',
     required: false,
-    description: 'data sort type can be one of ASC or DESC',
-    schema: { type: 'string' },
+    description: `data sort type can be one of ${Object.keys(SortType)}`,
+    schema: { enum: Object.keys(SortType) },
   })
   @ApiQuery({
     name: 'sortBy',
@@ -163,7 +168,7 @@ export class SocialProfileController {
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findAll(
+  socialProfileFindAll(
     @Query('page', new PaginationPipe()) page: number,
     @Query('offset', new PaginationPipe()) offset: number,
     @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
@@ -198,6 +203,9 @@ export class SocialProfileController {
           )
         )
       ),
+      RxJS.tap({
+        error: err => this._logger.error(`socialProfileFindAll failed, filterBy: ${filterBy}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -231,7 +239,7 @@ export class SocialProfileController {
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findSocialProfileByUserId(@Req() req): RxJS.Observable<SocialProfileViewDto[]> {
+  socialProfileFindByUserId(@Req() req): RxJS.Observable<SocialProfileViewDto[]> {
     return RxJS.from(this._socialProfileService.find({
         user: { id: req.user.id }
       })).pipe(
@@ -241,6 +249,9 @@ export class SocialProfileController {
           RxJS.reduce( (acc,dto) => [...acc, dto], [])
         )
       ),
+      RxJS.tap({
+        error: err => this._logger.error(`socialProfileFindByUserId failed, user: ${req.user.id}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -280,7 +291,7 @@ export class SocialProfileController {
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findById(@Req() req, @Param('uuid', new ParseUUIDPipe()) uuid): RxJS.Observable<SocialProfileViewDto> {
+  socialProfileFindById(@Req() req, @Param('uuid', new ParseUUIDPipe()) uuid): RxJS.Observable<SocialProfileViewDto> {
     return RxJS.from(this._socialProfileService.findById(uuid)).pipe(
       RxJS.mergeMap(socialFind =>
         RxJS.merge(
@@ -302,6 +313,9 @@ export class SocialProfileController {
           )
         )
       ),
+      RxJS.tap({
+        error: err => this._logger.error(`socialProfileFindById failed, id: ${uuid}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -325,7 +339,7 @@ export class SocialProfileController {
     )
   }
 
-  @Get('/total')
+  @Get('/find/total')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
@@ -333,11 +347,34 @@ export class SocialProfileController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  findTotalCount(): RxJS.Observable<object> {
+  socialProfileFindTotalCount(): RxJS.Observable<object> {
     return this._socialProfileService.findTotal().pipe(
-      RxJS.map(total => ({total}))
+      RxJS.map(total => ({total})),
+      RxJS.tap({
+        error: err => this._logger.error(`socialProfileFindTotalCount failed`, err)
+      }),
+      RxJS.catchError(error =>
+        RxJS.merge(
+          RxJS.of(error).pipe(
+            RxJS.filter(err => err instanceof HttpException),
+            RxJS.mergeMap(err => RxJS.throwError(err)),
+          ),
+          RxJS.of(error).pipe(
+            RxJS.filter(err => !(err instanceof HttpException)),
+            RxJS.mergeMap(err =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '500',
+                  message: 'Something Went Wrong',
+                  error: 'Internal Server Error'
+                }, HttpStatus.INTERNAL_SERVER_ERROR)
+              )
+            )
+          )
+        )
+      )
     )
   }
 }

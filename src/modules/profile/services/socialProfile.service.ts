@@ -11,7 +11,7 @@ import { FindAllType, SortType } from "./IService";
 export enum SocialProfileSortBy {
   TIMESTAMP = 'createdAt',
   USERNAME = 'username',
-  SOCIALNAME = 'socialName'
+  SOCIAL_NAME = 'socialName'
 }
 
 
@@ -160,15 +160,15 @@ export class SocialProfileService {
 
   findOne(option: FindOptionsWhere<SocialProfileEntity>): RxJS.Observable<SocialProfileEntity> {
     return RxJS.from(this._entityManager.getRepository(SocialProfileEntity).findOneBy(option)).pipe(
-      RxJS.tap({
-        error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
-      }),
-      RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
-        {
-          statusCode: '500',
-          message: 'Something Went Wrong',
-          error: 'Internal Server Error'
-        }, HttpStatus.INTERNAL_SERVER_ERROR))
+        RxJS.tap({
+          error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
+        }),
+        RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
+          {
+            statusCode: '500',
+            message: 'Something Went Wrong',
+            error: 'Internal Server Error'
+          }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
       RxJS.mergeMap(result =>
         RxJS.merge(
@@ -381,7 +381,6 @@ export class SocialProfileService {
           )
         )
       ),
-      
     )
   }
 

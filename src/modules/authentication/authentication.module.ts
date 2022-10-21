@@ -1,8 +1,8 @@
 import { AuthenticationController } from './authentication.controller';
 import { AuthenticationService } from './authentication.service';
-import { DynamicModule, Module } from '@nestjs/common';
+import { CacheModule, DynamicModule, Module } from "@nestjs/common";
 import { ProfileModule } from '../profile/profile.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthMailEntity, AuthTokenEntity } from './domain/entity';
 import { JwtModule } from '@nestjs/jwt';
@@ -30,6 +30,7 @@ export class AuthenticationModule {
         MailModule,
         ProfileModule,
         ConfigModule,
+        CacheModule,
       ],
       controllers: [AuthenticationController],
       providers: [AuthenticationService, strategyProvider],

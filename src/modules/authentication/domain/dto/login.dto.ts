@@ -8,15 +8,15 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
-  public static from(dto: LoginDto): LoginDto | null {
-    if (dto) {
-      const loginDto = new LoginDto();
-      loginDto.username = dto?.username;
-      loginDto.password = dto?.password;
-      return loginDto;
-    }
-    return null;
-  }
+  // public static from(dto: LoginDto): LoginDto | null {
+  //   if (dto) {
+  //     const loginDto = new LoginDto();
+  //     loginDto.username = dto?.username;
+  //     loginDto.password = dto?.password;
+  //     return loginDto;
+  //   }
+  //   return null;
+  // }
 
   @IsNotEmpty({ message: 'Username must not empty' })
   @IsDefined({ message: 'Username must be defined' })

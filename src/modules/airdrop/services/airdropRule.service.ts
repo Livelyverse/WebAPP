@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
-import { FindAllType, IAirdropService, SortBy, SortType } from "./IAirdrop.service";
+import { FindAllType, IAirdropService, SortType } from "./IAirdrop.service";
 import * as RxJS from "rxjs";
 import { InjectEntityManager } from "@nestjs/typeorm";
 import { EntityManager } from "typeorm";
@@ -7,6 +7,12 @@ import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
 import { AirdropRuleCreateDto } from "../domain/dto/airdropRuleCreate.dto";
 import { SocialAirdropRuleEntity } from "../domain/entity/socialAirdropRule.entity";
 import { AirdropRuleUpdateDto } from "../domain/dto/airdropRuleUpdate.dto";
+
+export enum AirdropRuleSortBy {
+  TIMESTAMP = 'createdAt',
+  SOCIAL_TYPE = 'socialType',
+  ACTION_TYPE = 'actionType'
+}
 
 @Injectable()
 export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEntity>{
@@ -18,7 +24,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
     offset: number,
     limit: number,
     sortType: SortType,
-    sortBy: SortBy,
+    sortBy: AirdropRuleSortBy,
   ): RxJS.Observable<FindAllType<SocialAirdropRuleEntity>> {
     return RxJS.from(this._entityManager.getRepository(SocialAirdropRuleEntity)
       .findAndCount({
@@ -37,7 +43,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )
@@ -56,7 +62,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )
@@ -75,7 +81,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
       RxJS.catchError(error => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
@@ -106,7 +112,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
       RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
@@ -137,7 +143,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
       RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
@@ -210,7 +216,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
                   RxJS.catchError(_ => RxJS.throwError(() =>
                     new HttpException({
                       statusCode: '500',
-                      message: 'Internal Server Error',
+                      message: 'Something Went Wrong',
                       error: 'Internal Server Error'
                     }, HttpStatus.INTERNAL_SERVER_ERROR))
                   )
@@ -231,7 +237,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
                 RxJS.throwError(() => new HttpException(
                   {
                     statusCode: '500',
-                    message: 'Internal Server Error',
+                    message: 'Something Went Wrong',
                     error: 'Internal Server Error'
                   }, HttpStatus.INTERNAL_SERVER_ERROR)
                 )
@@ -293,7 +299,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
                   RxJS.throwError(() => new HttpException(
                     {
                       statusCode: '500',
-                      message: 'Internal Server Error',
+                      message: 'Something Went Wrong',
                       error: 'Internal Server Error'
                     }, HttpStatus.INTERNAL_SERVER_ERROR)
                   )

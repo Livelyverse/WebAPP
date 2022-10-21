@@ -1,42 +1,27 @@
-import * as crypto from 'crypto';
-import {
-  BadRequestException,
-  ForbiddenException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { Algorithm } from 'jsonwebtoken';
-import { JwtService } from '@nestjs/jwt';
-import * as fs from 'fs';
-import { Response } from 'express';
-import { UserService } from '../profile/services/user.service';
-import { UserGroupEntity, RoleEntity, UserEntity } from "../profile/domain/entity";
-import { ConfigService } from '@nestjs/config';
-import { join } from 'path';
-import { InjectEntityManager, InjectRepository } from "@nestjs/typeorm";
-import { AuthMailEntity, AuthTokenEntity } from './domain/entity';
-import { EntityManager, MoreThan, Repository } from "typeorm";
-import { RefreshDto } from './domain/dto/refresh.dto';
-import { UserGroupService } from '../profile/services/userGroup.service';
-import * as argon2 from 'argon2';
-import {
-  ChangePasswordDto,
-  GetResetPasswordDto,
-  PostResetPasswordDto,
-} from './domain/dto/password.dto';
-import { validate } from 'class-validator';
-import { LoginDto } from './domain/dto/login.dto';
+import * as crypto from "crypto";
+import { CACHE_MANAGER, HttpException, HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
+import { Algorithm } from "jsonwebtoken";
+import { JwtService } from "@nestjs/jwt";
+import * as fs from "fs";
+import { Request, Response } from "express";
+import { UserService } from "../profile/services/user.service";
+import { UserEntity } from "../profile/domain/entity";
+import { ConfigService } from "@nestjs/config";
+import { join } from "path";
+import { InjectEntityManager } from "@nestjs/typeorm";
+import { AuthMailEntity, AuthTokenEntity } from "./domain/entity";
+import { EntityManager, LessThan, MoreThan } from "typeorm";
+import { UserGroupService } from "../profile/services/userGroup.service";
+import * as argon2 from "argon2";
+import { ChangePasswordDto, GetResetPasswordDto, PostResetPasswordDto } from "./domain/dto/password.dto";
+import { LoginDto } from "./domain/dto/login.dto";
 import { UserCreateDto } from "../profile/domain/dto";
-import { SignupDto } from './domain/dto/signup.dto';
-import { MailService } from '../mail/mail.service';
-import { ResendAuthMailDto } from './domain/dto/verification.dto';
-import { AuthMailType } from './domain/entity/authMail.entity';
-import { v4 as uuidv4 } from 'uuid';
+import { SignupDto } from "./domain/dto/signup.dto";
+import { MailService } from "../mail/mail.service";
+import { ResendAuthMailDto } from "./domain/dto/verification.dto";
+import { AuthMailType } from "./domain/entity/authMail.entity";
+import { v4 as uuidv4 } from "uuid";
+import { Cache } from "cache-manager";
 
 export interface TokenPayload {
   iss: string;
@@ -56,9 +41,12 @@ export class AuthenticationService {
   private readonly _refreshTokenTTL;
   private readonly _accessTokenTTL;
   private readonly _mailTokenTTL;
+  private readonly _domain;
   constructor(
     @InjectEntityManager()
     private readonly _entityManager: EntityManager,
+    @Inject(CACHE_MANAGER)
+    private readonly _cacheManager: Cache,
     private readonly _userService: UserService,
     private readonly _groupService: UserGroupService,
     private readonly _configService: ConfigService,
@@ -81,106 +69,116 @@ export class AuthenticationService {
     );
 
     this._accessTokenTTL = this._configService.get<number>('app.accessTokenTTL');
-    this._refreshTokenTTL = this._configService.get<number>(
-      'app.refreshTokenTTL',
-    );
+    this._refreshTokenTTL = this._configService.get<number>('app.refreshTokenTTL');
     this._mailTokenTTL = this._configService.get<number>('app.mailTokenTTL');
+    this._domain = this._configService.get<string>('http.domain');
   }
 
   get publicKey() {
     return this._publicKey;
   }
 
+  get domain() {
+    return this._domain
+  }
+
   public async changeUserPassword(
-    token: string,
+    user: UserEntity,
     dto: ChangePasswordDto,
   ): Promise<void> {
-    if (dto instanceof Array) {
-      this._logger.log(
-        `changeUserPassword Data Invalid, username: ${dto.username}`,
-      );
-      throw new BadRequestException({ message: 'Request Data Invalid' });
-    }
-
-    const errors = await validate(dto, {
-      validationError: { target: false },
-      forbidUnknownValues: false,
-    });
-    if (errors.length > 0) {
-      this._logger.log(
-        `changeUserPassword validation failed, username: ${dto.username}, errors: ${errors}`,
-      );
-
-      throw new HttpException(
-        { message: 'Input Data Invalid', errors },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const tokenPayload = await this.authTokenValidation(token, false);
-    let tokenEntity;
-    try {
-      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
-        relations: ['user'],
-        where: {
-          user: { id: tokenPayload.sub },
-        },
-      });
-    } catch (error) {
-      this._logger.error(
-        `changeUserPassword tokenRepository.findOne failed, userId: ${tokenPayload.sub}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
-
-    const user = tokenEntity.user;
-    if (!user.isActive) {
-      this._logger.log(
-        `changeUserPassword failed, user inactivated, username: ${user.username}`,
-      );
-      throw new ForbiddenException({ message: '' });
-    }
-
-    if (user.username !== dto.username) {
-      this._logger.warn(
-        `requested username doesn't match with user auth token, token user: ${user.username}, dto: ${dto.username}`,
-      );
-      throw new ForbiddenException({ message: '' });
-    }
+    // if (dto instanceof Array) {
+    //   this._logger.warn(
+    //     `changeUserPassword Data Invalid, username: ${dto.username}`,
+    //   );
+    //   throw new HttpException({
+    //     statusCode: '400',
+    //     message: 'Request Data Invalid',
+    //     error: 'Bad Request'
+    //   }, HttpStatus.BAD_REQUEST)
+    // }
+    // const errors = await validate(dto, {
+    //   validationError: { target: false },
+    //   forbidUnknownValues: false,
+    // });
+    // if (errors.length > 0) {
+    //   this._logger.log(
+    //     `changeUserPassword validation failed, username: ${dto.username}, errors: ${errors}`,
+    //   );
+    //
+    //   throw new HttpException(
+    //     { message: 'Input Data Invalid', errors },
+    //     HttpStatus.BAD_REQUEST,
+    //   );
+    // }
+    // const tokenPayload = await this.authTokenValidation(token, false);
+    // let tokenEntity;
+    // try {
+    //   tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
+    //     relations: ['user'],
+    //     where: {
+    //       user: { id: tokenPayload.sub },
+    //     },
+    //   });
+    // } catch (error) {
+    //   this._logger.error(
+    //     `changeUserPassword tokenRepository.findOne failed, userId: ${tokenPayload.sub}`,
+    //     error,
+    //   );
+    //   throw new InternalServerErrorException({
+    //     message: 'Something went wrong',
+    //   });
+    // }
+    //
+    // const user = tokenEntity.user;
+    // if (!user.isActive) {
+    //   this._logger.log(
+    //     `changeUserPassword failed, user inactivated, username: ${user.username}`,
+    //   );
+    //   throw new ForbiddenException({ message: '' });
+    // }
+    // if (user.username !== dto.username) {
+    //   this._logger.warn(
+    //     `requested username doesn't match with user auth token, token user: ${user.username}, dto: ${dto.username}`,
+    //   );
+    //   throw new ForbiddenException({ message: '' });
+    // }
 
     let isPassVerify;
     try {
       isPassVerify = await argon2.verify(user.password, dto.oldPassword);
     } catch (err) {
       this._logger.error(`argon2.hash failed, username: ${user.username}`, err);
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     if (!isPassVerify) {
-      this._logger.log(
-        `user password verification failed, username: ${user.username}`,
-      );
-      throw new ForbiddenException({ message: 'Password Invalid' });
+      this._logger.log(`user password verification failed, username: ${user.username}`);
+      throw new HttpException({
+        statusCode: '403',
+        message: 'Password Invalid',
+        error: 'FORBIDDEN'
+      }, HttpStatus.FORBIDDEN)
     }
 
     let hashPassword;
     try {
       hashPassword = await argon2.hash(dto.newPassword);
     } catch (err) {
-      this._logger.error(`argon2.hash failed, username: ${dto.username}`, err);
-      throw new HttpException(
-        { message: 'Internal Server Error' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this._logger.error(`argon2.hash failed, username: ${user.username}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     user.password = hashPassword;
     await this._userService.updateEntity(user);
+    await this._cacheManager.set(`USER.USERNAME:${user.username}`, user, 0);
 
     // tokenEntity.isRevoked = true;
     // try {
@@ -197,39 +195,46 @@ export class AuthenticationService {
   }
 
   public async userAuthentication(dto: LoginDto, res: Response): Promise<void> {
-    if (dto instanceof Array) {
-      this._logger.log(
-        `userAuthentication Data Invalid, username: ${dto.username}`,
-      );
-      res
-        .status(HttpStatus.BAD_REQUEST)
-        .send({ message: 'Request Data Invalid' });
-      return;
-    }
+    // if (dto instanceof Array) {
+    //   this._logger.log(
+    //     `userAuthentication Data Invalid, username: ${dto.username}`,
+    //   );
+    //   res
+    //     .status(HttpStatus.BAD_REQUEST)
+    //     .send({ message: 'Request Data Invalid' });
+    //   return;
+    // }
+    //
+    // const errors = await validate(dto, {
+    //   validationError: { target: false },
+    //   forbidUnknownValues: false,
+    // });
+    // if (errors.length > 0) {
+    //   this._logger.log(
+    //     `userAuthentication data validation failed, username: ${dto.username}, errors: ${errors}`,
+    //   );
+    //
+    //   res
+    //     .status(HttpStatus.BAD_REQUEST)
+    //     .send({ message: `Username Or Password Invalid`, errors });
+    //   return;
+    // }
 
-    const errors = await validate(dto, {
-      validationError: { target: false },
-      forbidUnknownValues: false,
-    });
-    if (errors.length > 0) {
-      this._logger.log(
-        `userAuthentication data validation failed, username: ${dto.username}, errors: ${errors}`,
-      );
+    let user = await this._cacheManager.get<UserEntity>(`USER.USERNAME:${dto.username}`);
+    if(!user) {
+      user = await this._userService.findByName(dto.username);
 
-      res
-        .status(HttpStatus.BAD_REQUEST)
-        .send({ message: `Username Or Password Invalid`, errors });
-      return;
-    }
-
-    const user = await this._userService.findByName(dto.username);
-
-    if (!user) {
-      this._logger.log(`user not found, username: ${dto.username}`);
-      res
-        .status(HttpStatus.NOT_FOUND)
-        .send({ message: 'Username Or Password Invalid' });
-      return;
+      if (!user) {
+        this._logger.log(`user not found, username: ${dto.username}`);
+        res
+          .status(HttpStatus.NOT_FOUND)
+          .send({
+            statusCode: '404',
+            message: 'Username Or Password Invalid',
+            error: 'Not Found'
+          });
+        return;
+      }
     }
 
     if (!user.isActive) {
@@ -238,7 +243,11 @@ export class AuthenticationService {
       );
       res
         .status(HttpStatus.NOT_FOUND)
-        .send({ message: 'Username Or Password Invalid' });
+        .send({
+          statusCode: '404',
+          message: 'Username Or Password Invalid' ,
+          error: 'Not Found'
+        });
       return;
     }
 
@@ -249,25 +258,34 @@ export class AuthenticationService {
       this._logger.error(`argon2.hash failed, username: ${dto.username}`, err);
       res
         .status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .send({ message: 'Something went wrong' });
+        .send({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        });
       return;
     }
 
     if (!isPassVerify) {
-      this._logger.log(
-        `user password verification failed, username: ${dto.username}`,
-      );
+      this._logger.log(`user password verification failed, username: ${dto.username}`);
       res
         .status(HttpStatus.NOT_FOUND)
-        .send({ message: 'Username Or Password Invalid' });
+        .send({
+          statusCode: '404',
+          message: 'Username Or Password Invalid' ,
+          error: 'Not Found'
+        });
       return;
     }
 
     if (user.isEmailConfirmed) {
-      const { refreshToken, tokenEntity } = await this.generateRefreshToken(
-        user,
-      );
-      const accessToken = await this.generateAccessToken(user, tokenEntity);
+      let authTokenEntity = await this.getAuthTokenEntity(user);
+      if(!authTokenEntity) {
+        authTokenEntity = await this.createAuthTokenEntity(user);
+      }
+
+      const refreshToken = await this.generateRefreshToken(authTokenEntity);
+      const accessToken = await this.generateAccessToken(authTokenEntity);
 
       res.status(HttpStatus.OK).send({
         access_token: accessToken,
@@ -276,11 +294,11 @@ export class AuthenticationService {
       return;
     }
 
-    const authMailEntity = await this.createOrGetAuthMailEntity(user);
-    const authMailToken = await this.generateAuthMailToken(
-      user,
-      authMailEntity,
-    );
+    let authMailEntity = await this.getAuthMailEntity(user);
+    if(!authMailEntity) {
+      authMailEntity = await this.createAuthMailEntity(user, AuthMailType.USER_VERIFICATION, false);
+    }
+    const authMailToken = await this.generateAuthMailToken(authMailEntity);
     res.status(201).send({ access_token: authMailToken });
   }
 
@@ -291,7 +309,8 @@ export class AuthenticationService {
     userDto.email = dto.email;
     userDto.userGroup = 'GHOST';
     const user = await this._userService.create(userDto);
-    const authMailEntity = await this.createOrGetAuthMailEntity(user, true);
+    await this._cacheManager.set(`USER.USERNAME:${dto.username}`, user, 0);
+    const authMailEntity = await this.createAuthMailEntity(user, AuthMailType.USER_VERIFICATION, true);
 
     this._mailService.sendCodeConfirmation(
       userDto.username,
@@ -299,7 +318,107 @@ export class AuthenticationService {
       Number(authMailEntity.verificationId),
     );
 
-    return await this.generateAuthMailToken(user, authMailEntity);
+    return await this.generateAuthMailToken(authMailEntity);
+  }
+
+  public async authMailCodeConfirmation(
+    authMailToken: TokenPayload,
+    verifyCode: string,
+  ): Promise<AuthMailEntity> {
+    if (!authMailToken.jti || authMailToken.exp * 1000 <= Date.now()) {
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
+    }
+
+    let authMailEntity = await this._cacheManager.get<AuthMailEntity>(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailToken.jti}`);
+    // if(!authMailEntity) {
+    //   try {
+    //     authMailEntity = await this._entityManager.getRepository(AuthMailEntity).findOne({
+    //       where: {
+    //         id: authMailToken.jti,
+    //         mailType: AuthMailType.USER_VERIFICATION,
+    //       },
+    //     });
+    //   } catch (error) {
+    //     this._logger.error(
+    //       `authMailRepository.findOne failed, id: ${authMailToken.jti}`,
+    //       error,
+    //     );
+    //     throw new HttpException({
+    //       statusCode: '500',
+    //       message: 'Something Went Wrong',
+    //       error: 'Internal Server Error'
+    //     }, HttpStatus.INTERNAL_SERVER_ERROR);
+    //   }
+    // }
+    if (!authMailEntity) {
+      this._logger.warn(
+        `authMailEntity not found, authToken: ${JSON.stringify(authMailToken)}`,
+      );
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
+    }
+
+    if (authMailEntity.verificationId !== verifyCode) {
+      this._logger.warn(
+        `verify code invalid, userId: ${authMailToken.sub}, code: ${verifyCode}`,
+      );
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
+    }
+
+    if (!authMailEntity.user.isActive) {
+      this._logger.warn(`user inactivated, userId: ${authMailToken.sub}`);
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
+    }
+
+    let memberGroup;
+    try {
+      memberGroup = await this._groupService.findByName('MEMBER');
+    } catch (error) {
+      this._logger.error(
+        `groupService.findByName for MEMBER userGroup failed, userId: ${authMailEntity.user.id}`,
+        error,
+      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    try {
+      authMailEntity.user.isEmailConfirmed = true;
+      authMailEntity.user.userGroup = memberGroup;
+      await this._entityManager.getRepository(AuthMailEntity).save(authMailEntity);
+    } catch (error) {
+      this._logger.error(
+        `mailVerificationRepository.save failed, userId: ${authMailEntity.user.id}`,
+        error,
+      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailEntity.user.id}`);
+    await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailToken.jti}`);
+    return authMailEntity;
   }
 
   public async resendMailVerification(
@@ -307,74 +426,78 @@ export class AuthenticationService {
     token: string,
   ): Promise<void> {
     if (!token) {
-      throw new UnauthorizedException({ message: '' });
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
     }
 
-    const authMailToken = await this.authTokenValidation(token, false);
-    let authMail;
-    try {
-      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
-        where: {
-          id: authMailToken.jti,
-          mailType: AuthMailType.USER_VERIFICATION,
-        },
-      });
-    } catch (error) {
-      this._logger.error(
-        `authMailRepository.findOne of resendMailVerification failed, id: ${authMailToken.jti}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
+    const mailToken = await this.authTokenValidation(token, false);
+    let authMailEntity = await this._cacheManager.get<AuthMailEntity>(`AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}`);
+    if(!authMailEntity) {
+      try {
+        authMailEntity = await this._entityManager.getRepository(AuthMailEntity).findOne({
+          where: {
+            id: mailToken.jti,
+            mailType: AuthMailType.USER_VERIFICATION,
+          },
+        });
+      } catch (error) {
+        this._logger.error(
+          `authMailRepository.findOne of resendMailVerification failed, id: ${mailToken.jti}`,
+          error,
+        );
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
 
-    if (!authMail) {
-      this._logger.warn(
-        `authMail entity of token invalid, authMail id: ${authMailToken.jti}`,
-      );
-      throw new ForbiddenException({ message: '' });
+      if (!authMailEntity) {
+        this._logger.warn(
+          `authMail entity of token invalid, authMail id: ${mailToken.jti}`,
+        );
+        throw new HttpException({
+          statusCode: '403',
+          message: 'Forbidden',
+          error: 'Forbidden'
+        }, HttpStatus.FORBIDDEN);
+      }
     }
 
     if (!dto || !dto.username) {
-      throw new BadRequestException({ message: 'Input Data Invalid' });
+      throw new HttpException({
+        statusCode: '400',
+        message: 'Input Data Invalid',
+        error: 'Bad Request'
+      }, HttpStatus.BAD_REQUEST);
     }
 
-    const user = authMail.user;
+    const user = authMailEntity.user;
     if (dto.username !== user.username) {
-      throw new ForbiddenException({ message: '' });
+      throw new HttpException({
+        statusCode: '403',
+        message: 'Forbidden',
+        error: 'Forbidden'
+      }, HttpStatus.FORBIDDEN);
     }
 
     if (user.isEmailConfirmed) {
       this._logger.warn(
         `user try again to resend mail verification, userId: ${user.id}`,
       );
-      throw new BadRequestException({
-        message: 'Resend Mail Verification Invalid',
-      });
+      throw new HttpException({
+        statusCode: '400',
+        message:  'Resend Mail Verification Invalid',
+        error: 'Bad Request'
+      }, HttpStatus.BAD_REQUEST);
     }
 
-    const authMailEntity = await this.createOrGetAuthMailEntity(user);
-
-    if (authMailEntity.isEmailSent) {
-      this._logger.log(
-        `mail verification already send to user, userId: ${user.id}, sendTo: ${authMailEntity.sendTo}`,
-      );
-      return;
+    if(authMailEntity.expiredAt.getTime() < Date.now()) {
+      authMailEntity = await this.createAuthMailEntity(user,  AuthMailType.USER_VERIFICATION, true);
     }
-
-    authMailEntity.isEmailSent = true;
-    authMailEntity.mailSentAt = new Date();
-    try {
-      await this._entityManager.getRepository(AuthMailEntity).save(authMailEntity);
-    } catch (error) {
-      this._logger.error(
-        `authMailRepository.save of resendMailVerification failed, userId: ${user.id}, 
-                 authMail Id: ${authMailEntity.id}`,
-        error,
-      );
-    }
-
     this._mailService.sendCodeConfirmation(
       user.username,
       user.email,
@@ -382,90 +505,78 @@ export class AuthenticationService {
     );
   }
 
-  public async sendForgetPasswordMail(email: string): Promise<any> {
-    let authMail;
-    let userEntity;
-    try {
-      userEntity = await this._userService.findByEmail(email);
-    } catch (err) {
-      this._logger.error(`userService.findByEmail failed, email: ${email}`, err);
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-
+  public async sendForgetPasswordMail(req: Request, email: string): Promise<any> {
+    let authMailEntity;
+    let userEntity = await this._cacheManager.get<UserEntity>(`USER.EMAIL:${email}`);
     if (!userEntity) {
-      this._logger.debug(
-        `forget password failed, email not found, email: ${email}`,
-      );
-      throw new NotFoundException({ message: 'Email Not Found' });
+      try {
+        userEntity = await this._userService.findByEmail(email);
+      } catch (err) {
+        this._logger.error(`userService.findByEmail failed, email: ${email}`, err);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      if (!userEntity) {
+        this._logger.debug(
+          `forget password failed, email not found, email: ${email}`,
+        );
+        throw new HttpException({
+          statusCode: '404',
+          message: 'Email Not Found',
+          error: 'Not Found'
+        }, HttpStatus.NOT_FOUND);
+      }
     }
 
+    await this._cacheManager.set(`USER.EMAIL:${email}`, userEntity, this._refreshTokenTTL / 1000);
     if (!userEntity.isEmailConfirmed) {
       this._logger.warn(
         `user try reset password mean while didn't confirmed, 
         userId: ${userEntity.id}, email: ${userEntity.email}`,
       );
-      throw new BadRequestException({ message: 'Reset Password Invalid' });
+      throw new HttpException({
+        statusCode: '400',
+        message: 'Reset Password Invalid',
+        error: 'Bad Request'
+      }, HttpStatus.BAD_REQUEST);
     }
 
-    try {
-      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
-        relations: ['user'],
-        where: {
-          user: { id: userEntity.id },
-          sendTo: email,
-          expiredAt: MoreThan(new Date()),
-          mailType: AuthMailType.FORGOTTEN_PASSWORD,
-        },
-      });
-    } catch (err) {
-      this._logger.error(`authMailRepository.find failed, email: ${email}`, err);
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    authMailEntity = await this._cacheManager.get<AuthMailEntity>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userEntity.id}`)
+    if(!authMailEntity) {
+      try {
+        authMailEntity = await this._entityManager.getRepository(AuthMailEntity).findOne({
+          relations: ['user'],
+          where: {
+            user: { id: userEntity.id },
+            sendTo: email,
+            expiredAt: MoreThan(new Date()),
+            mailType: AuthMailType.FORGOTTEN_PASSWORD,
+          },
+        });
+      } catch (err) {
+        this._logger.error(`authMailRepository.find failed, email: ${email}`, err);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
     }
 
-    if (authMail) {
+    if (authMailEntity) {
       this._logger.warn(`already sent forget password email, 
-      username: ${authMail.user.username}, email: ${email}, date: ${authMail.mailSentAt} `);
+      username: ${authMailEntity.user.username}, email: ${email}, date: ${authMailEntity.mailSentAt} `);
       return;
     }
 
-    authMail = new AuthMailEntity();
-    authMail.user = userEntity;
-    authMail.from = this._configService.get<string>('mail.from');
-    authMail.sendTo = userEntity.email;
-    authMail.verificationId = uuidv4();
-    authMail.expiredAt = new Date(Date.now() + this._mailTokenTTL);
-    authMail.isActive = true;
-    authMail.isUpdatable = true;
-    authMail.mailSentAt = new Date();
-    authMail.isEmailSent = true;
-    authMail.mailType = AuthMailType.FORGOTTEN_PASSWORD;
-
-    try {
-      await this._entityManager.getRepository(AuthMailEntity).save(authMail);
-    } catch (error) {
-      this._logger.error(
-        `authMailRepository.save failed, userId: ${authMail.user.id}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
-
-    const absoluteUrl =
-      'https://' +
-      this._configService.get<string>('http.domain') +
-      '/api/auth/mail/password/reset/' +
-      userEntity.id +
-      '/' +
-      authMail.verificationId;
-
+    authMailEntity = this.createAuthMailEntity(userEntity, AuthMailType.FORGOTTEN_PASSWORD, true)
+    const absoluteUrl = `${req.protocol}://${req.get('host')}/api/auth/mail/password/reset/`
+      + `${userEntity.id}/${authMailEntity.verificationId}`;
+      // this._configService.get<string>('http.domain') +
     this._mailService.sendForgetPassword(
       userEntity.username,
       userEntity.email,
@@ -478,33 +589,40 @@ export class AuthenticationService {
     resetId: string,
     resetPasswordDto: PostResetPasswordDto,
   ): Promise<any> {
-    let authMail;
-    try {
-      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
-        relations: ['user'],
-        where: {
-          user: { id: userId },
-          verificationId: resetId,
-          expiredAt: MoreThan(new Date()),
-          mailType: AuthMailType.FORGOTTEN_PASSWORD,
-        },
-      });
-    } catch (err) {
-      this._logger.error(
-        `authMailRepository.findOne failed, userId: ${userId}`,
-        err,
-      );
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    let authMail = await this._cacheManager.get<AuthMailEntity>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
+    // if(!authMail) {
+    //   try {
+    //     authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
+    //       relations: ['user'],
+    //       where: {
+    //         user: { id: userId },
+    //         verificationId: resetId,
+    //         expiredAt: MoreThan(new Date()),
+    //         mailType: AuthMailType.FORGOTTEN_PASSWORD,
+    //       },
+    //     });
+    //   } catch (err) {
+    //     this._logger.error(
+    //       `authMailRepository.findOne failed, userId: ${userId}`,
+    //       err,
+    //     );
+    //     throw new HttpException({
+    //       statusCode: '500',
+    //       message: 'Something Went Wrong',
+    //       error: 'Internal Server Error'
+    //     }, HttpStatus.INTERNAL_SERVER_ERROR);
+    //   }
+    // }
 
     if (!authMail) {
       this._logger.debug(
         `reset password failed, auth mail entity not found, userId: ${userId}, resetId: ${resetId}`,
       );
-      throw new NotFoundException({ message: 'User Not Found' });
+      throw new HttpException({
+        statusCode: '404',
+        message: 'Request Not Found',
+        error: 'Not Found'
+      }, HttpStatus.NOT_FOUND);
     }
 
     let hashPassword;
@@ -515,210 +633,192 @@ export class AuthenticationService {
         `argon2.hash failed, username: ${authMail.user.username}`,
         err,
       );
-      throw new HttpException(
-        { message: 'Internal Server Error' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     authMail.user.password = hashPassword;
     await this._userService.updateEntity(authMail.user);
+    await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
   }
 
   public async getUserResetPasswordReq(
     userId: string,
     resetId: string,
   ): Promise<GetResetPasswordDto> {
-    let authMail;
-    try {
-      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
-        relations: ['user'],
-        where: {
-          user: { id: userId },
-          verificationId: resetId,
-          expiredAt: MoreThan(new Date()),
-          mailType: AuthMailType.FORGOTTEN_PASSWORD,
-        },
-      });
-    } catch (err) {
-      this._logger.error(
-        `authMailRepository.findOne failed, userId: ${userId}`,
-        err,
-      );
-      throw new HttpException(
-        { message: 'Something went wrong' },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    let authMailEntity = await this._cacheManager.get<AuthMailEntity>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
+    // TODO check remove it
+    // if(!authMailEntity) {
+    //   try {
+    //     authMailEntity = await this._entityManager.getRepository(AuthMailEntity).findOne({
+    //       relations: ['user'],
+    //       where: {
+    //         user: { id: userId },
+    //         verificationId: resetId,
+    //         expiredAt: MoreThan(new Date()),
+    //         mailType: AuthMailType.FORGOTTEN_PASSWORD,
+    //       },
+    //     });
+    //   } catch (err) {
+    //     this._logger.error(
+    //       `authMailRepository.findOne failed, userId: ${userId}`,
+    //       err,
+    //     );
+    //     throw new HttpException({
+    //       statusCode: '500',
+    //       message: 'Something Went Wrong',
+    //       error: 'Internal Server Error'
+    //     }, HttpStatus.INTERNAL_SERVER_ERROR);
+    //   }
+    // }
 
-    if (!authMail) {
+    if (!authMailEntity) {
       this._logger.debug(
         `reset password failed, auth mail entity not found, userId: ${userId}, resetId: ${resetId}`,
       );
-      throw new NotFoundException({ message: 'User Not Found' });
+      throw new HttpException({
+        statusCode: '404',
+        message: 'Request Not Found',
+        error: 'Not Found'
+      }, HttpStatus.NOT_FOUND);
     }
 
     const resetPasswordDto = new GetResetPasswordDto();
-    resetPasswordDto.id = authMail.user.id;
-    resetPasswordDto.username = authMail.user.username;
-    resetPasswordDto.resetPasswordId = authMail.verificationId;
+    resetPasswordDto.id = authMailEntity.user.id;
+    resetPasswordDto.username = authMailEntity.user.username;
+    resetPasswordDto.resetPasswordId = authMailEntity.verificationId;
     return resetPasswordDto;
   }
 
-  public async revokeAuthToken(userId: string): Promise<AuthTokenEntity> {
-    let tokenEntity;
-    try {
-      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
-        relations: ['user'],
-        where: {
-          user: { id: userId },
-        },
-      });
-    } catch (error) {
+  public async revokeAuthToken(userId: string, authToken: TokenPayload): Promise<AuthTokenEntity> {
+    let authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_TOKEN.USER_ID:${userId}`);
+    if(!authTokenEntity) {
+      authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_ACCESS_TOKEN.ID:${authToken.jti}`);
+      if (!authTokenEntity) {
+        try {
+          authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
+            relations: ['user'],
+            where: {
+              user: { id: userId },
+            },
+          });
+        } catch (error) {
+          this._logger.error(
+            `tokenRepository.findOne failed, userId: ${userId}`,
+            error,
+          );
+          throw new HttpException({
+            statusCode: '500',
+            message: 'Something Went Wrong',
+            error: 'Internal Server Error'
+          }, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+      }
+    }
+
+    if (!authTokenEntity) {
       this._logger.error(
-        `tokenRepository.findOne failed, userId: ${userId}`,
-        error,
+        `user authToken for revokeAuthToken not found, userId: ${userId}`,
       );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    if (!tokenEntity) {
-      this._logger.error(
-        `user token for revokeAuthToken not found, userId: ${userId}`,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
-
-    tokenEntity.isRevoked = true;
+    authTokenEntity.isRevoked = true;
     try {
-      return this._entityManager.getRepository(AuthTokenEntity).save(tokenEntity);
+      await this._entityManager.getRepository(AuthTokenEntity).save(authTokenEntity);
     } catch (error) {
-      this._logger.error(`user token not found, userId: ${userId}`, error);
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
-  }
-
-  public async authMailCodeConfirmation(
-    authMailToken: TokenPayload,
-    verifyCode: string,
-  ): Promise<AuthMailEntity> {
-    if (!authMailToken.jti || authMailToken.exp * 1000 <= Date.now()) {
-      throw new UnauthorizedException({ message: '' });
+      this._logger.error(`user authToken not found, userId: ${userId}`, error);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    let authMail;
-    try {
-      authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
-        where: {
-          id: authMailToken.jti,
-          mailType: AuthMailType.USER_VERIFICATION,
-        },
-      });
-    } catch (error) {
-      this._logger.error(
-        `authMailRepository.findOne failed, id: ${authMailToken.jti}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
-
-    if (authMail.verificationId !== verifyCode) {
-      this._logger.warn(
-        `verify code invalid, userId: ${authMailToken.sub}, code: ${verifyCode}`,
-      );
-      throw new UnauthorizedException({ message: '' });
-    }
-
-    if (!authMail.user.isActive) {
-      this._logger.warn(`user inactivated, userId: ${authMailToken.sub}`);
-      throw new UnauthorizedException({ message: '' });
-    }
-
-    let memberGroup;
-    try {
-      memberGroup = await this._groupService.findByName('MEMBER');
-    } catch (error) {
-      this._logger.error(
-        `groupService.findByName for MEMBER group failed, userId: ${authMail.user.id}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
-
-    try {
-      authMail.user.isEmailConfirmed = true;
-      authMail.user.group = memberGroup;
-      return await this._entityManager.getRepository(AuthMailEntity).save(authMail);
-    } catch (error) {
-      this._logger.error(
-        `mailVerificationRepository.save failed, userId: ${authMail.user.id}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
+    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.ID:${authToken.jti}`);
+    await this._cacheManager.del(`AUTH_TOKEN.USER_ID:${userId}`);
+    return authTokenEntity;
   }
 
   public async accessTokenValidation(
     payload: TokenPayload,
-  ): Promise<UserEntity | HttpStatus> {
-    if (!payload.sub) {
-      this._logger.log(`payload.sub invalid, payload: ${payload}`);
-      throw new UnauthorizedException({ message: 'Illegal Auth Token' });
+  ): Promise<UserEntity | HttpException> {
+    if (!payload.sub || !payload.jti) {
+      this._logger.warn(`payload.sub or payload.jti invalid, payload: ${payload}`);
+      return new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
     }
 
-    let tokenEntity;
-    try {
-      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
-        relations: ['user'],
-        join: {
-          alias: "token",
-          innerJoinAndSelect: {
-            user: "token.user",
-            group: "user.group",
-            role: "group.role"
-          },
-        },
-        loadEagerRelations: true,
-        where: {
-          user: { id: payload.sub },
-        },
-      });
-    } catch (error) {
-      this._logger.error(
-        `tokenRepository.findOne failed, userId: ${payload.sub}`,
-        error,
-      );
-
-      return HttpStatus.INTERNAL_SERVER_ERROR;
+    let authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_ACCESS_TOKEN.ID:${payload.jti}`);
+    // if(!authTokenEntity) {
+    //   try {
+    //     authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
+    //       relations: ['user'],
+    //       join: {
+    //         alias: "token",
+    //         innerJoinAndSelect: {
+    //           user: "token.user",
+    //           group: "user.group",
+    //           role: "group.role"
+    //         },
+    //       },
+    //       loadEagerRelations: true,
+    //       where: {
+    //         user: { id: payload.sub },
+    //       },
+    //     });
+    //   } catch (error) {
+    //     this._logger.error(
+    //       `tokenRepository.findOne failed, userId: ${payload.sub}`,
+    //       error,
+    //     );
+    //
+    //     return new HttpException({
+    //       statusCode: '500',
+    //       message: 'Something Went Wrong',
+    //       error: 'Internal Server Error'
+    //     }, HttpStatus.INTERNAL_SERVER_ERROR);
+    //   }
+    // }
+    if(!authTokenEntity) {
+      return new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
     }
 
     if (payload.exp * 1000 <= Date.now()) {
-      return HttpStatus.EXPECTATION_FAILED;
+      return new HttpException({
+        statusCode: '417',
+        message: 'Access Token Expired',
+        error: 'Expectation Failed'
+      }, HttpStatus.EXPECTATION_FAILED);
     }
 
     if (
-      tokenEntity &&
-      !tokenEntity.isRevoked &&
-      tokenEntity.accessTokenId === payload.jti &&
-      tokenEntity.user.isEmailConfirmed &&
-      tokenEntity.user.isActive
+      !authTokenEntity.isRevoked &&
+      authTokenEntity.user.isEmailConfirmed &&
+      authTokenEntity.user.isActive
     ) {
-      return tokenEntity.user;
+      return authTokenEntity.user;
     }
 
-    return HttpStatus.UNAUTHORIZED;
+    return new HttpException({
+      statusCode: '401',
+      message: 'Unauthorized',
+      error: 'Unauthorized'
+    }, HttpStatus.UNAUTHORIZED);
   }
 
   public async authTokenValidation(
@@ -734,62 +834,96 @@ export class AuthenticationService {
       return await this._jwt.verifyAsync(token, option);
     } catch (error) {
       this._logger.error(
-        `authTokenValidation jwt.verifyAsync failed, token: ${token}`,
+        `authTokenValidation jwt.verifyAsync failed, auth token: ${token}`,
         error,
       );
-      // if (e instanceof TokenExpiredError) {
-      //   throw new UnauthorizedException('Illegal Auth Token');
-      // } else {
-      throw new UnauthorizedException({ message: '' });
-      // }
+
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
     }
   }
 
   public async resolveRefreshToken(encoded: string): Promise<AuthTokenEntity> {
     const payload = await this.authTokenValidation(encoded, false);
-    const tokenEntity = await this.getStoredTokenFromRefreshTokenPayload(
-      payload,
-    );
+    if (!payload.jti || !payload.sub) {
+      this._logger.warn(`refresh token payload invalid, payload: ${payload}`);
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
+    }
 
-    if (!tokenEntity) {
+    let authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_TOKEN.USER_ID:${payload.sub}`);
+    // if(!authTokenEntity) {
+    //   try {
+    //     authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
+    //       where: { id: payload.jti },
+    //     });
+    //   } catch (error) {
+    //     this._logger.error(
+    //       `authTokenRepository.findOne failed, refreshTokenId: ${payload.jti}, userId; ${payload.sub}`,
+    //       error,
+    //     );
+    //     throw new HttpException({
+    //       statusCode: '500',
+    //       message: 'Something Went Wrong',
+    //       error: 'Internal Server Error'
+    //     }, HttpStatus.INTERNAL_SERVER_ERROR);
+    //   }
+    // }
+
+    if (!authTokenEntity) {
       this._logger.log(
-        `tokenEntity not found, payload: ${JSON.stringify(payload)}`,
+        `authTokenEntity not found, payload: ${JSON.stringify(payload)}`,
       );
-      throw new UnauthorizedException({ message: '' });
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
     }
 
     if (
-      tokenEntity.isRevoked ||
-      Date.now() >= tokenEntity.refreshTokenExpiredAt.getTime() ||
-      payload.jti !== tokenEntity.refreshTokenId
+      authTokenEntity.isRevoked ||
+      Date.now() >= authTokenEntity.refreshTokenExpiredAt.getTime() ||
+      payload.jti !== authTokenEntity.id
     ) {
       this._logger.log(
-        `tokenEntity is revoked or expired or invalid, token userId: ${
-          tokenEntity.user.id
+        `authTokenEntity is revoked or expired or invalid, authToken userId: ${
+          authTokenEntity.user.id
         }, payload: ${JSON.stringify(payload)}`,
       );
-      throw new UnauthorizedException({ message: '' });
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
     }
 
-    const user = tokenEntity.user;
+    const user = authTokenEntity.user;
     if (!user || !user.isEmailConfirmed || !user.isActive) {
       this._logger.log(
         `user not found or deactivated or not email confirmed, userId: ${payload.sub}`,
       );
-      throw new UnauthorizedException({ message: '' });
+      throw new HttpException({
+        statusCode: '401',
+        message: 'Unauthorized',
+        error: 'Unauthorized'
+      }, HttpStatus.UNAUTHORIZED);
     }
 
-    return tokenEntity;
+    return authTokenEntity;
   }
 
-  public async generateAuthMailToken(
-    user: UserEntity,
-    authMail: AuthMailEntity,
-  ): Promise<string> {
+  public async generateAuthMailToken(authMail: AuthMailEntity): Promise<string> {
     const payload = {
-      iss: 'https://livelyplanet.io',
-      sub: user.id,
-      aud: 'https://livelyplanet.io',
+      iss: `https://${this._domain}`,
+      sub: authMail.user.id,
+      aud: `https://${this._domain}`,
       exp: Math.floor(authMail.expiredAt.getTime() / 1000),
       nbf: Math.floor(Date.now() / 1000),
       jti: authMail.id,
@@ -802,53 +936,59 @@ export class AuthenticationService {
       return await this._jwt.signAsync(payload, option);
     } catch (error) {
       this._logger.error(`jwt.signAsync failed, payload: ${payload}`, error);
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  public async generateAccessToken(
-    user: UserEntity,
-    tokenEntity: AuthTokenEntity,
-  ): Promise<string> {
+  public async generateAccessToken(authTokenEntity: AuthTokenEntity): Promise<string> {
+
+    const accessTokenId = crypto.randomUUID({
+      disableEntropyCache: true,
+    });
+
     const payload = {
-      iss: 'https://livelyplanet.io',
-      sub: user.id,
-      aud: 'https://livelyplanet.io',
+      iss: `https://${this._domain}`,
+      sub: authTokenEntity.user.id,
+      aud: `https://${this._domain}`,
       exp: Math.floor(Date.now() + this._accessTokenTTL) / 1000,
       nbf: Math.floor(Date.now() / 1000),
-      jti: tokenEntity.accessTokenId,
+      jti: accessTokenId,
     };
     const option = {
       algorithm: 'ES512' as Algorithm,
       privateKey: this._privateKey,
     };
+    let accessToken;
     try {
-      return await this._jwt.signAsync(payload, option);
+      accessToken = await this._jwt.signAsync(payload, option);
     } catch (error) {
       this._logger.error(
         `accessToken jwt.signAsync failed, payload: ${payload}`,
         error,
       );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+    await this._cacheManager.set(`AUTH_ACCESS_TOKEN.ID:${accessTokenId}`, authTokenEntity, this._accessTokenTTL / 1000);
+    return accessToken;
   }
 
-  public async generateRefreshToken(
-    user: UserEntity,
-  ): Promise<{ refreshToken: string; tokenEntity: AuthTokenEntity }> {
-    const tokenEntity = await this.createTokenEntity(user);
-
+  public async generateRefreshToken(authTokenEntity: AuthTokenEntity): Promise<string> {
     const payload = {
-      iss: 'https://livelyplanet.io',
-      sub: user.id,
-      aud: 'https://livelyplanet.io',
-      exp: Math.floor(tokenEntity.refreshTokenExpiredAt.getTime() / 1000),
+      iss: `https://${this._domain}`,
+      sub: authTokenEntity.user.id,
+      aud: `https://${this._domain}`,
+      exp: Math.floor(authTokenEntity.refreshTokenExpiredAt.getTime() / 1000),
       nbf: Math.floor(Date.now() / 1000),
-      jti: tokenEntity.refreshTokenId,
+      jti: authTokenEntity.id,
     };
 
     const option = {
@@ -864,90 +1004,118 @@ export class AuthenticationService {
         `refreshToken jwt.signAsync failed, payload: ${payload}`,
         error,
       );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return { refreshToken, tokenEntity };
+    return refreshToken;
   }
 
-  public async createTokenEntity(user: UserEntity): Promise<AuthTokenEntity> {
-    let tokenEntity;
-    try {
-      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
-        relations: ['user'],
-        where: {
-          user: { id: user.id },
-        },
-      });
-    } catch (error) {
-      this._logger.error(
-        `tokenRepository.findOne failed, userId: ${user.id}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
+  public async getAuthTokenEntity(user: UserEntity): Promise<AuthTokenEntity> {
+    let authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_TOKEN.USER_ID:${user.id}`);
+    if(!authTokenEntity) {
+      try {
+        authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
+          relations: ['user'],
+          where: {
+            user: { id: user.id },
+            refreshTokenExpiredAt: MoreThan(new Date()),
+            isRevoked: false
+          },
+        });
+      } catch (error) {
+        this._logger.error(
+          `_authTokenRepository.findOne failed, userId: ${user.id}`,
+          error,
+        );
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
     }
 
-    if (!tokenEntity) {
-      tokenEntity = new AuthTokenEntity();
-      tokenEntity.user = user;
-    }
-
-    tokenEntity.isRevoked = false;
-    tokenEntity.refreshTokenExpiredAt = new Date(
-      Date.now() + this._refreshTokenTTL,
-    );
-    tokenEntity.refreshTokenId = crypto.randomUUID({
-      disableEntropyCache: true,
-    });
-    tokenEntity.accessTokenId = crypto.randomUUID({
-      disableEntropyCache: true,
-    });
-
-    try {
-      return await this._entityManager.getRepository(AuthTokenEntity).save(tokenEntity);
-    } catch (error) {
-      this._logger.error(
-        `tokenRepository.save of createTokenEntity failed, token userId: ${tokenEntity.user.id}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
+    return authTokenEntity;
   }
 
-  public async createAccessTokenFromRefreshToken(
-    dto: RefreshDto,
-  ): Promise<string> {
-    let tokenEntity = await this.resolveRefreshToken(dto.refresh_token);
-    tokenEntity.accessTokenId = crypto.randomUUID({
-      disableEntropyCache: true,
-    });
+  public async createAuthTokenEntity(user: UserEntity): Promise<AuthTokenEntity> {
+    const authTokenEntity = new AuthTokenEntity();
+    authTokenEntity.user = user;
+    authTokenEntity.isRevoked = false;
+    authTokenEntity.refreshTokenExpiredAt = new Date(Date.now() + this._refreshTokenTTL);
 
     try {
-      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).save(tokenEntity);
+      await this._entityManager.getRepository(AuthTokenEntity).insert(authTokenEntity);
     } catch (error) {
       this._logger.error(
-        `tokenRepository.save for createAccessTokenFromRefreshToken failed, token userId: ${tokenEntity.user.id}`,
+        `authTokenRepository.save of createTokenEntity failed, token userId: ${authTokenEntity.user.id}`,
         error,
       );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    return await this.generateAccessToken(tokenEntity.user, tokenEntity);
+    await this._cacheManager.set(`AUTH_TOKEN.USER_ID:${user.id}`, authTokenEntity, this._refreshTokenTTL / 1000);
+    return authTokenEntity;
   }
 
-  public async createOrGetAuthMailEntity(
-    userEntity: UserEntity,
-    isCreateForce = false,
-  ): Promise<AuthMailEntity> {
-    let authMail;
-    if (!isCreateForce) {
+  public async createAuthMailEntity(userEntity: UserEntity, mailType: AuthMailType, isEmailSent: boolean): Promise<AuthMailEntity> {
+    const authMailEntity = new AuthMailEntity();
+    authMailEntity.user = userEntity;
+    authMailEntity.from = this._configService.get<string>('mail.from');
+    authMailEntity.sendTo = userEntity.email;
+    authMailEntity.expiredAt = new Date(Date.now() + this._mailTokenTTL);
+    authMailEntity.isActive = true;
+    authMailEntity.isUpdatable = true;
+
+    if(mailType === AuthMailType.USER_VERIFICATION) {
+      authMailEntity.verificationId = String(Math.floor(100000 + Math.random() * 900000));
+      authMailEntity.mailType = AuthMailType.USER_VERIFICATION;
+
+    } else if(mailType === AuthMailType.FORGOTTEN_PASSWORD) {
+      authMailEntity.verificationId = uuidv4();
+      authMailEntity.mailType = AuthMailType.FORGOTTEN_PASSWORD;
+    }
+
+    if(isEmailSent) {
+      authMailEntity.mailSentAt = new Date();
+      authMailEntity.isEmailSent = true;
+    } else {
+      authMailEntity.mailSentAt = null;
+      authMailEntity.isEmailSent = false;
+    }
+
+    try {
+      await this._entityManager.getRepository(AuthMailEntity).insert(authMailEntity);
+    } catch (error) {
+      this._logger.error(
+        `authMailRepository.save failed, userId: ${authMailEntity.user.id}`,
+        error,
+      );
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    if(mailType === AuthMailType.USER_VERIFICATION) {
+      await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailEntity.id}`, authMailEntity, this._mailTokenTTL / 1000);
+      await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`, authMailEntity, this._mailTokenTTL / 1000);
+    } else if(mailType === AuthMailType.FORGOTTEN_PASSWORD) {
+      await this._cacheManager.set(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID::${userEntity.id}`, authMailEntity, this._mailTokenTTL / 1000);
+    }
+    return authMailEntity;
+  }
+
+  public async getAuthMailEntity(userEntity: UserEntity): Promise<AuthMailEntity> {
+    let authMail = await this._cacheManager.get<AuthMailEntity>(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`);
+    if(!authMail) {
       try {
         authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
           relations: ['user'],
@@ -962,77 +1130,13 @@ export class AuthenticationService {
           `authMailRepository.findOne failed, userId: ${userEntity.id}`,
           error,
         );
-        throw new InternalServerErrorException({
-          message: 'Something went wrong',
-        });
-      }
-
-      if (authMail) {
-        return authMail;
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
       }
     }
-
-    authMail = new AuthMailEntity();
-    authMail.user = userEntity;
-    authMail.from = this._configService.get<string>('mail.from');
-    authMail.sendTo = userEntity.email;
-    authMail.verificationId = String(
-      Math.floor(100000 + Math.random() * 900000),
-    );
-    authMail.expiredAt = new Date(Date.now() + this._mailTokenTTL);
-    authMail.mailSentAt = null;
-    authMail.isEmailSent = false;
-    authMail.isActive = true;
-    authMail.isUpdatable = true;
-    authMail.mailType = AuthMailType.USER_VERIFICATION;
-
-    if (isCreateForce) {
-      authMail.mailSentAt = new Date();
-      authMail.isEmailSent = true;
-    }
-
-    try {
-      return await this._entityManager.getRepository(AuthMailEntity).save(authMail);
-    } catch (error) {
-      this._logger.error(
-        `authMailRepository.save failed, userId: ${authMail.user.id}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
-  }
-
-  private async getStoredTokenFromRefreshTokenPayload(
-    payload: TokenPayload,
-  ): Promise<AuthTokenEntity | null> {
-    const refreshTokenId = payload.jti;
-    const userId = payload.sub;
-    if (!refreshTokenId || !userId) {
-      this._logger.log(`payload invalid, payload: ${payload}`);
-      throw new UnauthorizedException({ message: '' });
-    }
-
-    let tokenEntity;
-    try {
-      tokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
-        relations: ['user'],
-        where: {
-          user: { id: userId },
-          refreshTokenId: refreshTokenId,
-        },
-      });
-    } catch (error) {
-      this._logger.error(
-        `tokenRepository.findOne failed, refreshTokenId: ${refreshTokenId}, userId; ${userId}`,
-        error,
-      );
-      throw new InternalServerErrorException({
-        message: 'Something went wrong',
-      });
-    }
-
-    return tokenEntity;
+    return authMail;
   }
 }

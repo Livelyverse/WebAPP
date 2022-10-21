@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { CacheModule, Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import yamlReader from './config/yamlReader';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -59,6 +59,17 @@ import { APP_MODE, BlockchainConfig } from "./modules/blockchain/blockchainConfi
         }
       },
       inject: [ConfigService]
+    }),
+    CacheModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        ttl: configService.get<number>('app.cache.ttl'),
+        isGlobal: false,
+        store: configService.get<string>('app.cache.store'),
+        host: configService.get<string>('app.cache.host'),
+        port: configService.get<number>('app.cache.port'),
+      }),
+      inject: [ConfigService],
     })
   ],
   controllers: [],

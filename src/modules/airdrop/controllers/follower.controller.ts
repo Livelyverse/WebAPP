@@ -5,24 +5,22 @@ import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
 import * as RxJS from "rxjs";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
-import { SortTypePipe } from "../domain/pipe/sortTypePipe";
-import { FindAllType, SortBy, SortType } from "../services/IAirdrop.service";
-import { SortByPipe } from "../domain/pipe/sortByPipe";
+import { FindAllType, SortType } from "../services/IAirdrop.service";
 import { EnumPipe } from "../domain/pipe/enumPipe";
 import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
-import { FollowerService } from "../services/follower.service";
+import { FollowerService, FollowerSortBy } from "../services/follower.service";
 import { FollowerViewDto } from "../domain/dto/followerView.dto";
 import { SocialFollowerEntity } from "../domain/entity/socialFollower.entity";
 
 @ApiBearerAuth()
-@ApiTags('/api/lively/social/follower')
-@Controller('/api/lively/social/follower')
+@ApiTags('/api/airdrops/lively/socials/followers')
+@Controller('/api/airdrops/lively/socials/followers')
 export class FollowerController {
 
   private readonly _logger = new Logger(FollowerController.name);
   constructor(private readonly _followerService: FollowerService) {}
 
-  @Get('/find/all/')
+  @Get('/find/all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
@@ -39,35 +37,35 @@ export class FollowerController {
     schema: { type: 'number' },
   })
   @ApiQuery({
-    name: 'sortType',
-    required: false,
-    description: 'data sort type can be one of ASC or DESC',
-    schema: { type: 'string' },
-  })
-  @ApiQuery({
     name: 'sortBy',
     required: false,
-    description: 'data sort field can be one of the timestamp fields',
-    schema: { type: 'string' },
+    description: `data sort field can be one of ${Object.keys(FollowerSortBy)}`,
+    schema: { enum: Object.keys(FollowerSortBy) },
+  })
+  @ApiQuery({
+    name: 'sortType',
+    required: false,
+    description: `data sort type can be one of ${Object.keys(SortType)}`,
+    schema: { enum: Object.keys(SortType) },
   })
   @ApiQuery({
     name: 'filter',
     required: false,
-    description: `filter ${Object.values(SocialType)} `,
-    schema: { enum: Object.values(SocialType) },
+    description: `filter ${Object.keys(SocialType)} `,
+    schema: { enum: Object.keys(SocialType) },
   })
   @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  airdropFindAll(
+  followerFindAll(
     @Query('page', new PaginationPipe()) page: number,
     @Query('offset', new PaginationPipe()) offset: number,
-    @Query('sortType', new SortTypePipe()) sortType: SortType,
-    @Query('sortBy', new SortByPipe(SortBy)) sortBy: SortBy,
+    @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
+    @Query('sortBy', new EnumPipe(FollowerSortBy)) sortBy: FollowerSortBy,
     @Query('filter', new EnumPipe(SocialType)) filter: SocialType
   ): RxJS.Observable<FindAllViewDto<FollowerViewDto>> {
     return RxJS.from(this._followerService.findAll(
@@ -92,6 +90,9 @@ export class FollowerController {
           )
         )
       ),
+      RxJS.tap({
+        error: err => this._logger.error(`followerFindAll failed, filter: ${filter}, sortBy: ${FollowerSortBy}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -104,7 +105,7 @@ export class FollowerController {
               RxJS.throwError(() => new HttpException(
                 {
                   statusCode: '500',
-                  message: 'Internal Server Error',
+                  message: 'Something Went Wrong',
                   error: 'Internal Server Error'
                 }, HttpStatus.INTERNAL_SERVER_ERROR)
               )

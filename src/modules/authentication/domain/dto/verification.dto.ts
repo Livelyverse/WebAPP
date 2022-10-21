@@ -19,14 +19,14 @@ export class AuthMailDto {
 }
 
 export class ResendAuthMailDto {
-  public static from(dto: ResendAuthMailDto): ResendAuthMailDto | null {
-    if (dto) {
-      const resendAuthMailDto = new ResendAuthMailDto();
-      resendAuthMailDto.username = dto?.username;
-      return resendAuthMailDto;
-    }
-    return null;
-  }
+  // public static from(dto: ResendAuthMailDto): ResendAuthMailDto | null {
+  //   if (dto) {
+  //     const resendAuthMailDto = new ResendAuthMailDto();
+  //     resendAuthMailDto.username = dto?.username;
+  //     return resendAuthMailDto;
+  //   }
+  //   return null;
+  // }
 
   @IsNotEmpty({ message: 'Username must not empty' })
   @IsDefined({ message: 'Username must be defined' })

@@ -8,22 +8,22 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ChangePasswordDto {
-  public static from(dto: ChangePasswordDto): ChangePasswordDto | null {
-    if (dto) {
-      const passwordDto = new ChangePasswordDto();
-      passwordDto.username = dto?.username;
-      passwordDto.newPassword = dto?.newPassword;
-      passwordDto.oldPassword = dto?.oldPassword;
-      return passwordDto;
-    }
-    return null;
-  }
+  // public static from(dto: ChangePasswordDto): ChangePasswordDto | null {
+  //   if (dto) {
+  //     const passwordDto = new ChangePasswordDto();
+  //     passwordDto.username = dto?.username;
+  //     passwordDto.newPassword = dto?.newPassword;
+  //     passwordDto.oldPassword = dto?.oldPassword;
+  //     return passwordDto;
+  //   }
+  //   return null;
+  // }
 
-  @IsNotEmpty({ message: 'Username must not empty' })
-  @IsDefined({ message: 'Username must be defined' })
-  @IsString({ message: 'Username must be string' })
-  @ApiProperty()
-  public username: string;
+  // @IsNotEmpty({ message: 'Username must not empty' })
+  // @IsDefined({ message: 'Username must be defined' })
+  // @IsString({ message: 'Username must be string' })
+  // @ApiProperty()
+  // public username: string;
 
   @Length(8, 128, { message: 'Password length at least 8 characters' })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)\S+$/, {
@@ -45,14 +45,14 @@ export class ChangePasswordDto {
 }
 
 export class PostResetPasswordDto {
-  public static from(dto: PostResetPasswordDto): PostResetPasswordDto | null {
-    if (dto) {
-      const resetPasswordDto = new PostResetPasswordDto();
-      resetPasswordDto.newPassword = dto?.newPassword;
-      return resetPasswordDto;
-    }
-    return null;
-  }
+  // public static from(dto: PostResetPasswordDto): PostResetPasswordDto | null {
+  //   if (dto) {
+  //     const resetPasswordDto = new PostResetPasswordDto();
+  //     resetPasswordDto.newPassword = dto?.newPassword;
+  //     return resetPasswordDto;
+  //   }
+  //   return null;
+  // }
 
   @Length(8, 128, { message: 'Password length at least 8 characters' })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)\S+$/, {

@@ -2,8 +2,8 @@ import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { UserEntity, BaseEntity } from '../../../profile/domain/entity';
 
 export enum AuthMailType {
-  USER_VERIFICATION = 0,
-  FORGOTTEN_PASSWORD = 1,
+  USER_VERIFICATION = "USER_VERIFICATION",
+  FORGOTTEN_PASSWORD = "FORGOTTEN_PASSWORD",
 }
 
 @Entity({ name: 'auth_mail' })
@@ -17,7 +17,7 @@ export class AuthMailEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
   verificationId: string;
 
-  @Column({ type: 'enum', enum: AuthMailType, unique: false, nullable: false })
+  @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
   mailType: AuthMailType;
 
   @Column({ type: 'timestamptz', unique: false, nullable: false })

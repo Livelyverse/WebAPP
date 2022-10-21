@@ -4,25 +4,23 @@ import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
 
 export type FindAllType<T extends BaseEntity> = { data: Array<T>; total: number }
 
-export enum SortBy {
-  TIMESTAMP = 'createdAt',
-}
-
 export enum BalanceSortBy {
   PENDING = 'PENDING',
   SETTLEMENT = 'SETTLEMENT',
   TOTAL = 'TOTAL'
 }
 
-
-export type SortType = 'ASC' | 'DESC'
+export enum SortType {
+  ASC = 'ASC',
+  DESC = 'DESC'
+}
 
 export interface IAirdropService<T extends BaseEntity> {
   findAll(
     offset: number,
     limit: number,
     sortType: SortType,
-    sortBy: SortBy,
+    sortBy: unknown,
   ): RxJS.Observable<FindAllType<T>>;
 
   findTotal(): RxJS.Observable<number>;

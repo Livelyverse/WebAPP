@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import { BlockchainService, BlockchainSortBy, FindAllType, NetworkType, SortType } from "./blockchain.service";
 import { FindAllTxViewDto } from "./domain/dto/findAllTxView.dto";
-import { ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import * as RxJS from "rxjs";
 import { PaginationPipe } from "./domain/pipe/paginationPipe";
 import { BlockchainTxViewDto } from "./domain/dto/blockchainTxView.dto";
@@ -20,8 +20,9 @@ import { EnumPipe } from "./domain/pipe/enumPipe";
 import { JwtAuthGuard } from "../authentication/domain/gurad/jwt-auth.guard";
 import { SocialProfileSortBy } from "../profile/services/socialProfile.service";
 
-@ApiTags('/api/blockchain')
-@Controller('/api/blockchain')
+@ApiBearerAuth()
+@ApiTags('/api/blockchains')
+@Controller('/api/blockchains')
 export class BlockchainController {
   private readonly _logger = new Logger(BlockchainController.name);
   constructor(private readonly _blockchainService: BlockchainService) {}
@@ -55,7 +56,10 @@ export class BlockchainController {
   })
   @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllTxViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   findAll(
     @Query('page', new PaginationPipe()) page: number,
@@ -120,7 +124,7 @@ export class BlockchainController {
     name: 'network',
     required: false,
     description: 'blockchain network name',
-    schema: { enum: Object.values(NetworkType) },
+    schema: { enum: Object.keys(NetworkType) },
   })
   @ApiQuery({
     name: 'from',
@@ -142,7 +146,10 @@ export class BlockchainController {
   })
   @ApiResponse({ status: 200, description: 'Record Found.', type: BlockchainTxViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   findByFilter(
     @Query('txHash', new TxHashPipe()) txHash: string,
