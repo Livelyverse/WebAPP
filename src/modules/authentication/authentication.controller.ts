@@ -28,6 +28,7 @@ import {
 } from './domain/dto/password.dto';
 import * as Joi from 'joi';
 import { ValidationPipe } from "./domain/pipe/validationPipe";
+import { UserEntity } from "../profile/domain/entity";
 
 export interface TokenResponse {
   access_token: string;
@@ -44,7 +45,7 @@ export class AuthenticationController {
   @Post('/signin')
   @UsePipes(new ValidationPipe({
     transform: true,
-    skipMissingProperties: true,
+    skipMissingProperties: false,
     validationError: { target: false }
   }))
   @ApiResponse({
@@ -70,7 +71,7 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({
     transform: true,
-    skipMissingProperties: true,
+    skipMissingProperties: false,
     validationError: { target: false }
   }))
   @UseGuards(JwtAuthGuard)
@@ -95,7 +96,7 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({
     transform: true,
-    skipMissingProperties: true,
+    skipMissingProperties: false,
     validationError: { target: false }
   }))
   @ApiResponse({
@@ -121,13 +122,7 @@ export class AuthenticationController {
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   public async signout(@Req() request: any): Promise<void> {
-    const authHeader = request.headers['authorization'];
-    const authToken = authHeader && authHeader.split(' ')[1];
-    const authTokenPayload = await this._authenticationService.authTokenValidation(
-      authToken,
-      false,
-    );
-    await this._authenticationService.revokeAuthToken(request.user.id, authTokenPayload);
+    await this._authenticationService.revokeAuthToken(request.user.id);
   }
 
   @Post('/mail/verify')
@@ -172,12 +167,12 @@ export class AuthenticationController {
       token,
       false,
     );
-    const authMail = await this._authenticationService.authMailCodeConfirmation(
+    const authMailEntity = await this._authenticationService.authMailCodeConfirmation(
       tokenPayload,
       authMailDto.verifyCode,
     );
 
-    const authTokenEntity = await this._authenticationService.createAuthTokenEntity(authMail.user);
+    const authTokenEntity = await this._authenticationService.createAuthTokenEntity(UserEntity.from(authMailEntity.user));
     const refreshToken = await this._authenticationService.generateRefreshToken(authTokenEntity);
     const accessToken = await this._authenticationService.generateAccessToken(authTokenEntity);
 
@@ -191,7 +186,7 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({
     transform: true,
-    skipMissingProperties: true,
+    skipMissingProperties: false,
     validationError: { target: false }
   }))
   @ApiResponse({ status: 200, description: 'Resend Mail Successful.'})
@@ -263,7 +258,7 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({
     transform: true,
-    skipMissingProperties: true,
+    skipMissingProperties: false,
     validationError: { target: false }
   }))
   @ApiParam({
@@ -371,7 +366,7 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({
     transform: true,
-    skipMissingProperties: true,
+    skipMissingProperties: false,
     validationError: { target: false }
   }))
   @ApiResponse({ status: 200, description: 'Generate accessToken success.' })

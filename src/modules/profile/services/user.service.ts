@@ -337,7 +337,22 @@ export class UserService implements IService<UserEntity> {
 
   async findById(id: string): Promise<UserEntity | null> {
     try {
-      return await this._userRepository.findOne({ where: { id: id } });
+      return await this._userRepository.findOne({
+        relations: {
+          userGroup: true
+        },
+        join: {
+          alias: "users",
+          innerJoinAndSelect: {
+            group: "users.userGroup",
+            role: "group.role",
+          }
+        },
+        loadEagerRelations: true,
+        where: {
+          id: id
+        }
+      });
     } catch (err) {
       this._logger.error(`userRepository.findOne failed. id: ${id}`, err);
       throw new HttpException({
@@ -363,7 +378,22 @@ export class UserService implements IService<UserEntity> {
 
   async findByEmail(email: string): Promise<UserEntity | null> {
     try {
-      return await this._userRepository.findOne({ where: { email: email } });
+      return await this._userRepository.findOne({
+        relations: {
+          userGroup: true
+        },
+        join: {
+          alias: "users",
+          innerJoinAndSelect: {
+            group: "users.userGroup",
+            role: "group.role",
+          }
+        },
+        loadEagerRelations: true,
+        where: {
+          email: email
+        }
+      });
     } catch (err) {
       this._logger.error(`userRepository.findOne failed, email: ${email}`, err);
       throw new HttpException({

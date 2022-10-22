@@ -30,7 +30,6 @@ export class AuthenticationModule {
         MailModule,
         ProfileModule,
         ConfigModule,
-        CacheModule,
       ],
       controllers: [AuthenticationController],
       providers: [AuthenticationService, strategyProvider],

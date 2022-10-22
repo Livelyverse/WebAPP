@@ -1,12 +1,11 @@
 import { Entity, Column, ManyToOne, OneToMany, OneToOne, JoinColumn } from "typeorm";
 import { BaseEntity } from './base.entity';
 import { UserGroupEntity } from './userGroup.entity';
+import { RoleEntity } from "./role.entity";
 
 @Entity({ name: 'user' })
 export class UserEntity extends BaseEntity {
-  // @Column({ type: 'varchar', length: 128, unique: true, nullable: false })
-  // username: string;
-
+  
   @Column({ type: 'varchar', length: 256, unique: true, nullable: false })
   email: string;
 
@@ -44,4 +43,29 @@ export class UserEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'userGroupId' })
   userGroup: UserGroupEntity;
+
+  static from(entity: UserEntity): UserEntity | null {
+    if(entity) {
+      const user = new UserEntity();
+      user.id = entity?.id;
+      user.email = entity?.email;
+      user.firstname = entity?.firstname;
+      user.lastname = entity?.lastname;
+      user.walletAddress = entity?.walletAddress;
+      user.password = entity?.password;
+      user.isEmailConfirmed = entity?.isEmailConfirmed;
+      user.imageUrl = entity.imageUrl;
+      user.imageFilename = entity.imageFilename;
+      user.imageMimeType = entity.imageMimeType;
+      user.userGroup = UserGroupEntity.from(entity?.userGroup);
+      user.version = entity?.version;
+      user.isActive = entity?.isActive;
+      user.isUpdatable = entity?.isUpdatable;
+      user.createdAt = typeof entity.createdAt === 'string' ? new Date(entity.createdAt) : entity.createdAt;
+      user.updatedAt = typeof entity.updatedAt === 'string' ? new Date(entity.updatedAt) : entity.updatedAt;
+      user.deletedAt = typeof entity?.deletedAt === 'string' ? new Date(entity.deletedAt) : entity?.deletedAt;
+      return user;
+    }
+    return null;
+  }
 }

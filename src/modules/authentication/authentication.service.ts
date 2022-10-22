@@ -10,7 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import { join } from "path";
 import { InjectEntityManager } from "@nestjs/typeorm";
 import { AuthMailEntity, AuthTokenEntity } from "./domain/entity";
-import { EntityManager, LessThan, MoreThan } from "typeorm";
+import { EntityManager, MoreThan } from "typeorm";
 import { UserGroupService } from "../profile/services/userGroup.service";
 import * as argon2 from "argon2";
 import { ChangePasswordDto, GetResetPasswordDto, PostResetPasswordDto } from "./domain/dto/password.dto";
@@ -31,6 +31,17 @@ export interface TokenPayload {
   jti: string;
   sub: string;
   data: object;
+}
+
+type AuthAccessToken = {
+  accessTokenId: string,
+  accessToken: string,
+  authTokenEntity: AuthTokenEntity
+}
+
+type AuthRefreshToken = {
+  refreshToken: string,
+  authTokenEntity: AuthTokenEntity
 }
 
 @Injectable()
@@ -178,7 +189,7 @@ export class AuthenticationService {
 
     user.password = hashPassword;
     await this._userService.updateEntity(user);
-    await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, 0);
+    await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, {ttl: 0});
 
     // tokenEntity.isRevoked = true;
     // try {
@@ -223,7 +234,6 @@ export class AuthenticationService {
     let user = await this._cacheManager.get<UserEntity>(`USER.EMAIL:${dto.email}`);
     if(!user) {
       user = await this._userService.findByEmail(dto.email);
-
       if (!user) {
         this._logger.log(`user not found, email: ${dto.email}`);
         res
@@ -235,6 +245,7 @@ export class AuthenticationService {
           });
         return;
       }
+      await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, {ttl: 0});
     }
 
     if (!user.isActive) {
@@ -278,7 +289,6 @@ export class AuthenticationService {
       return;
     }
 
-    // await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, 0);
     if (user.isEmailConfirmed) {
       let authTokenEntity = await this.getAuthTokenEntity(user);
       if(!authTokenEntity) {
@@ -316,7 +326,7 @@ export class AuthenticationService {
       userDto.email,
       Number(authMailEntity.verificationId),
     );
-    await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, this._mailTokenTTL / 1000);
+    await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, {ttl: this._mailTokenTTL / 1000});
     return await this.generateAuthMailToken(authMailEntity);
   }
 
@@ -415,7 +425,7 @@ export class AuthenticationService {
       }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    await this._cacheManager.set(`USER.EMAIL:${authMailEntity.user.email}`, authMailEntity.user, 0);
+    await this._cacheManager.set(`USER.EMAIL:${authMailEntity.user.email}`, authMailEntity.user, {ttl: 0});
     await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailEntity.user.id}`);
     await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailToken.jti}`);
     return authMailEntity;
@@ -495,7 +505,14 @@ export class AuthenticationService {
       }, HttpStatus.BAD_REQUEST);
     }
 
-    if(authMailEntity.expiredAt.getTime() < Date.now()) {
+    let expiredAt;
+    if(typeof authMailEntity.expiredAt === 'string') {
+      expiredAt = new Date(authMailEntity.expiredAt);
+    } else {
+      expiredAt = authMailEntity.expiredAt;
+    }
+
+    if(expiredAt.getTime() < Date.now()) {
       authMailEntity = await this.createAuthMailEntity(user,  AuthMailType.USER_VERIFICATION, true);
     }
     this._mailService.sendCodeConfirmation(
@@ -579,7 +596,7 @@ export class AuthenticationService {
       userEntity.email,
       absoluteUrl,
     );
-    await this._cacheManager.set(`USER.EMAIL:${email}`, userEntity, this._mailTokenTTL / 1000);
+    await this._cacheManager.set(`USER.EMAIL:${email}`, userEntity, {ttl: this._mailTokenTTL / 1000});
   }
 
   public async postUserResetPasswordHandler(
@@ -640,7 +657,7 @@ export class AuthenticationService {
 
     authMail.user.password = hashPassword;
     await this._userService.updateEntity(authMail.user);
-    await this._cacheManager.set(`USER.EMAIL:${authMail.user.email}`, authMail.user, 0);
+    await this._cacheManager.set(`USER.EMAIL:${authMail.user.email}`, authMail.user, {ttl: 0});
     await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
   }
 
@@ -692,11 +709,12 @@ export class AuthenticationService {
     return resetPasswordDto;
   }
 
-  public async revokeAuthToken(userId: string, authToken: TokenPayload): Promise<AuthTokenEntity> {
-    let authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_TOKEN.USER_ID:${userId}`);
-    if(!authTokenEntity) {
-      authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_ACCESS_TOKEN.ID:${authToken.jti}`);
-      if (!authTokenEntity) {
+  public async revokeAuthToken(userId: string): Promise<AuthTokenEntity> {
+    let authTokenEntity: AuthTokenEntity;
+    let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${userId}`);
+    if(!authRefreshToken) {
+      let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${userId}`);
+      if (!authAccessToken) {
         try {
           authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
             relations: ['user'],
@@ -715,7 +733,11 @@ export class AuthenticationService {
             error: 'Internal Server Error'
           }, HttpStatus.INTERNAL_SERVER_ERROR);
         }
+      } else {
+        authTokenEntity = authAccessToken.authTokenEntity;
       }
+    } else {
+      authTokenEntity = authRefreshToken.authTokenEntity;
     }
 
     if (!authTokenEntity) {
@@ -741,8 +763,8 @@ export class AuthenticationService {
       }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.ID:${authToken.jti}`);
-    await this._cacheManager.del(`AUTH_TOKEN.USER_ID:${userId}`);
+    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${userId}`);
+    await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${userId}`);
     return authTokenEntity;
   }
 
@@ -758,7 +780,7 @@ export class AuthenticationService {
       }, HttpStatus.UNAUTHORIZED);
     }
 
-    let authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_ACCESS_TOKEN.ID:${payload.jti}`);
+    let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${payload.sub}`);
     // if(!authTokenEntity) {
     //   try {
     //     authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
@@ -789,7 +811,7 @@ export class AuthenticationService {
     //     }, HttpStatus.INTERNAL_SERVER_ERROR);
     //   }
     // }
-    if(!authTokenEntity) {
+    if(!authAccessToken) {
       return new HttpException({
         statusCode: '401',
         message: 'Unauthorized',
@@ -806,11 +828,12 @@ export class AuthenticationService {
     }
 
     if (
-      !authTokenEntity.isRevoked &&
-      authTokenEntity.user.isEmailConfirmed &&
-      authTokenEntity.user.isActive
+      !authAccessToken.authTokenEntity.isRevoked &&
+      authAccessToken.authTokenEntity.user.isEmailConfirmed &&
+      authAccessToken.accessTokenId === payload.jti &&
+      authAccessToken.authTokenEntity.user.isActive
     ) {
-      return authTokenEntity.user;
+      return UserEntity.from(authAccessToken.authTokenEntity.user);
     }
 
     return new HttpException({
@@ -856,7 +879,7 @@ export class AuthenticationService {
       }, HttpStatus.UNAUTHORIZED);
     }
 
-    let authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_TOKEN.USER_ID:${payload.sub}`);
+    let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${payload.sub}`);
     // if(!authTokenEntity) {
     //   try {
     //     authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
@@ -875,7 +898,7 @@ export class AuthenticationService {
     //   }
     // }
 
-    if (!authTokenEntity) {
+    if (!authRefreshToken) {
       this._logger.log(
         `authTokenEntity not found, payload: ${JSON.stringify(payload)}`,
       );
@@ -886,14 +909,21 @@ export class AuthenticationService {
       }, HttpStatus.UNAUTHORIZED);
     }
 
+    let refreshTokenExpiredAt;
+    if(typeof authRefreshToken.authTokenEntity.refreshTokenExpiredAt === 'string') {
+      refreshTokenExpiredAt = new Date(authRefreshToken.authTokenEntity.refreshTokenExpiredAt);
+    } else {
+      refreshTokenExpiredAt = authRefreshToken.authTokenEntity.refreshTokenExpiredAt;
+    }
+
     if (
-      authTokenEntity.isRevoked ||
-      Date.now() >= authTokenEntity.refreshTokenExpiredAt.getTime() ||
-      payload.jti !== authTokenEntity.id
+      authRefreshToken.authTokenEntity.isRevoked ||
+      Date.now() >= refreshTokenExpiredAt.getTime() ||
+      payload.jti !== authRefreshToken.authTokenEntity.id
     ) {
       this._logger.log(
         `authTokenEntity is revoked or expired or invalid, authToken userId: ${
-          authTokenEntity.user.id
+          authRefreshToken.authTokenEntity.user.id
         }, payload: ${JSON.stringify(payload)}`,
       );
       throw new HttpException({
@@ -903,7 +933,7 @@ export class AuthenticationService {
       }, HttpStatus.UNAUTHORIZED);
     }
 
-    const user = authTokenEntity.user;
+    const user = authRefreshToken.authTokenEntity.user;
     if (!user || !user.isEmailConfirmed || !user.isActive) {
       this._logger.log(
         `user not found or deactivated or not email confirmed, userId: ${payload.sub}`,
@@ -915,17 +945,25 @@ export class AuthenticationService {
       }, HttpStatus.UNAUTHORIZED);
     }
 
-    return authTokenEntity;
+    return authRefreshToken.authTokenEntity;
   }
 
-  public async generateAuthMailToken(authMail: AuthMailEntity): Promise<string> {
+  public async generateAuthMailToken(authMailEntity: AuthMailEntity): Promise<string> {
+
+    let expiredAt;
+    if(typeof authMailEntity.expiredAt === 'string') {
+      expiredAt = new Date(authMailEntity.expiredAt);
+    } else {
+      expiredAt = authMailEntity.expiredAt;
+    }
+
     const payload = {
       iss: `https://${this._domain}`,
-      sub: authMail.user.id,
+      sub: authMailEntity.user.id,
       aud: `https://${this._domain}`,
-      exp: Math.floor(authMail.expiredAt.getTime() / 1000),
+      exp: Math.floor(expiredAt.getTime() / 1000),
       nbf: Math.floor(Date.now() / 1000),
-      jti: authMail.id,
+      jti: authMailEntity.id,
     };
     const option = {
       algorithm: 'ES512' as Algorithm,
@@ -944,80 +982,115 @@ export class AuthenticationService {
   }
 
   public async generateAccessToken(authTokenEntity: AuthTokenEntity): Promise<string> {
+    let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${authTokenEntity.user.id}`);
+    if(!authAccessToken) {
+      const accessTokenId = crypto.randomUUID({
+        disableEntropyCache: true,
+      });
 
-    const accessTokenId = crypto.randomUUID({
-      disableEntropyCache: true,
-    });
+      const payload = {
+        iss: `https://${this._domain}`,
+        sub: authTokenEntity.user.id,
+        aud: `https://${this._domain}`,
+        exp: Math.floor(Date.now() + this._accessTokenTTL) / 1000,
+        nbf: Math.floor(Date.now() / 1000),
+        jti: accessTokenId,
+      };
+      const option = {
+        algorithm: 'ES512' as Algorithm,
+        privateKey: this._privateKey,
+      };
+      let accessToken;
+      try {
+        accessToken = await this._jwt.signAsync(payload, option);
+      } catch (error) {
+        this._logger.error(
+          `accessToken jwt.signAsync failed, payload: ${payload}`,
+          error,
+        );
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
 
-    const payload = {
-      iss: `https://${this._domain}`,
-      sub: authTokenEntity.user.id,
-      aud: `https://${this._domain}`,
-      exp: Math.floor(Date.now() + this._accessTokenTTL) / 1000,
-      nbf: Math.floor(Date.now() / 1000),
-      jti: accessTokenId,
-    };
-    const option = {
-      algorithm: 'ES512' as Algorithm,
-      privateKey: this._privateKey,
-    };
-    let accessToken;
-    try {
-      accessToken = await this._jwt.signAsync(payload, option);
-    } catch (error) {
-      this._logger.error(
-        `accessToken jwt.signAsync failed, payload: ${payload}`,
-        error,
+      await this._cacheManager.set(
+        `AUTH_ACCESS_TOKEN.USER_ID:${authTokenEntity.user.id}`,
+        { accessTokenId, accessToken, authTokenEntity },
+        { ttl: this._accessTokenTTL / 1000 }
       );
-      throw new HttpException({
-        statusCode: '500',
-        message: 'Something Went Wrong',
-        error: 'Internal Server Error'
-      }, HttpStatus.INTERNAL_SERVER_ERROR);
+      return accessToken;
+    } else {
+      return authAccessToken.accessToken;
     }
-
-    await this._cacheManager.set(`AUTH_ACCESS_TOKEN.ID:${accessTokenId}`, authTokenEntity, this._accessTokenTTL / 1000);
-    return accessToken;
   }
 
   public async generateRefreshToken(authTokenEntity: AuthTokenEntity): Promise<string> {
-    const payload = {
-      iss: `https://${this._domain}`,
-      sub: authTokenEntity.user.id,
-      aud: `https://${this._domain}`,
-      exp: Math.floor(authTokenEntity.refreshTokenExpiredAt.getTime() / 1000),
-      nbf: Math.floor(Date.now() / 1000),
-      jti: authTokenEntity.id,
-    };
-
-    const option = {
-      algorithm: 'ES512' as Algorithm,
-      privateKey: this._privateKey,
-    };
-
     let refreshToken;
-    try {
-      refreshToken = await this._jwt.signAsync(payload, option);
-    } catch (error) {
-      this._logger.error(
-        `refreshToken jwt.signAsync failed, payload: ${payload}`,
-        error,
-      );
-      throw new HttpException({
-        statusCode: '500',
-        message: 'Something Went Wrong',
-        error: 'Internal Server Error'
-      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${authTokenEntity.user.id}`);
+    if(!authRefreshToken) {
+      let refreshTokenExpiredAt;
+      if (typeof authTokenEntity.refreshTokenExpiredAt === 'string') {
+        refreshTokenExpiredAt = new Date(authTokenEntity.refreshTokenExpiredAt);
+      } else {
+        refreshTokenExpiredAt = authTokenEntity.refreshTokenExpiredAt;
+      }
+
+      const payload = {
+        iss: `https://${this._domain}`,
+        sub: authTokenEntity.user.id,
+        aud: `https://${this._domain}`,
+        exp: Math.floor(refreshTokenExpiredAt.getTime() / 1000),
+        nbf: Math.floor(Date.now() / 1000),
+        jti: authTokenEntity.id,
+      };
+
+      const option = {
+        algorithm: 'ES512' as Algorithm,
+        privateKey: this._privateKey,
+      };
+
+      try {
+        refreshToken = await this._jwt.signAsync(payload, option);
+      } catch (error) {
+        this._logger.error(
+          `refreshToken jwt.signAsync failed, payload: ${payload}`,
+          error,
+        );
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+      await this._cacheManager.set(`AUTH_REFRESH_TOKEN.USER_ID:${authTokenEntity.user.id}`,
+        { refreshToken, authTokenEntity },
+        { ttl: this._refreshTokenTTL / 1000 });
+      return refreshToken;
+    } else {
+      return authRefreshToken.refreshToken;
     }
-    return refreshToken;
   }
 
   public async getAuthTokenEntity(user: UserEntity): Promise<AuthTokenEntity> {
-    let authTokenEntity = await this._cacheManager.get<AuthTokenEntity>(`AUTH_TOKEN.USER_ID:${user.id}`);
-    if(!authTokenEntity) {
+    let authTokenEntity: AuthTokenEntity;
+    let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+    if(!authRefreshToken) {
       try {
         authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
-          relations: ['user'],
+          relations: {
+            user: true
+          },
+          join: {
+            alias: "authMail",
+            innerJoinAndSelect: {
+              user: "authMail.user",
+              userGroup: "user.userGroup",
+              role: "userGroup.role"
+            }
+          },
+          loadEagerRelations: true,
           where: {
             user: { id: user.id },
             refreshTokenExpiredAt: MoreThan(new Date()),
@@ -1060,7 +1133,6 @@ export class AuthenticationService {
       }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    await this._cacheManager.set(`AUTH_TOKEN.USER_ID:${user.id}`, authTokenEntity, this._refreshTokenTTL / 1000);
     return authTokenEntity;
   }
 
@@ -1104,20 +1176,31 @@ export class AuthenticationService {
       }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if(mailType === AuthMailType.USER_VERIFICATION) {
-      await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailEntity.id}`, authMailEntity, this._mailTokenTTL / 1000);
-      await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`, authMailEntity, this._mailTokenTTL / 1000);
+      await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailEntity.id}`, authMailEntity, {ttl: this._mailTokenTTL / 1000});
+      await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`, authMailEntity, {ttl: this._mailTokenTTL / 1000});
     } else if(mailType === AuthMailType.FORGOTTEN_PASSWORD) {
-      await this._cacheManager.set(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID::${userEntity.id}`, authMailEntity, this._mailTokenTTL / 1000);
+      await this._cacheManager.set(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID::${userEntity.id}`, authMailEntity, {ttl: this._mailTokenTTL / 1000});
     }
     return authMailEntity;
   }
 
   public async getAuthMailEntity(userEntity: UserEntity): Promise<AuthMailEntity> {
-    let authMail = await this._cacheManager.get<AuthMailEntity>(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`);
-    if(!authMail) {
+    let authMailEntity = await this._cacheManager.get<AuthMailEntity>(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`);
+    if(!authMailEntity) {
       try {
-        authMail = await this._entityManager.getRepository(AuthMailEntity).findOne({
-          relations: ['user'],
+        authMailEntity = await this._entityManager.getRepository(AuthMailEntity).findOne({
+          relations: {
+            user: true
+          },
+          join: {
+            alias: "authMail",
+            innerJoinAndSelect: {
+              user: "authMail.user",
+              userGroup: "user.userGroup",
+              role: "userGroup.role"
+            }
+          },
+          loadEagerRelations: true,
           where: {
             user: { id: userEntity.id },
             expiredAt: MoreThan(new Date()),
@@ -1135,7 +1218,12 @@ export class AuthenticationService {
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR);
       }
+      if(authMailEntity) {
+        await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`, authMailEntity, {
+          ttl: Math.round((authMailEntity.expiredAt.getTime() - Date.now()) / 1000)
+        });
+      }
     }
-    return authMail;
+    return authMailEntity;
   }
 }

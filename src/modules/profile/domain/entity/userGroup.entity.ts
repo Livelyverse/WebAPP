@@ -21,4 +21,21 @@ export class UserGroupEntity extends BaseEntity {
   @JoinColumn({ name: 'roleId' })
   role: RoleEntity;
 
+  static from(entity: UserGroupEntity): UserGroupEntity | null {
+    if(entity) {
+      const userGroup = new UserGroupEntity();
+      userGroup.id = entity?.id;
+      userGroup.name = entity?.name;
+      userGroup.description = entity?.description;
+      userGroup.role = RoleEntity.from(entity?.role);
+      userGroup.version = entity?.version;
+      userGroup.isActive = entity?.isActive;
+      userGroup.isUpdatable = entity?.isUpdatable;
+      userGroup.createdAt = typeof entity.createdAt === 'string' ? new Date(entity.createdAt) : entity.createdAt;
+      userGroup.updatedAt = typeof entity.updatedAt === 'string' ? new Date(entity.updatedAt) : entity.updatedAt;
+      userGroup.deletedAt = typeof entity?.deletedAt === 'string' ? new Date(entity.deletedAt) : entity?.deletedAt;
+      return userGroup;
+    }
+    return null;
+  }
 }

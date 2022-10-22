@@ -1,4 +1,5 @@
-import { CacheModule, Module } from "@nestjs/common";
+import { CacheModule, CacheStore, Module } from "@nestjs/common";
+import { redisStore } from 'cache-manager-redis-store';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import yamlReader from './config/yamlReader';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -10,6 +11,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AirdropModule } from './modules/airdrop/airdrop.module';
 import { BlockchainModule } from './modules/blockchain/blockchain.module';
 import { APP_MODE, BlockchainConfig } from "./modules/blockchain/blockchainConfig";
+import { RedisClientOptions } from "redis";
 @Module({
   imports: [
     AuthenticationModule.forRoot('jwt'),
@@ -63,12 +65,16 @@ import { APP_MODE, BlockchainConfig } from "./modules/blockchain/blockchainConfi
     CacheModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
+        store: await redisStore({
+          store: "none",
+          socket: {
+            host: configService.get<string>('app.cache.host'),
+            port: configService.get<number>('app.cache.port'),
+          },
+        }) as unknown as CacheStore,
         ttl: configService.get<number>('app.cache.ttl'),
-        isGlobal: false,
-        store: configService.get<string>('app.cache.store'),
-        host: configService.get<string>('app.cache.host'),
-        port: configService.get<number>('app.cache.port'),
       }),
+      isGlobal: true,
       inject: [ConfigService],
     })
   ],

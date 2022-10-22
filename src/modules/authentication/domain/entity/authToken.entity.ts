@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity, UserEntity } from '../../../profile/domain/entity';
 
 @Entity({ name: 'auth_token' })
@@ -15,7 +15,14 @@ export class AuthTokenEntity extends BaseEntity {
   @Column({ type: 'timestamptz', unique: false, nullable: false })
   refreshTokenExpiredAt: Date;
 
-  @OneToOne((type) => UserEntity)
+  @ManyToOne((type) => UserEntity, {
+    cascade: ['soft-remove'],
+    onDelete: 'NO ACTION',
+    nullable: false,
+    lazy: false,
+    eager: true,
+    orphanedRowAction: 'nullify',
+  })
   @JoinColumn()
   user: UserEntity;
 }

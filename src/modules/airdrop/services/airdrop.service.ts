@@ -528,7 +528,7 @@ export class AirdropService {
               RxJS.filter(filterVal => !!filterVal),
               RxJS.concatMap(filterVal =>
                 RxJS.from(this._entityManager.createQueryBuilder(UserEntity, "users")
-                  .select('"users"."id" as "userId", "users"."username" as "username"')
+                  .select('"users"."id" as "userId", "users"."email" as "email"')
                   .addSelect('COALESCE("sub1"."airdrops", 0) as "pending", COALESCE("sub2"."airdrops", 0) as "settlement"')
                   .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
                   .leftJoin(qb =>
@@ -585,7 +585,7 @@ export class AirdropService {
               RxJS.concatMap(_ =>
                 RxJS.from(this._entityManager.createQueryBuilder()
                   .select("*")
-                  .from(subQuery => subQuery.select('"users"."id" as "userId", "users"."username" as "username"')
+                  .from(subQuery => subQuery.select('"users"."id" as "userId", "users"."email" as "email"')
                       .addSelect('COALESCE("sub1"."airdrops", 0) as "pending", COALESCE("sub2"."airdrops", 0) as "settlement"')
                       .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
                       .leftJoin(qb =>
