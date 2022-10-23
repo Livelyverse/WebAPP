@@ -1,12 +1,17 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
-import { FindAllType, IAirdropService, SortBy, SortType } from "./IAirdrop.service";
+import { FindAllType, IAirdropService, SortType } from "./IAirdrop.service";
 import * as RxJS from "rxjs";
 import { InjectEntityManager } from "@nestjs/typeorm";
 import { EntityManager } from "typeorm";
 import { SocialLivelyCreateDto } from "../domain/dto/socialLivelyCreate.dto";;
 import { SocialLivelyUpdateDto } from "../domain/dto/socialLivelyUpdate.dto";
 import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
+
+export enum SocialLivelySortBy {
+  TIMESTAMP = 'createdAt',
+  SOCIAL_TYPE = 'socialType'
+}
 
 @Injectable()
 export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
@@ -24,7 +29,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
     offset: number,
     limit: number,
     sortType: SortType,
-    sortBy: SortBy,
+    sortBy: SocialLivelySortBy,
   ): RxJS.Observable<FindAllType<SocialLivelyEntity>> {
     return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity)
       .findAndCount({
@@ -43,7 +48,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )
@@ -62,7 +67,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )
@@ -81,7 +86,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
       RxJS.catchError(error => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
@@ -112,7 +117,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
       RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
@@ -143,7 +148,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
       RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
@@ -211,7 +216,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
                   RxJS.catchError(_ => RxJS.throwError(() =>
                     new HttpException({
                       statusCode: '500',
-                      message: 'Internal Server Error',
+                      message: 'Something Went Wrong',
                       error: 'Internal Server Error'
                     }, HttpStatus.INTERNAL_SERVER_ERROR))
                   )
@@ -232,7 +237,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
                 RxJS.throwError(() => new HttpException(
                   {
                     statusCode: '500',
-                    message: 'Internal Server Error',
+                    message: 'Something Went Wrong',
                     error: 'Internal Server Error'
                   }, HttpStatus.INTERNAL_SERVER_ERROR)
                 )
@@ -295,7 +300,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
                   RxJS.throwError(() => new HttpException(
                     {
                       statusCode: '500',
-                      message: 'Internal Server Error',
+                      message: 'Something Went Wrong',
                       error: 'Internal Server Error'
                     }, HttpStatus.INTERNAL_SERVER_ERROR)
                   )

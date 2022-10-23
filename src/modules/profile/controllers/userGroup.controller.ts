@@ -13,29 +13,29 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-  Param,
-  ParseUUIDPipe,
+  Param, ParseUUIDPipe,
   Post,
   Query,
+  Req,
   UseGuards, UsePipes
 } from "@nestjs/common";
-import { RoleService, RoleSortBy } from "../services/role.service";
-import { RoleCreateDto, RoleUpdateDto, RoleViewDto } from "../domain/dto";
-import { RoleEntity } from '../domain/entity';
+import { UserGroupService, UserGroupSortBy } from "../services/userGroup.service";
+import { UserGroupCreateDto, UserGroupViewDto, UserGroupUpdateDto } from "../domain/dto";
+import { UserGroupEntity } from '../domain/entity';
 import { JwtAuthGuard } from '../../authentication/domain/gurad/jwt-auth.guard';
 import RoleGuard from '../../authentication/domain/gurad/role.guard';
 import { FindAllViewDto } from '../domain/dto/findAllView.dto';
 import { ValidationPipe } from "../../airdrop/domain/pipe/validationPipe";
-import { SortType } from "../services/IService";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { EnumPipe } from "../domain/pipe/enumPipe";
+import { SortType } from "../services/IService";
 
 @ApiBearerAuth()
-@ApiTags('/api/profiles/roles')
-@Controller('/api/profiles/roles')
-export class RoleController {
-  private readonly _logger = new Logger(RoleController.name);
-  constructor(private readonly _roleService: RoleService) {}
+@ApiTags('/api/profiles/user-groups')
+@Controller('/api/profiles/user-groups')
+export class UserGroupController {
+  private readonly _logger = new Logger(UserGroupController.name);
+  constructor(private readonly _userGroupService: UserGroupService) {}
 
   @Post('create')
   @HttpCode(HttpStatus.OK)
@@ -46,15 +46,15 @@ export class RoleController {
     skipMissingProperties: true,
     validationError: { target: false }
   }))
-  @ApiResponse({ status: 200, description: 'Record Created Successfully.', type: RoleViewDto })
+  @ApiResponse({ status: 200, description: 'Record Created successfully', type: UserGroupViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async create(@Body() roleDto: RoleCreateDto): Promise<RoleViewDto> {
-    const role = await this._roleService.create(roleDto);
-    return RoleViewDto.from(role);
+  async create(@Body() userGroupDto: UserGroupCreateDto): Promise<UserGroupViewDto> {
+    const group = await this._userGroupService.create(userGroupDto);
+    return UserGroupViewDto.from(group);
   }
 
   @Post('update')
@@ -67,19 +67,17 @@ export class RoleController {
     validationError: { target: false }
   }))
   @ApiResponse({
-    status: 200,
-    description: 'Record Updated Successfully.',
-    type: RoleViewDto
+    status: 200, description: 'Record Updated Successfully.', type: UserGroupViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async update(@Body() roleDto: RoleUpdateDto): Promise<RoleViewDto> {
-    const role = await this._roleService.update(roleDto);
-    return RoleViewDto.from(role);
+  async update(@Body() userGroupDto: UserGroupUpdateDto): Promise<UserGroupViewDto> {
+    const group = await this._userGroupService.update(userGroupDto);
+    return UserGroupViewDto.from(group);
   }
 
   @Get('/find/id/:uuid')
@@ -88,26 +86,26 @@ export class RoleController {
   @ApiParam({
     name: 'uuid',
     required: true,
-    description: 'find by role id',
+    description: 'find by group id',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'Record Found.', type: RoleViewDto})
+  @ApiResponse({ status: 200, description: 'Record Found.', type: UserGroupViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async findRoleById(@Param('uuid', new ParseUUIDPipe()) uuid): Promise<RoleViewDto> {
-    let role: RoleEntity;
-    role = await this._roleService.findById(uuid);
-    if (!role) {
-      throw new HttpException({
-        statusCode: '404',
-        message: 'Role Not Found',
-        error: 'Not Found'
-      }, HttpStatus.NOT_FOUND);
+  async findUserGroupById(@Param('uuid', new ParseUUIDPipe()) uuid): Promise<UserGroupViewDto> {
+    const group = await this._userGroupService.findById(uuid);
+
+    if (!group) {
+      throw new HttpException(
+        { message: `UserGroup Not Found` },
+        HttpStatus.NOT_FOUND,
+      );
     }
-    return RoleViewDto.from(role);
+
+    return UserGroupViewDto.from(group);
   }
 
   @Get('/find/name/:name')
@@ -116,19 +114,19 @@ export class RoleController {
   @ApiParam({
     name: 'name',
     required: true,
-    description: 'find role by name',
+    description: 'find by group name',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'Record Found.', type: RoleViewDto})
+  @ApiResponse({ status: 200, description: 'Record Found.', type: UserGroupViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async findRoleByName(@Param('name') name): Promise<RoleViewDto> {
-    let role: RoleEntity;
+  async getGroup(@Param('name') name): Promise<UserGroupViewDto> {
+    let group: UserGroupEntity;
     if (typeof name === 'string') {
-      role = await this._roleService.findByName(name);
+      group = await this._userGroupService.findByName(name);
     } else {
       throw new HttpException({
         statusCode: '400',
@@ -137,16 +135,16 @@ export class RoleController {
       }, HttpStatus.BAD_REQUEST);
     }
 
-    if (!role) {
+    if (!group) {
       throw new HttpException({
         statusCode: '404',
-        message: 'Role Not Found',
-        error: 'Not Found'
+        message: 'UserGroup Not Found',
+        error: 'Bad Request'
       }, HttpStatus.NOT_FOUND);
     }
-    return RoleViewDto.from(role);
-  }
 
+    return UserGroupViewDto.from(group);
+  }
 
   @Get('/find/all')
   @HttpCode(HttpStatus.OK)
@@ -167,8 +165,8 @@ export class RoleController {
   @ApiQuery({
     name: 'sortBy',
     required: false,
-    description: `data sort field can be one of ${Object.keys(RoleSortBy)}`,
-    schema: { enum: Object.keys(RoleSortBy) },
+    description: `data sort field can be one of ${Object.keys(UserGroupSortBy)}`,
+    schema: { enum: Object.keys(UserGroupSortBy) },
   })
   @ApiQuery({
     name: 'sortType',
@@ -178,18 +176,18 @@ export class RoleController {
   })
   @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async findAllRoles(
+  async findAllUserGroups(
     @Query('page', new PaginationPipe()) page: number,
     @Query('offset', new PaginationPipe()) offset: number,
     @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
-    @Query('sortBy', new EnumPipe(RoleSortBy)) sortBy: RoleSortBy,
+    @Query('sortBy', new EnumPipe(UserGroupSortBy)) sortBy: UserGroupSortBy,
   ): Promise<FindAllViewDto> {
-    const { data, total } = await this._roleService.findAll(
+    const { data, total } = await this._userGroupService.findAll(
       (page - 1) * offset,
       offset,
       sortType,
@@ -198,7 +196,7 @@ export class RoleController {
     if (total === 0 || data.length === 0) {
       throw new HttpException({
         statusCode: '404',
-        message: 'Roles Not Found',
+        message: 'UserGroups Not Found',
         error: 'Not Found'
       }, HttpStatus.NOT_FOUND);
     }
@@ -214,21 +212,18 @@ export class RoleController {
   @ApiParam({
     name: 'uuid',
     required: true,
-    description: 'soft delete by role name',
+    description: 'soft delete by group id',
     schema: { type: 'string' },
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Record Deleted Successfully.',
-  })
+  @ApiResponse({ status: 200, description: 'Record Deleted successfully.'})
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 422, description: 'Record Could Not Deleted.', })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  async deleteById(@Param('uuid', new ParseUUIDPipe()) uuid) {
-    return await this._roleService.delete(uuid);
+  async deleteUserGroupById(@Param('uuid', new ParseUUIDPipe()) uuid) {
+      return await this._userGroupService.deleteByName(uuid);
   }
 
   @Post('/delete/name/:name')
@@ -238,25 +233,24 @@ export class RoleController {
   @ApiParam({
     name: 'name',
     required: true,
-    description: 'soft delete by role name',
+    description: 'soft delete by group name',
     schema: { type: 'string' },
   })
-  @ApiResponse({ status: 200, description: 'Record Deleted successfully.'})
+  @ApiResponse({ status: 200, description: 'Record Deleted Successfully.'})
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 422, description: 'Record Could Not Deleted.'})
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async delete(@Param('name') name) {
     if (typeof name === 'string') {
-      return await this._roleService.deleteByName(name);
+      return await this._userGroupService.deleteByName(name);
     } else {
-      throw new HttpException({
-        statusCode: '400',
-        message: 'Input Data invalid',
-        error: 'Not Found'
-      }, HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        { message: 'Input Data invalid' },
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 }

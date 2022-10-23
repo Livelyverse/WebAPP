@@ -6,7 +6,7 @@ export class FollowerViewDto {
   static from(entity: SocialFollowerEntity): FollowerViewDto | null {
     if(entity) {
       const followerDto = new FollowerViewDto();
-      followerDto.username = entity.socialProfile.user.username;
+      followerDto.email = entity.socialProfile.user.email;
       followerDto.socialType = entity.socialProfile.socialType.toString();
       followerDto.socialUsername = entity.socialProfile.username;
       followerDto.socialName = entity.socialProfile?.socialName ? entity.socialProfile.socialName : null;
@@ -20,7 +20,7 @@ export class FollowerViewDto {
   }
 
   @ApiResponseProperty()
-  username: string;
+  email: string;
 
   @ApiResponseProperty()
   socialType: string

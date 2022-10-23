@@ -17,22 +17,22 @@ export class SocialProfileEntity extends BaseEntity {
   socialType: SocialType
 
   @Column({ type: 'varchar', length: 256, unique: false, nullable: true })
-  socialName?: string
+  socialName: string
 
   @Column({ type: 'varchar', length: 256, unique: false, nullable: true })
-  socialId?: string
+  socialId: string
 
   @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
   username: string
 
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: true })
-  profileUrl?: string
+  profileUrl: string
 
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: true })
-  website?: string
+  website: string
 
   @Column({ type: 'varchar', length: 256, unique: false, nullable: true })
-  location?: string
+  location: string
 
   @ManyToOne((type) => UserEntity,{
     cascade: ['soft-remove'],

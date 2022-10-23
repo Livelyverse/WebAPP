@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
-import { BalanceSortBy, FindAllType, SortBy, SortType } from "./IAirdrop.service";
+import { BalanceSortBy, FindAllType, SortType } from "./IAirdrop.service";
 import { InjectEntityManager } from "@nestjs/typeorm";
 import { EntityManager, IsNull, Not } from "typeorm";
 import { SocialAirdropEntity } from "../domain/entity/socialAirdrop.entity";
@@ -14,6 +14,10 @@ import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
 
 export type FindAllBalanceType = { data: Array<AirdropBalance>; total: number }
 
+export enum AirdropSortBy {
+  TIMESTAMP = 'createdAt',
+}
+
 @Injectable()
 export class AirdropService {
 
@@ -25,7 +29,7 @@ export class AirdropService {
     offset: number,
     limit: number,
     sortType: SortType,
-    sortBy: SortBy,
+    sortBy: AirdropSortBy,
     isSettlement: boolean | null,
     filterBy: AirdropFilterType | null,
     filter: unknown,
@@ -500,7 +504,7 @@ export class AirdropService {
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )
@@ -524,7 +528,7 @@ export class AirdropService {
               RxJS.filter(filterVal => !!filterVal),
               RxJS.concatMap(filterVal =>
                 RxJS.from(this._entityManager.createQueryBuilder(UserEntity, "users")
-                  .select('"users"."id" as "userId", "users"."username" as "username"')
+                  .select('"users"."id" as "userId", "users"."email" as "email"')
                   .addSelect('COALESCE("sub1"."airdrops", 0) as "pending", COALESCE("sub2"."airdrops", 0) as "settlement"')
                   .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
                   .leftJoin(qb =>
@@ -581,7 +585,7 @@ export class AirdropService {
               RxJS.concatMap(_ =>
                 RxJS.from(this._entityManager.createQueryBuilder()
                   .select("*")
-                  .from(subQuery => subQuery.select('"users"."id" as "userId", "users"."username" as "username"')
+                  .from(subQuery => subQuery.select('"users"."id" as "userId", "users"."email" as "email"')
                       .addSelect('COALESCE("sub1"."airdrops", 0) as "pending", COALESCE("sub2"."airdrops", 0) as "settlement"')
                       .addSelect('COALESCE("sub1"."airdrops",0) + COALESCE("sub2"."airdrops",0) as "total"')
                       .leftJoin(qb =>
@@ -920,7 +924,7 @@ export class AirdropService {
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )

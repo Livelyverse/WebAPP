@@ -4,7 +4,7 @@ export interface AirdropBalance {
   total: bigint;
   pending: bigint;
   settlement: bigint;
-  username?: string;
+  email?: string;
   userId?: string;
   actionType?: string;
   socialType?: string;
@@ -17,7 +17,7 @@ export class AirdropBalanceViewDto {
       balanceDto.total = entity.total.toString();
       balanceDto.pending = entity.pending.toString();
       balanceDto.settlement = entity.settlement.toString();
-      balanceDto.username = entity?.username ? entity.username : null;
+      balanceDto.email = entity?.email ? entity.email : null;
       balanceDto.userId = entity?.userId ? entity.userId : null;
       balanceDto.actionType = entity?.actionType ? entity.actionType : null;
       balanceDto.socialType = entity?.socialType ? entity.socialType : null;
@@ -36,7 +36,7 @@ export class AirdropBalanceViewDto {
   settlement: string;
 
   @ApiResponseProperty()
-  username: string;
+  email: string;
 
   @ApiResponseProperty()
   userId: string;

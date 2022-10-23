@@ -1,10 +1,10 @@
 import { AuthenticationController } from './authentication.controller';
 import { AuthenticationService } from './authentication.service';
-import { DynamicModule, Module } from '@nestjs/common';
+import { DynamicModule, Module } from "@nestjs/common";
 import { ProfileModule } from '../profile/profile.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthMailEntity, TokenEntity } from './domain/entity';
+import { AuthMailEntity, AuthTokenEntity } from './domain/entity';
 import { JwtModule } from '@nestjs/jwt';
 import { MailModule } from '../mail/mail.module';
 
@@ -25,7 +25,7 @@ export class AuthenticationModule {
     return {
       module: AuthenticationModule,
       imports: [
-        TypeOrmModule.forFeature([AuthMailEntity, TokenEntity]),
+        TypeOrmModule.forFeature([AuthMailEntity, AuthTokenEntity]),
         JwtModule.register({ secret: '' }),
         MailModule,
         ProfileModule,

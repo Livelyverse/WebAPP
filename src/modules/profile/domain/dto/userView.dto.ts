@@ -1,16 +1,15 @@
-import { ApiProperty, ApiPropertyOptional, ApiResponseProperty } from "@nestjs/swagger";
+import { ApiPropertyOptional, ApiResponseProperty } from "@nestjs/swagger";
 import { UserEntity } from '../entity';
-import { ApiModelProperty } from "@nestjs/swagger/dist/decorators/api-model-property.decorator";
 
 export class UserViewDto {
   public static from(user: UserEntity): UserViewDto | null {
     if (user) {
       const userDto = new UserViewDto();
       userDto.id = user.id;
-      userDto.username = user.username;
+      // userDto.username = user.username;
       userDto.email = user.email;
-      userDto.group = user.group.name;
-      userDto.role = user.group.role.name;
+      userDto.userGroup = user.userGroup.name;
+      userDto.role = user.userGroup.role.name;
       userDto.firstname = user.firstname;
       userDto.lastname = user.lastname;
       userDto.imageUrl = user.imageUrl;
@@ -25,11 +24,11 @@ export class UserViewDto {
   @ApiResponseProperty()
   public id: string;
 
-  @ApiResponseProperty()
-  public username: string;
+  // @ApiResponseProperty()
+  // public username: string;
 
   @ApiResponseProperty()
-  public group: string;
+  public userGroup: string;
 
   @ApiResponseProperty()
   public role: string;
@@ -38,16 +37,16 @@ export class UserViewDto {
   public email: string;
 
   @ApiResponseProperty()
-  public imageUrl?: string;
+  public imageUrl: string;
 
   @ApiResponseProperty()
-  public firstname?: string;
+  public firstname: string;
 
   @ApiResponseProperty()
-  public lastname?: string;
+  public lastname: string;
 
   @ApiPropertyOptional()
-  public walletAddress?: string;
+  public walletAddress: string;
 
   @ApiResponseProperty()
   public createdAt: Date;

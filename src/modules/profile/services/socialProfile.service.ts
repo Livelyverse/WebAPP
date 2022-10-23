@@ -6,14 +6,14 @@ import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
 import { BaseEntity, SocialProfileEntity, UserEntity } from "../domain/entity";
 import { SocialProfileCreateDto, SocialProfileUpdateDto } from "../domain/dto";
 import { SocialType } from "../domain/entity/socialProfile.entity";
+import { FindAllType, SortType } from "./IService";
 
-export type FindAllType<T extends BaseEntity> = { data: Array<T>; total: number }
-
-export enum SortBy {
+export enum SocialProfileSortBy {
   TIMESTAMP = 'createdAt',
+  USERNAME = 'username',
+  SOCIAL_NAME = 'socialName'
 }
 
-export type SortType = 'ASC' | 'DESC'
 
 @Injectable()
 export class SocialProfileService {
@@ -26,7 +26,7 @@ export class SocialProfileService {
     offset: number,
     limit: number,
     sortType: SortType,
-    sortBy: SortBy,
+    sortBy: SocialProfileSortBy,
     filterBy: SocialType
   ): RxJS.Observable<FindAllType<SocialProfileEntity>> {
     return RxJS.merge(
@@ -66,7 +66,7 @@ export class SocialProfileService {
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )
@@ -85,7 +85,7 @@ export class SocialProfileService {
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       )
@@ -104,7 +104,7 @@ export class SocialProfileService {
       RxJS.catchError(error => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
@@ -135,7 +135,7 @@ export class SocialProfileService {
       RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
-          message: 'Internal Server Error',
+          message: 'Something Went Wrong',
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
@@ -160,15 +160,15 @@ export class SocialProfileService {
 
   findOne(option: FindOptionsWhere<SocialProfileEntity>): RxJS.Observable<SocialProfileEntity> {
     return RxJS.from(this._entityManager.getRepository(SocialProfileEntity).findOneBy(option)).pipe(
-      RxJS.tap({
-        error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
-      }),
-      RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
-        {
-          statusCode: '500',
-          message: 'Internal Server Error',
-          error: 'Internal Server Error'
-        }, HttpStatus.INTERNAL_SERVER_ERROR))
+        RxJS.tap({
+          error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
+        }),
+        RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
+          {
+            statusCode: '500',
+            message: 'Something Went Wrong',
+            error: 'Internal Server Error'
+          }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
       RxJS.mergeMap(result =>
         RxJS.merge(
@@ -199,9 +199,6 @@ export class SocialProfileService {
           }
         })
       ).pipe(
-        RxJS.tap({
-          error: err => this._logger.error(`findOne SocialProfile failed, username ${socialProfileDto.username}, socialType: ${socialProfileDto.socialType}`, err)
-        }),
         RxJS.mergeMap(result =>
           RxJS.merge(
             RxJS.of(result).pipe(
@@ -244,7 +241,7 @@ export class SocialProfileService {
                   RxJS.catchError(_ => RxJS.throwError(() =>
                     new HttpException({
                       statusCode: '500',
-                      message: 'Internal Server Error',
+                      message: 'Something Went Wrong',
                       error: 'Internal Server Error'
                     }, HttpStatus.INTERNAL_SERVER_ERROR))
                   )
@@ -253,6 +250,9 @@ export class SocialProfileService {
             )
           )
         ),
+        RxJS.tap({
+          error: err => this._logger.error(`create SocialProfile failed, username ${socialProfileDto.username}, socialType: ${socialProfileDto.socialType}`, err)
+        }),
         RxJS.catchError(error =>
           RxJS.merge(
             RxJS.of(error).pipe(
@@ -265,7 +265,7 @@ export class SocialProfileService {
                 RxJS.throwError(() => new HttpException(
                   {
                     statusCode: '500',
-                    message: 'Internal Server Error',
+                    message: 'Something Went Wrong',
                     error: 'Internal Server Error'
                   }, HttpStatus.INTERNAL_SERVER_ERROR)
                 )
@@ -276,7 +276,7 @@ export class SocialProfileService {
       )
   }
 
-  update(dto: SocialProfileUpdateDto): RxJS.Observable<SocialProfileEntity> {
+  update(dto: SocialProfileUpdateDto, entity: UserEntity): RxJS.Observable<SocialProfileEntity> {
     return RxJS.of(dto).pipe(
       RxJS.mergeMap(socialProfileDto => RxJS.from(this.findById(dto.id)).pipe(
           RxJS.tap({
@@ -298,7 +298,26 @@ export class SocialProfileService {
               ),
               RxJS.of(result).pipe(
                 RxJS.filter(socialFindResult => !!socialFindResult),
-                RxJS.map(socialFindResult => [socialProfileDto, socialFindResult])
+                RxJS.mergeMap(socialFindResult =>
+                  RxJS.merge(
+                    RxJS.of(socialFindResult).pipe(
+                      RxJS.filter(socialFindResult => socialFindResult.user.id === entity.id),
+                      RxJS.map(socialFindResult => [socialProfileDto, socialFindResult])
+                    ),
+                    RxJS.of(socialFindResult).pipe(
+                      RxJS.filter(socialFindResult => socialFindResult.user.id !== entity.id),
+                      RxJS.mergeMap(_ =>
+                        RxJS.throwError(() => new HttpException(
+                          {
+                            statusCode: '403',
+                            message: 'Update Forbidden',
+                            error: 'FORBIDDEN'
+                          }, HttpStatus.FORBIDDEN)
+                        )
+                      )
+                    )
+                  )
+                )
               )
             )
           ),
@@ -329,7 +348,7 @@ export class SocialProfileService {
                   RxJS.throwError(() => new HttpException(
                     {
                       statusCode: '500',
-                      message: 'Internal Server Error',
+                      message: 'Something Went Wrong',
                       error: 'Internal Server Error'
                     }, HttpStatus.INTERNAL_SERVER_ERROR)
                   )
@@ -338,7 +357,30 @@ export class SocialProfileService {
             )
           ),
         )
-      )
+      ),
+      RxJS.tap({
+        error: err => this._logger.error(`socialProfile update failed, id: ${dto.id}`, err)
+      }),
+      RxJS.catchError(error =>
+        RxJS.merge(
+          RxJS.of(error).pipe(
+            RxJS.filter(err => err instanceof HttpException),
+            RxJS.mergeMap(err => RxJS.throwError(err)),
+          ),
+          RxJS.of(error).pipe(
+            RxJS.filter(err => !(err instanceof HttpException)),
+            RxJS.mergeMap(err =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '500',
+                  message: 'Something Went Wrong',
+                  error: 'Internal Server Error'
+                }, HttpStatus.INTERNAL_SERVER_ERROR)
+              )
+            )
+          )
+        )
+      ),
     )
   }
 
@@ -355,7 +397,7 @@ export class SocialProfileService {
   remove(id: string): RxJS.Observable<void> {
     return RxJS.throwError(() => new HttpException({
       statusCode: '501',
-      message: 'Delete Not Implemented',
+      message: 'Remove Not Implemented',
       error: 'NOT IMPLEMENTED'
     }, HttpStatus.NOT_IMPLEMENTED));
   }

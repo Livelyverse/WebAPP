@@ -1,7 +1,7 @@
-import { GroupEntity, RoleEntity, UserEntity, SocialProfileEntity } from '../entity';
+import { UserGroupEntity, RoleEntity, UserEntity, SocialProfileEntity } from '../entity';
 import { ApiResponseProperty } from "@nestjs/swagger";
 import { RoleViewDto } from './roleView.dto';
-import { GroupViewDto } from './groupView.dto';
+import { UserGroupViewDto } from './userGroupView.dto';
 import { UserViewDto } from './userView.dto';
 import { SocialProfileViewDto } from "./socialProfileView.dto";
 
@@ -11,7 +11,7 @@ export class FindAllViewDto {
     offset: number,
     totalCount: number,
     totalPage: number,
-    entities: RoleEntity[] | GroupEntity[] | UserEntity[] | SocialProfileEntity[],
+    entities: RoleEntity[] | UserGroupEntity[] | UserEntity[] | SocialProfileEntity[],
   ): FindAllViewDto | null {
     if (!entities) {
       return null;
@@ -27,8 +27,8 @@ export class FindAllViewDto {
       if (Array.isArray(entities) && entities[0] instanceof RoleEntity) {
         findAllDto.data[i] = RoleViewDto.from(entities[i] as RoleEntity);
 
-      } else if (Array.isArray(entities) && entities[0] instanceof GroupEntity) {
-        findAllDto.data[i] = GroupViewDto.from(entities[i] as GroupEntity);
+      } else if (Array.isArray(entities) && entities[0] instanceof UserGroupEntity) {
+        findAllDto.data[i] = UserGroupViewDto.from(entities[i] as UserGroupEntity);
 
       } else if (Array.isArray(entities) && entities[0] instanceof UserEntity) {
         findAllDto.data[i] = UserViewDto.from(entities[i] as UserEntity);
@@ -53,5 +53,5 @@ export class FindAllViewDto {
   public totalCount: number;
 
   @ApiResponseProperty()
-  public data: RoleViewDto[] | GroupViewDto[] | UserViewDto[] | SocialProfileViewDto[];
+  public data: RoleViewDto[] | UserGroupViewDto[] | UserViewDto[] | SocialProfileViewDto[];
 }

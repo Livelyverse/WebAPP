@@ -31,23 +31,24 @@ export class SocialProfileCreateDto {
   @IsNotEmpty({ message: 'ProfileName must not empty' })
   @IsDefined({ message: 'ProfileName must be defined' })
   @IsString({ message: 'ProfileName must be string' })
+  @IsOptional()
   @ApiProperty()
-  socialName?: string
+  socialName: string
 
   @Matches(/(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/,
     { message: 'ProfileUrl must be valid url'})
   @IsOptional()
   @ApiPropertyOptional()
-  profileUrl?: string
+  profileUrl: string
 
   @Matches(/(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/,
     { message: 'Website must be valid url'})
   @IsOptional()
   @ApiPropertyOptional()
-  website?: string
+  website: string
 
   @IsString({ message: 'Location must be string' })
   @IsOptional()
   @ApiPropertyOptional()
-  location?: string
+  location: string
 }

@@ -7,7 +7,7 @@ import {
   HttpStatus,
   Logger,
   Param,
-  ParseBoolPipe,
+  ParseBoolPipe, ParseUUIDPipe,
   Query,
   UseGuards
 } from "@nestjs/common";
@@ -17,35 +17,34 @@ import * as RxJS from "rxjs";
 import { AirdropFilterType, AirdropInfoViewDto } from "../domain/dto/airdropInfoView.dto";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
-import { SortTypePipe } from "../domain/pipe/sortTypePipe";
-import { BalanceSortBy, FindAllType, SortBy, SortType } from "../services/IAirdrop.service";
-import { SortByPipe } from "../domain/pipe/sortByPipe";
+import { BalanceSortBy, FindAllType, SortType } from "../services/IAirdrop.service";
 import { EnumPipe } from "../domain/pipe/enumPipe";
 import { AirdropBalanceViewDto } from "../domain/dto/airdropBalanceView.dto";
 import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
 import { SocialActionType } from "../domain/entity/enums";
-import { AirdropService, FindAllBalanceType } from "../services/airdrop.service";
+import { AirdropService, AirdropSortBy, FindAllBalanceType } from "../services/airdrop.service";
 import { isUUID } from "class-validator";
 import { SocialAirdropEntity } from "../domain/entity/socialAirdrop.entity";
 import { FindAllBalanceViewDto } from "../domain/dto/findAllBalanceView.dto";
 import { BooleanPipe } from "../domain/pipe/booleanPipe";
+import { AirdropRuleSortBy } from "../services/airdropRule.service";
 
 
 @ApiBearerAuth()
-@ApiTags('/api/lively/airdrop/reports')
-@Controller('/api/lively/airdrop/reports')
+@ApiTags('/api/airdrops/reports')
+@Controller('/api/airdrops/reports')
 export class AirdropController {
 
   private readonly _logger = new Logger(AirdropController.name);
   constructor(private readonly _airdropService: AirdropService) {}
 
-  @Get('/find/info/userid/:uuid')
+  @Get('/find/id/:uuid')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'uuid',
     required: true,
-    description: `user id`,
+    description: `find by user id`,
     schema: { type: 'string' },
   })
   @ApiQuery({
@@ -69,36 +68,34 @@ export class AirdropController {
   @ApiQuery({
     name: 'sortBy',
     required: false,
-    description: 'data sort field can be one of the timestamp fields',
-    schema: { type: 'string' },
+    description: `data sort field can be one of ${Object.keys(AirdropSortBy)}`,
+    schema: { enum: Object.keys(AirdropSortBy) },
   })
   @ApiQuery({
-    name: 'settlement',
+    name: 'sortType',
     required: false,
-    description: 'airdrop tx settlement',
-    schema: { type: 'boolean' },
+    description: `data sort type can be one of ${Object.keys(SortType)}`,
+    schema: { enum: Object.keys(SortType) },
   })
   @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  airdropFindByUserId(@Param() params,
+  airdropFindByUserId(@Param('uuid', new ParseUUIDPipe()) uuid,
     @Query('page', new PaginationPipe()) page: number,
     @Query('offset', new PaginationPipe()) offset: number,
-    @Query('sortType', new SortTypePipe()) sortType: SortType,
-    @Query('sortBy', new SortByPipe(SortBy)) sortBy: SortBy,
+    @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
+    @Query('sortBy', new EnumPipe(AirdropSortBy)) sortBy: AirdropSortBy,
     @Query('settlement', new BooleanPipe()) isSettlement: boolean,
   ): RxJS.Observable<FindAllViewDto<AirdropInfoViewDto>> {
     const filterBy = AirdropFilterType.USER_ID;
-    return RxJS.merge(
-      RxJS.of(params).pipe(
-        RxJS.filter(pathParam => isUUID(pathParam.uuid)),
-        RxJS.mergeMap(pathParam => this._airdropService.findAll(
-          (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, pathParam.uuid)),
-        RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
+    return RxJS.from(
+      this._airdropService.findAll(
+          (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, uuid)).pipe(
+      RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
           RxJS.merge(
             RxJS.of(result).pipe(
               RxJS.filter((findAllResult) => findAllResult.total === 0),
@@ -118,16 +115,9 @@ export class AirdropController {
             )
           )
         ),
-      ),
-      RxJS.of(params).pipe(
-        RxJS.filter(pathParam => !isUUID(pathParam.uuid)),
-        RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
-          statusCode: '400',
-          message: 'Invalid Path Param',
-          error: 'Bad Request'
-        }, HttpStatus.BAD_REQUEST)))
-      )
-    ).pipe(
+      RxJS.tap({
+        error: err => this._logger.error(`airdropFindByUserId failed, uuid: ${uuid}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -140,7 +130,7 @@ export class AirdropController {
               RxJS.throwError(() => new HttpException(
                 {
                   statusCode: '500',
-                  message: 'Internal Server Error',
+                  message: 'Something Went Wrong',
                   error: 'Internal Server Error'
                 }, HttpStatus.INTERNAL_SERVER_ERROR)
               )
@@ -151,13 +141,13 @@ export class AirdropController {
     )
   }
 
-  @Get('/find/balance/userid/:uuid')
+  @Get('/find/balance/id/:uuid')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'uuid',
     required: true,
-    description: `user id`,
+    description: `find by user id`,
     schema: { type: 'string' },
   })
   @ApiResponse({ status: 200, description: 'Record Found.', type: AirdropBalanceViewDto})
@@ -165,16 +155,13 @@ export class AirdropController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  airdropBalanceByUserId(@Param() params): RxJS.Observable<AirdropBalanceViewDto> {
+  airdropFindBalanceByUserId(@Param('uuid', new ParseUUIDPipe()) uuid): RxJS.Observable<AirdropBalanceViewDto> {
     const filterBy = AirdropFilterType.USER_ID;
-    return RxJS.merge(
-      RxJS.of(params).pipe(
-        RxJS.filter(pathParam => isUUID(pathParam.uuid)),
-        RxJS.mergeMap(pathParam => this._airdropService.findAllBalance(
-          null, null, null, null, filterBy, pathParam.uuid)),
-        RxJS.mergeMap((result: FindAllBalanceType) =>
+    return RxJS.from(
+      this._airdropService.findAllBalance(null, null, null, null, filterBy, uuid)).pipe(
+      RxJS.mergeMap((result: FindAllBalanceType) =>
           RxJS.merge(
             RxJS.of(result).pipe(
               RxJS.filter((findAllResult) => findAllResult.total === 0),
@@ -191,16 +178,9 @@ export class AirdropController {
             )
           )
         ),
-      ),
-      RxJS.of(params).pipe(
-        RxJS.filter(pathParam => !isUUID(pathParam.uuid)),
-        RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
-          statusCode: '400',
-          message: 'Invalid UUID Path Param',
-          error: 'Bad Request'
-        }, HttpStatus.BAD_REQUEST)))
-      )
-    ).pipe(
+      RxJS.tap({
+        error: err => this._logger.error(`airdropFindBalanceByUserId failed, uuid: ${uuid}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -213,7 +193,7 @@ export class AirdropController {
               RxJS.throwError(() => new HttpException(
                 {
                   statusCode: '500',
-                  message: 'Internal Server Error',
+                  message: 'Something Went Wrong',
                   error: 'Internal Server Error'
                 }, HttpStatus.INTERNAL_SERVER_ERROR)
               )
@@ -224,7 +204,7 @@ export class AirdropController {
     )
   }
 
-  @Get('/find/all/info/')
+  @Get('/find/all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
@@ -241,16 +221,16 @@ export class AirdropController {
     schema: { type: 'number' },
   })
   @ApiQuery({
-    name: 'sortType',
-    required: false,
-    description: 'data sort type can be one of ASC or DESC',
-    schema: { type: 'string' },
-  })
-  @ApiQuery({
     name: 'sortBy',
     required: false,
-    description: 'data sort field can be one of the timestamp fields',
-    schema: { type: 'string' },
+    description: `data sort field can be one of ${Object.keys(AirdropSortBy)}`,
+    schema: { enum: Object.keys(AirdropSortBy) },
+  })
+  @ApiQuery({
+    name: 'sortType',
+    required: false,
+    description: `data sort type can be one of ${Object.keys(SortType)}`,
+    schema: { enum: Object.keys(SortType) },
   })
   @ApiQuery({
     name: 'settlement',
@@ -261,17 +241,17 @@ export class AirdropController {
   @ApiQuery({
     name: 'filterBy',
     required: false,
-    description: `filter by one of ${Object.values(AirdropFilterType)}`,
-    schema: { enum: Object.values(AirdropFilterType) },
+    description: `filter by one of ${Object.keys(AirdropFilterType)}`,
+    schema: { enum: Object.keys(AirdropFilterType) },
   })
   @ApiQuery({
     name: 'filter',
     required: false,
-    description: `filter by one of uuid or ${Object.values(SocialType)} or ${Object.values(SocialActionType)}`,
+    description: `filter by one of uuid or ${Object.keys(SocialType)} or ${Object.keys(SocialActionType)}`,
     schema: {
       oneOf: [
-        { enum: Object.values(SocialType) },
-        { enum: Object.values(SocialActionType)},
+        { enum: Object.keys(SocialType) },
+        { enum: Object.keys(SocialActionType)},
         { type: 'uuid' }
       ]
     },
@@ -280,14 +260,14 @@ export class AirdropController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   airdropFindAll(
     @Query('page', new PaginationPipe()) page: number,
     @Query('offset', new PaginationPipe()) offset: number,
-    @Query('sortType', new SortTypePipe()) sortType: SortType,
-    @Query('sortBy', new SortByPipe(SortBy)) sortBy: SortBy,
+    @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
+    @Query('sortBy', new EnumPipe(AirdropSortBy)) sortBy: AirdropSortBy,
     @Query('settlement', new BooleanPipe()) isSettlement: boolean,
     @Query('filterBy', new EnumPipe(AirdropFilterType)) filterBy: AirdropFilterType,
     @Query('filter') filter: string
@@ -439,6 +419,9 @@ export class AirdropController {
         ),
       )
     ).pipe(
+      RxJS.tap({
+        error: err => this._logger.error(`airdropFindAll failed, filterBy: ${filterBy}, filter: ${filter}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -451,7 +434,7 @@ export class AirdropController {
               RxJS.throwError(() => new HttpException(
                 {
                   statusCode: '500',
-                  message: 'Internal Server Error',
+                  message: 'Something Went Wrong',
                   error: 'Internal Server Error'
                 }, HttpStatus.INTERNAL_SERVER_ERROR)
               )
@@ -462,7 +445,7 @@ export class AirdropController {
     )
   }
 
-  @Get('/find/all/balance')
+  @Get('/find/balance/all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
@@ -481,29 +464,29 @@ export class AirdropController {
   @ApiQuery({
     name: 'sortType',
     required: false,
-    description: 'sortType can be one of ASC or DESC',
-    schema: { type: 'string' },
+    description: `data sort type can be one of ${Object.keys(SortType)}`,
+    schema: { enum: Object.keys(SortType) },
   })
   @ApiQuery({
     name: 'sortBy',
     required: false,
-    description: `sortBy field can be one of ${Object.values(BalanceSortBy)}`,
-    schema: { enum: Object.values(BalanceSortBy) },
+    description: `sortBy field can be one of ${Object.keys(BalanceSortBy)}`,
+    schema: { enum: Object.keys(BalanceSortBy) },
   })
   @ApiQuery({
     name: 'filterBy',
     required: false,
-    description: `filter by one of ${Object.values(AirdropFilterType)}`,
-    schema: { enum: Object.values(AirdropFilterType) },
+    description: `filter by one of ${Object.keys(AirdropFilterType)}`,
+    schema: { enum: Object.keys(AirdropFilterType) },
   })
   @ApiQuery({
     name: 'filter',
     required: false,
-    description: `filter by one of uuid or ${Object.values(SocialType)} or ${Object.values(SocialActionType)}`,
+    description: `filter by one of uuid or ${Object.keys(SocialType)} or ${Object.keys(SocialActionType)}`,
     schema: {
       oneOf: [
-        { enum: Object.values(SocialType) },
-        { enum: Object.values(SocialActionType) },
+        { enum: Object.keys(SocialType) },
+        { enum: Object.keys(SocialActionType) },
         { type: 'uuid' }
       ]
     }
@@ -512,14 +495,14 @@ export class AirdropController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 417, description: 'Token Expired.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   airdropFindAllBalance(
     @Query('page', new PaginationPipe()) page: number,
     @Query('offset', new PaginationPipe()) offset: number,
-    @Query('sortType', new SortTypePipe()) sortType: SortType,
-    @Query('sortBy', new SortByPipe(BalanceSortBy)) sortBy: BalanceSortBy,
+    @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
+    @Query('sortBy', new EnumPipe(BalanceSortBy)) sortBy: BalanceSortBy,
     @Query('filterBy', new EnumPipe(AirdropFilterType)) filterBy: AirdropFilterType,
     @Query('filter') filter: string
   ): RxJS.Observable<FindAllBalanceViewDto> {
@@ -745,6 +728,9 @@ export class AirdropController {
         ),
       )
     ).pipe(
+      RxJS.tap({
+        error: err => this._logger.error(`airdropFindAllBalance failed, filterBy: ${filterBy}, filter: ${filter}`, err)
+      }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(
@@ -757,7 +743,7 @@ export class AirdropController {
               RxJS.throwError(() => new HttpException(
                 {
                   statusCode: '500',
-                  message: 'Internal Server Error',
+                  message: 'Something Went Wrong',
                   error: 'Internal Server Error'
                 }, HttpStatus.INTERNAL_SERVER_ERROR)
               )

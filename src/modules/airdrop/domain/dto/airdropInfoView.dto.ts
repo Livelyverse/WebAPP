@@ -13,7 +13,7 @@ export class AirdropInfoViewDto {
     if(entity) {
       const airdropDto = new AirdropInfoViewDto();
       airdropDto.id = entity.id;
-      airdropDto.username = entity.socialTracker.socialProfile.user.username;
+      airdropDto.email = entity.socialTracker.socialProfile.user.email;
       airdropDto.userId = entity.socialTracker.socialProfile.user.id;
       airdropDto.socialName = entity.socialTracker.socialProfile.socialName;
       airdropDto.socialUsername = entity.socialTracker.socialProfile.username;
@@ -38,7 +38,7 @@ export class AirdropInfoViewDto {
   id: string;
 
   @ApiResponseProperty()
-  username: string;
+  email: string;
 
   @ApiResponseProperty()
   userId: string;

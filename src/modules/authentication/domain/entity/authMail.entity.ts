@@ -1,9 +1,9 @@
 import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
-import { UserEntity, BaseEntity } from '../../../profile/domain/entity';
+import { UserEntity, BaseEntity, UserGroupEntity } from "../../../profile/domain/entity";
 
 export enum AuthMailType {
-  USER_VERIFICATION = 0,
-  FORGOTTEN_PASSWORD = 1,
+  USER_VERIFICATION = "USER_VERIFICATION",
+  FORGOTTEN_PASSWORD = "FORGOTTEN_PASSWORD",
 }
 
 @Entity({ name: 'auth_mail' })
@@ -17,17 +17,11 @@ export class AuthMailEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
   verificationId: string;
 
-  @Column({ type: 'enum', enum: AuthMailType, unique: false, nullable: false })
+  @Column({ type: 'varchar', length: 256, unique: false, nullable: false })
   mailType: AuthMailType;
 
   @Column({ type: 'timestamptz', unique: false, nullable: false })
   expiredAt: Date;
-
-  @Column({ type: 'boolean', default: false, nullable: false })
-  isEmailSent: boolean;
-
-  @Column({ type: 'timestamptz', unique: false, nullable: true })
-  mailSentAt: Date;
 
   @ManyToOne((type) => UserEntity, {
     cascade: ['update', 'soft-remove'],
@@ -39,4 +33,5 @@ export class AuthMailEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'userId' })
   public user: UserEntity;
+
 }

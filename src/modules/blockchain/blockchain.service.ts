@@ -15,7 +15,6 @@ import { IERC20Extra } from "@livelyverse/lively-core-onchain/export/types/token
 import { ContractTransaction, Event } from "@ethersproject/contracts/src.ts";
 import { BlockchainTxEntity, TxStatus, TxType } from "./domain/entity/blockchainTx.entity";
 import { TypeORMError } from "typeorm/error/TypeORMError";
-import { SortType } from "./domain/pipe/sortTypePipe";
 import { BlockchainTxViewDto } from "./domain/dto/blockchainTxView.dto";
 
 export interface BlockchainFilterType {
@@ -43,6 +42,11 @@ export enum NetworkType {
   BSC = 'bsc',
   POLYGON = 'polygon',
   GOERLI = 'goerli'
+}
+
+export enum SortType {
+  ASC = 'ASC',
+  DESC = 'DESC'
 }
 
 export type FindAllType = {

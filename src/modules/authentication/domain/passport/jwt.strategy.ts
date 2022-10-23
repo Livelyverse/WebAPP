@@ -12,16 +12,16 @@ import { UserEntity } from '../../../profile/domain/entity';
 
 @Injectable()
 export default class JwtStrategy extends Strategy {
-  private readonly logger = new Logger(JwtStrategy.name);
-  constructor(private readonly authenticationService: AuthenticationService) {
+  private readonly _logger = new Logger(JwtStrategy.name);
+  constructor(private readonly _authenticationService: AuthenticationService) {
     super(
       {
         jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
         passReqToCallback: true,
-        secretOrKey: authenticationService.publicKey,
+        secretOrKey: _authenticationService.publicKey,
         ignoreExpiration: true,
-        issuer: 'https://livelyplanet.io',
-        audience: 'https://livelyplanet.io',
+        issuer: `https://${_authenticationService.domain}`,
+        audience: `https://${_authenticationService.domain}`,
         algorithms: ['ES512'],
       },
       async (req, payload, next) => {
@@ -32,16 +32,12 @@ export default class JwtStrategy extends Strategy {
   }
 
   public async verify(req, payload, done) {
-    const obj = await this.authenticationService.accessTokenValidation(payload);
+    const obj = await this._authenticationService.accessTokenValidation(payload);
 
     if (obj instanceof UserEntity) {
       return done(null, obj, payload);
     } else {
-      return done(
-        new HttpException({ message: '' }, obj as HttpStatus),
-        null,
-        null,
-      );
+      return done(obj, null, null,);
     }
   }
 }

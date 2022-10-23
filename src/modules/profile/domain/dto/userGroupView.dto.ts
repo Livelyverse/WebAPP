@@ -1,13 +1,14 @@
-import { ApiProperty, ApiPropertyOptional, ApiResponseProperty } from "@nestjs/swagger";
-import { GroupEntity } from '../entity';
+import { ApiResponseProperty } from "@nestjs/swagger";
+import { UserGroupEntity } from '../entity';
 
-export class GroupViewDto {
-  public static from(group: GroupEntity): GroupViewDto | null {
+export class UserGroupViewDto {
+  public static from(group: UserGroupEntity): UserGroupViewDto | null {
     if (group) {
-      const groupDto = new GroupViewDto();
+      const groupDto = new UserGroupViewDto();
       groupDto.id = group.id;
       groupDto.name = group.name;
       groupDto.role = group.role.name;
+      groupDto.description = group.description;
       groupDto.createdAt = group.createdAt;
       groupDto.updatedAt = group.updatedAt;
       groupDto.isActive = group.isActive;
@@ -27,7 +28,7 @@ export class GroupViewDto {
   public role: string;
 
   @ApiResponseProperty()
-  public description?: string;
+  public description: string;
 
   @ApiResponseProperty()
   public createdAt: Date;
