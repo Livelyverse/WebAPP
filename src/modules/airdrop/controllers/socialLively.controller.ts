@@ -29,8 +29,8 @@ import { ContextType, ValidationPipe } from "../domain/pipe/validationPipe";
 import { EnumPipe } from "../domain/pipe/enumPipe";
 
 @ApiBearerAuth()
-@ApiTags('/api/airdrops/lively/socials/profiles')
-@Controller('/api/airdrops/lively/socials/profiles')
+@ApiTags('/api/airdrops/socials/profiles')
+@Controller('/api/airdrops/socials/profiles')
 export class SocialLivelyController {
 
   private readonly _logger = new Logger(SocialLivelyController.name);

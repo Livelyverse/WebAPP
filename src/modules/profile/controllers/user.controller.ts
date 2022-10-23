@@ -125,7 +125,7 @@ export class UserController {
     return UserViewDto.from(user);
   }
 
-  @Get('/find/userid/:uuid')
+  @Get('/find/id/:uuid')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)

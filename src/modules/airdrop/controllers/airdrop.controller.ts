@@ -31,8 +31,8 @@ import { AirdropRuleSortBy } from "../services/airdropRule.service";
 
 
 @ApiBearerAuth()
-@ApiTags('/api/airdrops/lively/reports')
-@Controller('/api/airdrops/lively/reports')
+@ApiTags('/api/airdrops/reports')
+@Controller('/api/airdrops/reports')
 export class AirdropController {
 
   private readonly _logger = new Logger(AirdropController.name);

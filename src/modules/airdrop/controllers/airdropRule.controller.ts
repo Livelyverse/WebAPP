@@ -30,8 +30,8 @@ import { SocialAirdropRuleEntity } from "../domain/entity/socialAirdropRule.enti
 import { EnumPipe } from "../../profile/domain/pipe/enumPipe";
 
 @ApiBearerAuth()
-@ApiTags('/api/airdrops/lively/rules/')
-@Controller('/api/airdrops/lively/rules/')
+@ApiTags('/api/airdrops/rules/')
+@Controller('/api/airdrops/rules/')
 export class AirdropRuleController {
 
   private readonly _logger = new Logger(AirdropRuleController.name);

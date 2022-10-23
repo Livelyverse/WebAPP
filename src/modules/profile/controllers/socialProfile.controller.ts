@@ -25,8 +25,8 @@ import { ValidationPipe } from "../domain/pipe/validationPipe";
 import { FindAllType, SortType } from "../services/IService";
 
 @ApiBearerAuth()
-@ApiTags('/api/profiles/users/socials')
-@Controller('/api/profiles/users/socials')
+@ApiTags('/api/profiles/socials')
+@Controller('/api/profiles/socials')
 export class SocialProfileController {
 
   private readonly _logger = new Logger(SocialProfileController.name);
@@ -39,7 +39,6 @@ export class SocialProfileController {
     validationError: { target: false }
   }))
   @HttpCode(HttpStatus.OK)
-  @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,

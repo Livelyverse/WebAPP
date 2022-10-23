@@ -55,25 +55,6 @@ export class UserService implements IService<UserEntity> {
   }
 
   async create(userDto: UserCreateDto): Promise<UserEntity> {
-    // const errors = await validate(userDto, {
-    //   validationError: { target: false },
-    //   forbidUnknownValues: false,
-    // });
-    // if (errors.length > 0) {
-    //   this._logger.log(
-    //     `create user validation failed, dto: ${JSON.stringify(
-    //       userDto,
-    //     )}, errors: ${errors}`,
-    //   );
-    //
-    //  
-    //  
-    //   throw new HttpException(
-    //     { message: 'Input data validation failed', errors },
-    //     HttpStatus.BAD_REQUEST,
-    //   );
-    // }
-
     const groupEntity = await this._userGroupService.findByName(
       userDto.userGroup.toUpperCase(),
     );
@@ -179,8 +160,33 @@ export class UserService implements IService<UserEntity> {
   }
 
   async removeByEmail(email: string): Promise<void> {
-    // let deleteResult;
-    const user = await this.findByEmail(email);
+    let user;
+    try {
+        user = await this._userRepository.findOne({
+        relations: {
+          userGroup: true
+        },
+        join: {
+          alias: "users",
+          innerJoinAndSelect: {
+            group: "users.userGroup",
+            role: "group.role",
+          }
+        },
+        withDeleted: true,
+        loadEagerRelations: true,
+        where: {
+          email: email
+        }
+      });
+    } catch (err) {
+      this._logger.error(`userRepository.findOne failed, email: ${email}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
 
     if (!user) {
       throw new HttpException({
@@ -246,8 +252,34 @@ export class UserService implements IService<UserEntity> {
   }
 
   async removeById(id: string): Promise<void> {
-    // let deleteResult;
-    const user = await this.findById(id);
+
+    let user;
+    try {
+      user = await this._userRepository.findOne({
+        relations: {
+          userGroup: true
+        },
+        join: {
+          alias: "users",
+          innerJoinAndSelect: {
+            group: "users.userGroup",
+            role: "group.role",
+          }
+        },
+        withDeleted: true,
+        loadEagerRelations: true,
+        where: {
+          id: id
+        }
+      });
+    } catch (err) {
+      this._logger.error(`userRepository.findOne failed. id: ${id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
 
     if (!user) {
       throw new NotFoundException({ message: `User Id ${id} not found` });
@@ -435,50 +467,6 @@ export class UserService implements IService<UserEntity> {
   }
 
   async update(userDto: UserUpdateDto, entity: UserEntity): Promise<UserEntity> {
-    // const errors = await validate(userDto, {
-    //   validationError: { target: false },
-    //   forbidUnknownValues: false,
-    // });
-    // if (errors.length > 0) {
-    //   this._logger.log(
-    //     `user update validation failed, dto: ${userDto}, errors: ${errors}`,
-    //   );
-    //   throw new HttpException(
-    //     { message: 'Input data validation failed', errors },
-    //     HttpStatus.BAD_REQUEST,
-    //   );
-    // }
-    //
-    // const user = await this._userRepository.findOne({
-    //   where: { id: userDto.id },
-    // });
-    // if (!user) {
-    //   this._logger.log(
-    //     `_userRepository.findOne failed, group not found: ${userDto.username}`,
-    //   );
-    //   throw new HttpException(
-    //     { message: `Update group failed, ${userDto.username} not found` },
-    //     HttpStatus.NOT_FOUND,
-    //   );
-    // }
-
-    // const groupEntity = await this._userGroupService.findByName(
-    //   userDto.group.toUpperCase(),
-    // );
-    // if (!groupEntity) {
-    //   this._logger.log(
-    //     `_userGroupService.findByName failed, group '${userDto.group.toUpperCase()}' not found`,
-    //   );
-    //   throw new HttpException(
-    //     {
-    //       message: `update user ${
-    //         userDto.username
-    //       } failed, group ${userDto.group.toUpperCase()} not found`,
-    //     },
-    //     HttpStatus.NOT_FOUND,
-    //   );
-    // }
-
     try {
       entity.firstname = userDto.firstname;
       entity.lastname = userDto.lastname;

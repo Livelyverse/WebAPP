@@ -13,8 +13,8 @@ import { FollowerViewDto } from "../domain/dto/followerView.dto";
 import { SocialFollowerEntity } from "../domain/entity/socialFollower.entity";
 
 @ApiBearerAuth()
-@ApiTags('/api/airdrops/lively/socials/followers')
-@Controller('/api/airdrops/lively/socials/followers')
+@ApiTags('/api/airdrops/socials/followers')
+@Controller('/api/airdrops/socials/followers')
 export class FollowerController {
 
   private readonly _logger = new Logger(FollowerController.name);
