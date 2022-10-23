@@ -63,7 +63,6 @@ export class AuthenticationController {
     @Body() loginDto: LoginDto,
     @Res() res: Response,
   ): Promise<void> {
-    // const dto = LoginDto.from(loginDto);
     await this._authenticationService.userAuthentication(loginDto, res);
   }
 
@@ -85,10 +84,6 @@ export class AuthenticationController {
     @Body() passwordDto: ChangePasswordDto,
     @Req() req,
   ): Promise<void> {
-    // const authHeader = req.headers['authorization'];
-    // const token = authHeader && authHeader.split(' ')[1];
-
-    // const dto = ChangePasswordDto.from(passwordDto);
     await this._authenticationService.changeUserPassword(req.user, passwordDto);
   }
 
@@ -107,7 +102,6 @@ export class AuthenticationController {
   @ApiResponse({ status: 404, description: 'Not Found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   async signup(@Body() signupDto: SignupDto): Promise<any> {
-    // const dto = SignupDto.from(signupDto);
     const accessToken = await this._authenticationService.userSignUp(signupDto);
     return {
       access_token: accessToken,
@@ -151,18 +145,6 @@ export class AuthenticationController {
       }, HttpStatus.UNAUTHORIZED);
     }
 
-    // const dto = AuthMailDto.from(authMailDto);
-    // if (!dto || !dto.verifyCode) {
-    //   this.logger.warn(
-    //     `request mail verification invalid, ${JSON.stringify(authMailDto)}`,
-    //   );
-    //   throw new HttpException({
-    //     statusCode: '400',
-    //     message: 'Invalid Input Date',
-    //     error: 'Bad Request'
-    //   }, HttpStatus.BAD_REQUEST);
-    // }
-
     const tokenPayload = await this._authenticationService.authTokenValidation(
       token,
       false,
@@ -200,21 +182,6 @@ export class AuthenticationController {
   ): Promise<any> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-
-    // const dto = ResendAuthMailDto.from(resendAuthMailDto);
-    // if (!dto || !dto.username) {
-    //   this.logger.warn(
-    //     `request mail resend verification invalid, ${JSON.stringify(
-    //       resendAuthMailDto,
-    //     )}`,
-    //   );
-    //   throw new HttpException({
-    //     statusCode: '400',
-    //     message: 'Invalid Input Date',
-    //     error: 'Bad Request'
-    //   }, HttpStatus.BAD_REQUEST);
-    // }
-
     await this._authenticationService.resendMailVerification(
       resendAuthMailDto,
       token,
@@ -242,7 +209,7 @@ export class AuthenticationController {
     });
     const validationResult = schema.validate(emailParam);
     if (validationResult.error) {
-      this.logger.debug(
+      this.logger.log(
         `email address invalid, email: ${emailParam}, error: ${validationResult.error.message}`,
       );
       throw new HttpException({
@@ -285,29 +252,6 @@ export class AuthenticationController {
     @Param('resetid', new ParseUUIDPipe()) resetid: string,
     @Body() resetPasswordDto: PostResetPasswordDto,
   ): Promise<any> {
-
-    // const dto = PostResetPasswordDto.from(resetPasswordDto);
-    // const errors = await validate(dto, {
-    //   validationError: { target: false },
-    //   forbidUnknownValues: false,
-    // });
-    // if (errors.length > 0) {
-    //   this.logger.log(
-    //     `resetPassword validation failed, userId: ${userid}, errors: ${errors}`,
-    //   );
-    //
-    //   throw new HttpException({
-    //     statusCode: '400',
-    //     message: 'Invalid Input Date',
-    //     error: 'Bad Request'
-    //   }, HttpStatus.BAD_REQUEST);
-    //
-    //   throw new HttpException(
-    //     { message: 'New Password Invalid', errors },
-    //     HttpStatus.BAD_REQUEST,
-    //   );
-    // }
-
     await this._authenticationService.postUserResetPasswordHandler(
       userid,
       resetid,
@@ -318,7 +262,7 @@ export class AuthenticationController {
   @Get('/mail/password/reset/:userid/:resetid')
   @HttpCode(HttpStatus.OK)
   @ApiParam({
-    name: 'userId',
+    name: 'userid',
     required: true,
     description: 'user Id of requested reset password',
     schema: { type: 'string' },
@@ -340,22 +284,6 @@ export class AuthenticationController {
     @Param('userid', new ParseUUIDPipe()) userid: string,
     @Param('resetid', new ParseUUIDPipe()) resetid: string,
   ): Promise<GetResetPasswordDto> {
-    // if (!isUUID(userId)) {
-    //   this.logger.debug(`userId invalid, userId: ${userId}`);
-    //   throw new BadRequestException({
-    //     message: 'User Id Invalid',
-    //   });
-    // }
-    //
-    // if (!isUUID(resetId)) {
-    //   this.logger.debug(`resetId invalid, resetId: ${userId}`);
-    //
-    //   throw new HttpException(
-    //     { message: 'Reset Password Id Invalid' },
-    //     HttpStatus.BAD_REQUEST,
-    //   );
-    // }
-
     return await this._authenticationService.getUserResetPasswordReq(
       userid,
       resetid,
@@ -389,18 +317,6 @@ export class AuthenticationController {
     }
 
     await this._authenticationService.authTokenValidation(token, true);
-
-    // const dto = RefreshDto.from(refreshDto);
-    // if (!dto || !dto.refresh_token) {
-    //   this.logger.log(
-    //     `request refresh token invalid, ${JSON.stringify(refreshDto)}`,
-    //   );
-    //   throw new BadRequestException({ message: 'Invalid Input Date' });
-    // }
-
-    // const accessToken =
-    //   await this._authenticationService.createAccessTokenFromRefreshToken(refreshDto);
-
     const authTokenEntity = await this._authenticationService.resolveRefreshToken(refreshDto.refresh_token);
     const accessToken = await this._authenticationService.generateAccessToken(authTokenEntity)
     return {

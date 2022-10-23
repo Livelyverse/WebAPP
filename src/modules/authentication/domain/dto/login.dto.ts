@@ -8,16 +8,6 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
-  // public static from(dto: LoginDto): LoginDto | null {
-  //   if (dto) {
-  //     const loginDto = new LoginDto();
-  //     loginDto.username = dto?.username;
-  //     loginDto.password = dto?.password;
-  //     return loginDto;
-  //   }
-  //   return null;
-  // }
-
   @IsNotEmpty({ message: 'Email must not empty' })
   @IsDefined({ message: 'Email must be defined' })
   @IsEmail({ message: 'Email must be valid' })

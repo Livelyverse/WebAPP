@@ -1,10 +1,11 @@
 import {
+  CACHE_MANAGER,
   HttpException,
-  HttpStatus,
+  HttpStatus, Inject,
   Injectable,
   Logger,
-  NotFoundException,
-} from '@nestjs/common';
+  NotFoundException
+} from "@nestjs/common";
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserCreateDto, UserUpdateDto } from '../domain/dto';
@@ -21,6 +22,7 @@ import {
   AuthTokenEntity,
 } from '../../authentication/domain/entity';
 import { ConfigService } from '@nestjs/config';
+import { Cache } from "cache-manager";
 
 export enum UserSortBy {
   TIMESTAMP = 'createdAt',
@@ -40,6 +42,8 @@ export class UserService implements IService<UserEntity> {
     private readonly _authMailRepository: Repository<AuthMailEntity>,
     @InjectRepository(UserEntity)
     private readonly _userRepository: Repository<UserEntity>,
+    @Inject(CACHE_MANAGER)
+    private readonly _cacheManager: Cache,
     private readonly _userGroupService: UserGroupService,
     private readonly _configService: ConfigService,
   ) {
@@ -224,6 +228,11 @@ export class UserService implements IService<UserEntity> {
       }
     }
 
+    await this._cacheManager.del(`USER.EMAIL:${user.email}`);
+    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
+    await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+    await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${user.id}`);
+    await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID::${user.id}`);
     try {
       await this._userRepository.remove(user);
     } catch (err) {
@@ -282,6 +291,11 @@ export class UserService implements IService<UserEntity> {
       }
     }
 
+    await this._cacheManager.del(`USER.EMAIL:${user.email}`);
+    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
+    await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+    await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${user.id}`);
+    await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID::${user.id}`);
     try {
       await this._userRepository.remove(user);
     } catch (err) {

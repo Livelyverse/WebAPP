@@ -1,5 +1,5 @@
 import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
-import { UserEntity, BaseEntity } from '../../../profile/domain/entity';
+import { UserEntity, BaseEntity, UserGroupEntity } from "../../../profile/domain/entity";
 
 export enum AuthMailType {
   USER_VERIFICATION = "USER_VERIFICATION",
@@ -23,12 +23,6 @@ export class AuthMailEntity extends BaseEntity {
   @Column({ type: 'timestamptz', unique: false, nullable: false })
   expiredAt: Date;
 
-  @Column({ type: 'boolean', default: false, nullable: false })
-  isEmailSent: boolean;
-
-  @Column({ type: 'timestamptz', unique: false, nullable: true })
-  mailSentAt: Date;
-
   @ManyToOne((type) => UserEntity, {
     cascade: ['update', 'soft-remove'],
     onDelete: 'NO ACTION',
@@ -39,4 +33,5 @@ export class AuthMailEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'userId' })
   public user: UserEntity;
+
 }
