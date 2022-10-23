@@ -216,21 +216,23 @@ export class UserService implements IService<UserEntity> {
       }
     }
 
-    const authToken = await this._tokenRepository.findOne({
+    const authTokens = await this._tokenRepository.find({
       relations: ['user'],
       where: {
         user: { id: user.id },
       },
     });
 
-    if (authToken) {
-      try {
-        await this._tokenRepository.remove(authToken);
-      } catch (error) {
-        this._logger.error(
-          `tokenRepository.remove failed: authToken id ${authToken.id}`,
-          error,
-        );
+    if (authTokens && authTokens.length > 0) {
+      for (let i = 0; i < authTokens.length; i++) {
+        try {
+          await this._tokenRepository.remove(authTokens[i]);
+        } catch (error) {
+          this._logger.error(
+            `tokenRepository.remove failed: authToken id ${authTokens[i].id}`,
+            error,
+          );
+        }
       }
     }
 
@@ -305,21 +307,23 @@ export class UserService implements IService<UserEntity> {
       }
     }
 
-    const authToken = await this._tokenRepository.findOne({
+    const authTokens = await this._tokenRepository.find({
       relations: ['user'],
       where: {
         user: { id: user.id },
       },
     });
 
-    if (authToken) {
-      try {
-        await this._tokenRepository.remove(authToken);
-      } catch (error) {
-        this._logger.error(
-          `tokenRepository.remove failed: authToken id ${authToken.id}`,
-          error,
-        );
+    if (authTokens && authTokens.length > 0) {
+      for (let i = 0; i < authTokens.length; i++) {
+        try {
+          await this._tokenRepository.remove(authTokens[i]);
+        } catch (error) {
+          this._logger.error(
+            `tokenRepository.remove failed: authToken id ${authTokens[i].id}`,
+            error,
+          );
+        }
       }
     }
 
