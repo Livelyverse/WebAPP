@@ -58,9 +58,6 @@ export type FindAllType = {
 export class BlockchainService {
   private readonly _logger = new Logger(BlockchainService.name);
   private readonly _systemAdmin: Wallet;
-  private readonly _admin: Wallet;
-  private readonly _assetManager: Wallet;
-  private readonly _taxTreasury: Wallet;
   private readonly _livelyToken: LivelyToken;
   private readonly _jsonRpcProvider: JsonRpcProvider;
   private readonly _eventEmitter: EventEmitter;
@@ -76,16 +73,10 @@ export class BlockchainService {
     private readonly _configService: ConfigService)
   {
     let systemAdmin = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'systemadmin');
-    let admin = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'admin');
-    let assetManager = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'assetmanager');
-    let taxTreasury = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'taxtreasury')
     let livelyToken = this._blockchainOptions.config.tokens.find((token) => token.name.toUpperCase() === 'LVL')
     this._jsonRpcProvider = new ethers.providers.JsonRpcProvider(this._blockchainOptions.config.network.url);
     this._systemAdmin = new ethers.Wallet(systemAdmin.privateKey, this._jsonRpcProvider);
-    this._admin = new ethers.Wallet(admin.privateKey, this._jsonRpcProvider);
-    this._assetManager = new ethers.Wallet(assetManager.privateKey, this._jsonRpcProvider);
-    this._taxTreasury = new ethers.Wallet(taxTreasury.privateKey, this._jsonRpcProvider);
-    this._livelyToken = LivelyToken__factory.connect(livelyToken.address, this._admin);
+    this._livelyToken = LivelyToken__factory.connect(livelyToken.address, this._systemAdmin);
     this._eventEmitter = new EventEmitter();
     this._safeMode = false;
     this._confirmationCount = this._blockchainOptions.appMode == APP_MODE.DEV ? 0 : this._blockchainOptions.appMode == APP_MODE.TEST ? 3 : 7
@@ -175,7 +166,7 @@ export class BlockchainService {
           RxJS.of([airdropReq, batchTransfers]).pipe(
             RxJS.filter((_) => !this._safeMode),
             RxJS.switchMap(([airdropReq, batchTransfers]:[AirdropRequestDto, IERC20Extra.BatchTransferRequestStruct[]]) =>
-              RxJS.defer(() => RxJS.from(this._livelyToken.connect(this._assetManager).batchTransfer(batchTransfers))).pipe(
+              RxJS.defer(() => RxJS.from(this._livelyToken.connect(this._systemAdmin).batchTransfer(batchTransfers))).pipe(
                 RxJS.concatMap( (airdropTx: ContractTransaction) =>
                   RxJS.of(airdropTx).pipe(
                     RxJS.map(tx => {
