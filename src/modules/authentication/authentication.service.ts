@@ -461,8 +461,8 @@ export class AuthenticationService {
     }
 
     authMailEntity = await this.createAuthMailEntity(userEntity, AuthMailType.FORGOTTEN_PASSWORD)
-    const absoluteUrl = `${req.protocol}://${req.get('host')}/forget-password/change-password/`
-      + `${userEntity.id}/${authMailEntity.verificationId}`;
+    const absoluteUrl = `${req.protocol}://${req.get('host')}/forget-password/change-password?`
+      + `user-id=${userEntity.id}&reset-id=${authMailEntity.verificationId}`;
       // this._configService.get<string>('http.domain') +
     await this._cacheManager.set(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`,
       { mailToken: null, authMailEntity, latestMailResendTimestamp: null },
