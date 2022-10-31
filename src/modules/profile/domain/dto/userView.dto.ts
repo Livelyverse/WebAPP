@@ -6,12 +6,10 @@ export class UserViewDto {
     if (user) {
       const userDto = new UserViewDto();
       userDto.id = user.id;
-      // userDto.username = user.username;
       userDto.email = user.email;
       userDto.userGroup = user.userGroup.name;
       userDto.role = user.userGroup.role.name;
-      userDto.firstname = user.firstname;
-      userDto.lastname = user.lastname;
+      userDto.fullName = user.fullName;
       userDto.imageUrl = user.imageUrl;
       userDto.walletAddress = user.walletAddress;
       userDto.createdAt = user.createdAt;
@@ -40,10 +38,7 @@ export class UserViewDto {
   public imageUrl: string;
 
   @ApiResponseProperty()
-  public firstname: string;
-
-  @ApiResponseProperty()
-  public lastname: string;
+  public fullName: string;
 
   @ApiPropertyOptional()
   public walletAddress: string;

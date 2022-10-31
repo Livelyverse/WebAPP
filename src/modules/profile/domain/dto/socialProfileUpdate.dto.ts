@@ -2,16 +2,23 @@ import {
   IsString,
   Matches,
   IsOptional,
-  IsNotEmpty, IsDefined, IsUUID
+  IsNotEmpty, IsDefined, IsUUID, IsEnum
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { SocialType } from "../entity/socialProfile.entity";
 
 export class SocialProfileUpdateDto {
-  @IsNotEmpty({ message: 'Id must not empty' })
-  @IsDefined({ message: 'Id must be defined' })
-  @IsUUID("all", { message: 'Id must be valid UUID'})
+  // @IsNotEmpty({ message: 'Id must not empty' })
+  // @IsDefined({ message: 'Id must be defined' })
+  // @IsUUID("all", { message: 'Id must be valid UUID'})
+  // @ApiProperty()
+  // id: string;
+
+  @IsNotEmpty({ message: 'SocialType must not empty' })
+  @IsDefined({ message: 'SocialType must be defined' })
+  @IsEnum(SocialType, { message: `SocialType must one of these values, ${Object.keys(SocialType).toString()}` } )
   @ApiProperty()
-  id: string;
+  socialType: SocialType
 
   @IsNotEmpty({ message: 'Username must not empty' })
   @IsString({ message: 'Username must be string' })

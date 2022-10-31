@@ -23,6 +23,7 @@ import {
 } from '../../authentication/domain/entity';
 import { ConfigService } from '@nestjs/config';
 import { Cache } from "cache-manager";
+import { ethers } from "ethers";
 
 export enum UserSortBy {
   TIMESTAMP = 'createdAt',
@@ -88,8 +89,7 @@ export class UserService implements IService<UserEntity> {
     // newUser.username = userDto.username;
     newUser.email = userDto.email;
     newUser.password = hashPassword;
-    newUser.firstname = userDto.firstname;
-    newUser.lastname = userDto.lastname;
+    newUser.fullName = userDto.fullName;
     newUser.userGroup = groupEntity;
 
     try {
@@ -471,16 +471,29 @@ export class UserService implements IService<UserEntity> {
   }
 
   async update(userDto: UserUpdateDto, entity: UserEntity): Promise<UserEntity> {
+
     try {
-      entity.firstname = userDto.firstname;
-      entity.lastname = userDto.lastname;
-      entity.walletAddress = userDto.walletAddress;
+      entity.walletAddress = ethers.utils.getAddress(userDto.walletAddress);
+    } catch (err) {
+      throw new HttpException({
+        statusCode: '400',
+        message: 'invalid wallet address',
+        error: 'Bad Request'
+      }, HttpStatus.BAD_REQUEST)
+    }
+
+    try {
+      entity.fullName = userDto.fullName;
       return await this._userRepository.save(entity);
     } catch (err) {
-      this._logger.error(
-        `userRepository.save failed: ${JSON.stringify(userDto)}`,
-        err,
-      );
+      this._logger.error(`userRepository.save of update failed, mail: ${entity.email}, dto: ${JSON.stringify(userDto)}`, err);
+      if (err?.code === PostgresErrorCode.UniqueViolation) {
+        throw new HttpException({
+          statusCode: '400',
+          message: 'wallet address already exists',
+          error: 'Bad Request'
+        }, HttpStatus.BAD_REQUEST)
+      }
       throw new HttpException({
         statusCode: '500',
         message: 'Something Went Wrong',

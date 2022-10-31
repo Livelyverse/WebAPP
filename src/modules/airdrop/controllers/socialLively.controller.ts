@@ -6,7 +6,8 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-  Param, ParseUUIDPipe,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -27,6 +28,7 @@ import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
 import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
 import { ContextType, ValidationPipe } from "../domain/pipe/validationPipe";
 import { EnumPipe } from "../domain/pipe/enumPipe";
+
 
 @ApiBearerAuth()
 @ApiTags('/api/airdrops/socials/profiles')
@@ -175,7 +177,12 @@ export class SocialLivelyController {
     @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
     @Query('sortBy', new EnumPipe(SocialLivelySortBy)) sortBy: SocialLivelySortBy,
   ): RxJS.Observable<FindAllViewDto<SocialLivelyViewDto>> {
-    return RxJS.from(this._socialLivelyService.findAll((page - 1) * offset, offset, sortType, sortBy)).pipe(
+    return RxJS.from(this._socialLivelyService.findAll(
+      (page - 1) * offset,
+      offset,
+      sortType ? sortType : SortType.ASC,
+      sortBy ? sortBy : SocialLivelySortBy.TIMESTAMP
+    )).pipe(
       RxJS.mergeMap((result: FindAllType<SocialLivelyEntity>) =>
         RxJS.merge(
           RxJS.of(result).pipe(

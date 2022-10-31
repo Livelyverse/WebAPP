@@ -7,11 +7,14 @@ import { BaseEntity, SocialProfileEntity, UserEntity } from "../domain/entity";
 import { SocialProfileCreateDto, SocialProfileUpdateDto } from "../domain/dto";
 import { SocialType } from "../domain/entity/socialProfile.entity";
 import { FindAllType, SortType } from "./IService";
+import { FindManyOptions } from "typeorm/find-options/FindManyOptions";
+import { FindOneOptions } from "typeorm/find-options/FindOneOptions";
 
 export enum SocialProfileSortBy {
   TIMESTAMP = 'createdAt',
   USERNAME = 'username',
-  SOCIAL_NAME = 'socialName'
+  SOCIALNAME = 'socialName',
+  SOCIALTYPE = 'socialType'
 }
 
 
@@ -127,8 +130,8 @@ export class SocialProfileService {
     )
   }
 
-  find(option: FindOptionsWhere<SocialProfileEntity>): RxJS.Observable<SocialProfileEntity[]> {
-    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity).findBy(option)).pipe(
+  find(option: FindManyOptions<SocialProfileEntity>): RxJS.Observable<SocialProfileEntity[]> {
+    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity).find(option)).pipe(
       RxJS.tap({
         error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
       }),
@@ -158,8 +161,8 @@ export class SocialProfileService {
     )
   }
 
-  findOne(option: FindOptionsWhere<SocialProfileEntity>): RxJS.Observable<SocialProfileEntity> {
-    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity).findOneBy(option)).pipe(
+  findOne(option: FindOneOptions<SocialProfileEntity>): RxJS.Observable<SocialProfileEntity> {
+    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity).findOne(option)).pipe(
         RxJS.tap({
           error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
         }),
@@ -189,12 +192,12 @@ export class SocialProfileService {
     )
   }
 
-  create(socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileEntity> {
+  create(user: UserEntity, socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileEntity> {
     return RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
         .findOne({
           relations: ['user'],
           where: {
-            user: { id:  socialProfileDto.userId },
+            user: { id:  user.id },
             socialType: socialProfileDto.socialType
           }
         })
@@ -208,11 +211,11 @@ export class SocialProfileService {
               }),
               RxJS.mergeMap(_ =>
                 RxJS.throwError(() =>
-                    new HttpException({
-                      statusCode: '400',
-                      message: 'SocialProfile Already Exist',
-                      error: 'Bad Request'
-                    }, HttpStatus.BAD_REQUEST)
+                  new HttpException({
+                    statusCode: '400',
+                    message: 'SocialProfile Already Exist',
+                    error: 'Bad Request'
+                  }, HttpStatus.BAD_REQUEST)
                 )
               )
             ),
@@ -220,9 +223,7 @@ export class SocialProfileService {
               RxJS.filter(socialFindResult => !!!socialFindResult),
               RxJS.map(_ => socialProfileDto),
               RxJS.map(socialProfileDto => {
-                const user = new UserEntity();
                 const entity = new SocialProfileEntity();
-                user.id = socialProfileDto.userId;
                 entity.user = user;
                 entity.socialType = socialProfileDto.socialType;
                 entity.username = socialProfileDto.username;
@@ -276,11 +277,19 @@ export class SocialProfileService {
       )
   }
 
-  update(dto: SocialProfileUpdateDto, entity: UserEntity): RxJS.Observable<SocialProfileEntity> {
+  update(dto: SocialProfileUpdateDto, user: UserEntity): RxJS.Observable<SocialProfileEntity> {
     return RxJS.of(dto).pipe(
-      RxJS.mergeMap(socialProfileDto => RxJS.from(this.findById(dto.id)).pipe(
+      RxJS.mergeMap(socialProfileDto => RxJS.from(this.findOne({
+        relations: {
+          user: true,
+        },
+        where: {
+          user: { id: user.id },
+          socialType: dto.socialType
+        }
+      })).pipe(
           RxJS.tap({
-            error: err => this._logger.error(`findById SocialProfile failed, social username ${dto.username}, Id: ${dto.id}`, err)
+            error: err => this._logger.error(`findOne SocialProfile failed, user.email: ${user.email}, social username ${dto.username}, Id: ${dto.socialType}`, err)
           }),
           RxJS.mergeMap(result =>
             RxJS.merge(
@@ -301,11 +310,11 @@ export class SocialProfileService {
                 RxJS.mergeMap(socialFindResult =>
                   RxJS.merge(
                     RxJS.of(socialFindResult).pipe(
-                      RxJS.filter(socialFindResult => socialFindResult.user.id === entity.id),
+                      RxJS.filter(socialFindResult => socialFindResult.user.id === user.id),
                       RxJS.map(socialFindResult => [socialProfileDto, socialFindResult])
                     ),
                     RxJS.of(socialFindResult).pipe(
-                      RxJS.filter(socialFindResult => socialFindResult.user.id !== entity.id),
+                      RxJS.filter(socialFindResult => socialFindResult.user.id !== user.id),
                       RxJS.mergeMap(_ =>
                         RxJS.throwError(() => new HttpException(
                           {
@@ -328,13 +337,13 @@ export class SocialProfileService {
         socialProfileEntity.socialName = socialProfileDto.socialName ? socialProfileDto.socialName : socialProfileEntity?.socialName;
         socialProfileEntity.profileUrl = socialProfileDto.profileUrl ? socialProfileDto.profileUrl : socialProfileDto?.profileUrl;
         socialProfileEntity.location = socialProfileDto.location ? socialProfileDto.location : socialProfileDto?.location;
-        return socialProfileDto
+        return socialProfileEntity
       }),
       RxJS.mergeMap((entity:SocialProfileEntity) =>
         RxJS.from(this._entityManager.getRepository(SocialProfileEntity).save(entity)).pipe(
           RxJS.tap({
-            next: result => this._logger.debug(`update SocialProfile success, id: ${result.id}, username: ${result.username}, socialType: ${result.socialType}`),
-            error: err => this._logger.error(`update SocialProfile failed, id: ${entity.id}, username ${entity.username} socialType: ${entity.socialType}`, err)
+            next: result => this._logger.debug(`update SocialProfile success, user.email: ${user.email}, username: ${result.username}, socialType: ${result.socialType}`),
+            error: err => this._logger.error(`update SocialProfile failed, user.email: ${user.email}, username ${entity.username} socialType: ${entity.socialType}`, err)
           }),
           RxJS.catchError(error =>
             RxJS.merge(
@@ -359,7 +368,7 @@ export class SocialProfileService {
         )
       ),
       RxJS.tap({
-        error: err => this._logger.error(`socialProfile update failed, id: ${dto.id}`, err)
+        error: err => this._logger.error(`socialProfile update failed, user.email: ${user.email}, socialType: ${dto.socialType}`, err)
       }),
       RxJS.catchError(error =>
         RxJS.merge(

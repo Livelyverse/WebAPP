@@ -35,6 +35,8 @@ export class TweetTrackerJob {
   private readonly _twitterClient: TwitterApiv2ReadOnly;
   private readonly _trackerDuration: number;
   private readonly _trackerInterval: number;
+  private readonly _startAt: Date;
+  private readonly _endAt: Date;
 
   constructor(
       @InjectEntityManager()
@@ -58,6 +60,10 @@ export class TweetTrackerJob {
     }
 
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
+    const startTimestamp = this._configService.get<number>('airdrop.twitter.startAt');
+    const endTimestamp = this._configService.get<number>('airdrop.twitter.endAt');
+    this._startAt = new Date(startTimestamp);
+    this._endAt = new Date(endTimestamp);
 
     const interval = setInterval(this.fetchTweetsFromPage.bind(this), this._trackerInterval);
     this._schedulerRegistry.addInterval('TweetsTrackerJob', interval);
@@ -65,18 +71,23 @@ export class TweetTrackerJob {
   }
 
   fetchTweetsFromPage() {
+
     let socialLivelyQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(SocialLivelyEntity, "socialLively")
       .where('"socialLively"."socialType" = \'TWITTER\'')
       .andWhere('"socialLively"."isActive" = \'true\'')
       .getOneOrFail())
       .pipe(
-        RxJS.tap((socialLively) => this._logger.debug(`fetch social lively success, socialType: ${socialLively.socialType}`)),
+        RxJS.tap({
+          next: (socialLively) => this._logger.debug(`fetch social lively success, socialType: ${socialLively.socialType}`),
+          error: (err) => this._logger.error(`find Social lively tweeter failed`, err)
+        }),
         RxJS.catchError(err => RxJS.throwError(() => new TweetTrackerError('fetch social lively failed', err)))
       )
 
     this._logger.debug("Tweets Tracker job starting . . . ");
 
     RxJS.from(socialLivelyQueryResultObservable).pipe(
+      // fetch social lively airdrop twitter rules
       RxJS.mergeMap((socialLively) =>
         RxJS.from(this._entityManager.createQueryBuilder(SocialAirdropRuleEntity, "airdropRule")
           .select()
@@ -87,7 +98,7 @@ export class TweetTrackerJob {
         ).pipe(
           RxJS.tap({
             next: (airdropRules) => airdropRules.forEach(airdropRule => this._logger.debug(`tweeter tracker airdrop rule found, actionType: ${airdropRule.actionType}, token: ${airdropRule.unit},  amount: ${airdropRule.amount}, decimal: ${airdropRule.decimal}`)),
-            error: (err) => this._logger.error(`find tweeter tracker airdrop rule failed, ${err}`)
+            error: (err) => this._logger.error(`find tweeter tracker airdrop rule failed`, err)
           }),
           RxJS.mergeMap((airdropRules) =>
             RxJS.merge(
@@ -112,9 +123,13 @@ export class TweetTrackerJob {
               )
             )
           ),
+          RxJS.tap({
+            error: (err) => this._logger.error(`fetch airdrop rules failed`, err)
+          }),
           RxJS.catchError(err => RxJS.throwError(() => new TweetTrackerError('fetch airdrop rules failed', err)))
         )
       ),
+      // fetch twitter events from db which trackingEndAt greater than now
       RxJS.switchMap((data) =>
         RxJS.from(this._entityManager.getRepository(SocialEventEntity)
           .find({
@@ -132,6 +147,7 @@ export class TweetTrackerJob {
                 RxJS.filter((queryResult) => !queryResult.length),
                 RxJS.tap((_) => this._logger.log(`pipe(1-0): SocialEvent with active tracker not found . . .`)),
                 RxJS.switchMap((_) =>
+                  // fetch at least one twitter event from db
                   RxJS.from(this._entityManager.getRepository(SocialEventEntity)
                     .find({
                       skip: 0,
@@ -142,7 +158,7 @@ export class TweetTrackerJob {
                     })
                   ).pipe(
                     RxJS.tap({
-                      error: err => this._logger.error(`find social events failed, error: ${err}`)
+                      error: err => this._logger.error(`find social events failed`, err)
                     }),
                     RxJS.switchMap((socialEventEntities) =>
                       RxJS.merge(
@@ -150,20 +166,22 @@ export class TweetTrackerJob {
                             RxJS.filter((socialEvents) => !!socialEvents.length),
                             RxJS.map((socialEvents) => socialEvents[0]),
                             RxJS.tap((socialEvent) => this._logger.debug(`pipe(1-1), latest SocialEvent found, socialEvent.contentId: ${socialEvent.contentId}`)),
+                            // fetch tweet events from Twitter from the latest event content.Id which exists in db
                             RxJS.switchMap((socialEvent: SocialEventEntity) =>
                               RxJS.defer(() =>
                                  RxJS.from(this._twitterClient.userTimeline(data.socialLively.userId, {
                                       max_results: 100,
                                       since_id: socialEvent.contentId,
+                                      end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
                                       "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source"],
                                  }))
                               ).pipe(
                                 RxJS.expand((paginator:TweetUserTimelineV2Paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
-                                RxJS.filter((paginator) => paginator.data.meta.result_count > 0),
                                 RxJS.tap({
                                   next: (paginator) => this._logger.debug(`pipe(1-1), paginator data count: ${paginator.meta.result_count}`),
-                                  error: (error) => this._logger.error(`pipe(1-1): paginator failed, socialEvent.contentId: ${socialEvent.contentId},error: ${error}`)
+                                  error: (error) => this._logger.error(`pipe(1-1): paginator failed, socialEvent.contentId: ${socialEvent.contentId}`, error)
                                 }),
+                                RxJS.filter((paginator) => paginator.data.meta.result_count > 0),
                                 RxJS.concatMap((paginator) =>
                                   RxJS.from(paginator.data.data).pipe(
                                     RxJS.tap((tweet: TweetV2) => this._logger.log(`pipe(1-1), tweet.id: ${tweet?.id}, tweet.referenced_tweet: ${JSON.stringify(tweet?.referenced_tweets)}`)),
@@ -190,7 +208,7 @@ export class TweetTrackerJob {
                                       ).pipe(
                                         RxJS.tap({
                                           next: (_)=> this._logger.log(`pipe(1-1), save SocialEvent success, tweet.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}`),
-                                          error: err => this._logger.error(`pipe(1-1), save SocialEvent failed, tweet.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}, error: ${err}`),
+                                          error: err => this._logger.error(`pipe(1-1), save SocialEvent failed, tweet.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}`, err),
                                         }),
                                         RxJS.map((_) => ({socialEvent, ...data})),
                                         RxJS.catchError(error => RxJS.throwError(() => new TweetTrackerError('save SocialEvent failed', error)))
@@ -213,6 +231,9 @@ export class TweetTrackerJob {
                                         RxJS.mergeMap(err => RxJS.throwError(err))
                                       ),
                                     )
+                                }),
+                                RxJS.tap({
+                                  error: err => this._logger.error(`pipe(1-0): twitter client userTimeline failed`, err)
                                 }),
                                 RxJS.catchError((error) =>
                                   RxJS.merge(
@@ -246,20 +267,23 @@ export class TweetTrackerJob {
                         ),
                         RxJS.of(socialEventEntities).pipe(
                           RxJS.filter((socialEventEntities) => !socialEventEntities.length),
-                          RxJS.tap((_) => this._logger.log(`pipe(1-2), SocialEvent not found . . .`)),
+                          RxJS.tap((_) => this._logger.log(`pipe(1-2): SocialEvent not found . . .`)),
+                          // fetch all tweet events from Twitter from startAt until endAt
                           RxJS.switchMap((_) =>
                             RxJS.defer(() =>
                               RxJS.from(this._twitterClient.userTimeline(data.socialLively.userId, {
                                 max_results: 100,
+                                start_time: this._startAt.getTime() < Date.now() ? this._startAt.toISOString() : new Date().toISOString(),
+                                end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
                                 "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source"],
                               }))
                             ).pipe(
                               RxJS.expand((paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
-                              RxJS.filter((paginator) => paginator.data.meta.result_count > 0),
                               RxJS.tap({
                                 next: (paginator) => this._logger.debug(`pipe(1-2), paginator data count: ${paginator.meta.result_count}`),
-                                error: (error) => this._logger.error(`pipe(1-2): paginator failed, data.socialLively.userId: ${data.socialLively.userId},error: ${error}`)
+                                error: (error) => this._logger.error(`pipe(1-2): paginator failed, data.socialLively.userId: ${data.socialLively.userId}`, error)
                               }),
+                              RxJS.filter((paginator) => paginator.data.meta.result_count > 0),
                               RxJS.concatMap((paginator) =>
                                 RxJS.from(paginator.data.data).pipe(
                                   RxJS.tap((tweet: TweetV2) => this._logger.log(`pipe(1-2), tweet.id: ${tweet.id}, tweet.referenced_tweet: ${JSON.stringify(tweet?.referenced_tweets)}`)),
@@ -286,7 +310,7 @@ export class TweetTrackerJob {
                                     ).pipe(
                                       RxJS.tap({
                                         next: (_)=> this._logger.log(`pipe(1-2), save SocialEvent success, tweet.Id: ${socialEvent.contentId}, SocialEvent.id: ${socialEvent.id}`),
-                                        error: err => this._logger.log(`pipe(1-2), save SocialEvent failed, tweet.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}, error: ${err}`),
+                                        error: err => this._logger.log(`pipe(1-2), save SocialEvent failed, tweet.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}`, err),
                                       }),
                                       RxJS.map((insertResult) => ({socialEvent, ...data})),
                                       RxJS.catchError(error => RxJS.throwError(() => new TweetTrackerError('save SocialEvent failed', error)))
@@ -309,6 +333,9 @@ export class TweetTrackerJob {
                                       RxJS.mergeMap(err => RxJS.throwError(err))
                                     ),
                                   )
+                              }),
+                              RxJS.tap({
+                                error: err => this._logger.error(`pipe(1-2): twitter client userTimeline failed`, err)
                               }),
                               RxJS.catchError((error) =>
                                 RxJS.merge(
@@ -342,6 +369,9 @@ export class TweetTrackerJob {
                         )
                       )
                     ),
+                    RxJS.tap({
+                      error: err => this._logger.error(`pipe(1-0), finalize twitter client userTimeline failed`, err)
+                    }),
                     RxJS.catchError((error) =>
                       RxJS.merge(
                         RxJS.of(error).pipe(
@@ -378,15 +408,16 @@ export class TweetTrackerJob {
                           RxJS.from(this._twitterClient.userTimeline(data.socialLively.userId, {
                             max_results: 100,
                             since_id: socialEvent.contentId,
+                            end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
                             "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source"],
                           }))
                         ).pipe(
                           RxJS.expand((paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
-                          RxJS.filter((paginator) => paginator.data.meta.result_count > 0),
                           RxJS.tap({
                             next: (paginator) => this._logger.debug(`pipe(2): paginator data count: ${paginator.meta.result_count}`),
-                            error: (error) => this._logger.error(`pipe(2): paginator failed, socialEvent.contentId: ${socialEvent.contentId}, error: ${error}`)
+                            error: (error) => this._logger.error(`pipe(2): paginator failed, socialEvent.contentId: ${socialEvent.contentId}`, error)
                           }),
+                          RxJS.filter((paginator) => paginator.data.meta.result_count > 0),
                           RxJS.concatMap((paginator) =>
                             RxJS.from(paginator.data.data).pipe(
                               RxJS.tap((tweet: TweetV2) => this._logger.log(`pipe(2): tweet.id: ${tweet?.id}, tweet.referenced_tweet: ${JSON.stringify(tweet?.referenced_tweets)}`)),
@@ -413,7 +444,7 @@ export class TweetTrackerJob {
                                 ).pipe(
                                   RxJS.tap({
                                     next: (_)=> this._logger.log(`pipe(2): save socialEvent success, tweet.Id: ${socialEvent.contentId}, socialEvent.id: ${socialEvent.id}`),
-                                    error: err => this._logger.log(`pipe(2): save SocialEvent failed, tweet.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}, error: ${err}`),
+                                    error: err => this._logger.log(`pipe(2): save SocialEvent failed, tweet.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}`, err),
                                   }),
                                   RxJS.map((_) => ({socialEvent, ...data})),
                                   RxJS.catchError(error => RxJS.throwError(() => new TweetTrackerError('save SocialEvent failed', error)))
@@ -436,6 +467,9 @@ export class TweetTrackerJob {
                                   RxJS.mergeMap(err => RxJS.throwError(err))
                                 ),
                               )
+                          }),
+                          RxJS.tap({
+                            error: err => this._logger.error(`pipe(2): twitter client userTimeline failed`, err)
                           }),
                           RxJS.catchError((error) =>
                             RxJS.merge(
@@ -472,8 +506,10 @@ export class TweetTrackerJob {
               )
             )
           ),
+          // fetch likes and retweets of contents
           RxJS.concatMap((data) =>
             RxJS.concat(
+              // fetch tweetLikedBy of each stream content
               RxJS.defer(() =>
                 RxJS.from(this._twitterClient.tweetLikedBy(data.socialEvent.contentId, {
                   asPaginator: true,
@@ -482,6 +518,10 @@ export class TweetTrackerJob {
               )
               .pipe(
                 RxJS.expand((paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
+                RxJS.tap({
+                  next: (paginator) => this._logger.debug(`pipe(3-0): tweeter client paginator tweets Likes count: ${paginator.meta.result_count}`),
+                  error: (error) => this._logger.error(`pipe(3-0): paginator failed, tweet.Id: ${data.socialEvent.contentId}`, error)
+                }),
                 RxJS.concatMap((paginator) =>
                   RxJS.merge(
                     RxJS.of(paginator).pipe(
@@ -499,10 +539,6 @@ export class TweetTrackerJob {
                     )
                   )
                 ),
-                RxJS.tap({
-                  next: (paginator) => this._logger.debug(`pipe(3-0): tweeter client paginator tweets Likes count: ${paginator.meta.result_count}`),
-                  error: (error) => this._logger.error(`pipe(3-0): paginator failed, tweet.Id: ${data.socialEvent.contentId}\n error: ${error}`)
-                }),
                 RxJS.mergeMap((paginator) =>
                   RxJS.merge(
                     RxJS.of(paginator).pipe(
@@ -529,7 +565,7 @@ export class TweetTrackerJob {
                                 .getRawOne()
                             ).pipe(
                               RxJS.tap( {
-                                error: (error) => this._logger.error(`pipe(3-1): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, error: ${error}`),
+                                error: (error) => this._logger.error(`pipe(3-1): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}`, error),
                               }),
                               RxJS.mergeMap((queryResult) =>
                                 RxJS.merge(
@@ -588,10 +624,13 @@ export class TweetTrackerJob {
                                   })
                                 ).pipe(RxJS.tap({
                                     next: (_) => this._logger.log(`pipe(3-1): save socialTracker success, tweet.Id: ${data.socialEvent.contentId}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`),
-                                    error: (error) => this._logger.error(`pipe(3-1): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}, error: ${error}`),
+                                    error: (error) => this._logger.error(`pipe(3-1): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`, error),
                                   }),
                                 )
                               ),
+                              RxJS.tap({
+                                error: err => this._logger.error(`pipe(3-1): fetch and persist tweet Likes failed`, err)
+                              }),
                               RxJS.catchError(error => RxJS.throwError(() => new TweetTrackerError('fetch and persist tweet Likes failed', error)))
                             )
                           )
@@ -621,6 +660,9 @@ export class TweetTrackerJob {
                       ),
                     )
                 }),
+                RxJS.tap({
+                  error: err => this._logger.error(`pipe(3-0): twitter client tweetLikedBy failed`, err)
+                }),
                 RxJS.catchError((error) =>
                   RxJS.merge(
                     RxJS.of(error).pipe(
@@ -649,6 +691,7 @@ export class TweetTrackerJob {
                 RxJS.finalize(() => this._logger.debug(`pipe(3-0): finalize twitter client tweetLikedBy, tweet.id: ${data.socialEvent.contentId}`)),
                 this.retryWithDelay(30000, 3),
               ),
+              // fetch tweetRetweetedBy of each stream content
               RxJS.defer(() =>
                 RxJS.from(this._twitterClient.tweetRetweetedBy(data.socialEvent.contentId, {
                   asPaginator: true,
@@ -656,6 +699,10 @@ export class TweetTrackerJob {
                 }))
               ).pipe(
                 RxJS.expand((paginator: TweetRetweetersUsersV2Paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
+                RxJS.tap({
+                  next: (paginator) => this._logger.debug(`pipe(4-0): tweeter client paginator tweets retweets count: ${paginator.meta.result_count}`),
+                  error: (error) => this._logger.error(`pipe(4-0): paginator failed, tweet.Id: ${data.socialEvent.contentId}`, error)
+                }),
                 RxJS.concatMap((paginator) =>
                   RxJS.merge(
                     RxJS.of(paginator).pipe(
@@ -673,10 +720,6 @@ export class TweetTrackerJob {
                     )
                   )
                 ),
-                RxJS.tap({
-                  next: (paginator) => this._logger.debug(`pipe(4-0): tweeter client paginator tweets retweets count: ${paginator.meta.result_count}`),
-                  error: (error) => this._logger.error(`pipe(4-0): paginator failed, tweet.Id: ${data.socialEvent.contentId}\n${error}`)
-                }),
                 RxJS.mergeMap((paginator) =>
                   RxJS.merge(
                     RxJS.of(paginator).pipe(
@@ -704,7 +747,7 @@ export class TweetTrackerJob {
                               .getRawOne()
                             ).pipe(
                               RxJS.tap( {
-                                error: (error) => this._logger.error(`pipe(4-1): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, error: ${error}`),
+                                error: (error) => this._logger.error(`pipe(4-1): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}`, error),
                               }),
                               RxJS.mergeMap((queryResult) =>
                                 RxJS.merge(
@@ -763,10 +806,13 @@ export class TweetTrackerJob {
                                 ).pipe(
                                   RxJS.tap({
                                     next: (_) => this._logger.log(`pipe(4-1): save socialTracker success, tweet.Id: ${data.socialEvent.contentId}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`),
-                                    error: (error) => this._logger.error(`pipe(4-1): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}\n${error}`),
+                                    error: (error) => this._logger.error(`pipe(4-1): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`, error),
                                   }),
                                 )
                               ),
+                              RxJS.tap({
+                                error: (error) => this._logger.error(`pipe(4-1): fetch and persist tweet retweets failed`, error),
+                              }),
                               RxJS.catchError(error => RxJS.throwError(() => new TweetTrackerError('fetch and persist tweet retweets failed', error)))
                             )
                           )
@@ -795,6 +841,9 @@ export class TweetTrackerJob {
                         RxJS.mergeMap(err => RxJS.throwError(err))
                       ),
                     )
+                }),
+                RxJS.tap({
+                  error: err => this._logger.error(`pipe(4-0): twitter client tweetRetweetedBy failed`, err)
                 }),
                 RxJS.catchError((error) =>
                   RxJS.merge(
@@ -829,7 +878,7 @@ export class TweetTrackerJob {
         )
       ),
     ).subscribe({
-      error: (err) => this._logger.error(`fetchTweetsFromPage failed, ${err.stack},\n${err?.cause?.stack}`),
+      error: (err) => this._logger.error(`fetchTweetsFromPage failed,\n cause: ${err?.cause?.stack}`, err),
       complete: () => this._logger.debug(`fetchTweetsFromPage completed`),
     })
   }

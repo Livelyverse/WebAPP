@@ -7,7 +7,7 @@ import {
   HttpStatus,
   Logger,
   Param,
-  ParseBoolPipe, ParseUUIDPipe,
+  ParseUUIDPipe,
   Query,
   UseGuards
 } from "@nestjs/common";
@@ -18,7 +18,6 @@ import { AirdropFilterType, AirdropInfoViewDto } from "../domain/dto/airdropInfo
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { BalanceSortBy, FindAllType, SortType } from "../services/IAirdrop.service";
-import { EnumPipe } from "../domain/pipe/enumPipe";
 import { AirdropBalanceViewDto } from "../domain/dto/airdropBalanceView.dto";
 import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
 import { SocialActionType } from "../domain/entity/enums";
@@ -27,7 +26,7 @@ import { isUUID } from "class-validator";
 import { SocialAirdropEntity } from "../domain/entity/socialAirdrop.entity";
 import { FindAllBalanceViewDto } from "../domain/dto/findAllBalanceView.dto";
 import { BooleanPipe } from "../domain/pipe/booleanPipe";
-import { AirdropRuleSortBy } from "../services/airdropRule.service";
+import { EnumPipe } from "../domain/pipe/enumPipe";
 
 
 @ApiBearerAuth()
@@ -94,7 +93,14 @@ export class AirdropController {
     const filterBy = AirdropFilterType.USER_ID;
     return RxJS.from(
       this._airdropService.findAll(
-          (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, uuid)).pipe(
+          (page - 1) * offset,
+        offset,
+        sortType ? sortType : SortType.ASC,
+        sortBy ? sortBy : AirdropSortBy.TIMESTAMP,
+        isSettlement,
+        filterBy,
+        uuid
+      )).pipe(
       RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
           RxJS.merge(
             RxJS.of(result).pipe(
@@ -280,7 +286,13 @@ export class AirdropController {
             RxJS.of(filter).pipe(
               RxJS.filter(filterVal => isUUID(filterVal)),
               RxJS.mergeMap(filterVal => this._airdropService.findAll(
-                (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, filterVal)),
+                (page - 1) * offset,
+                offset,
+                sortType ? sortType : SortType.ASC,
+                sortBy ? sortBy : AirdropSortBy.TIMESTAMP,
+                isSettlement,
+                filterBy,
+                filterVal)),
               RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
                 RxJS.merge(
                   RxJS.of(result).pipe(
@@ -514,7 +526,13 @@ export class AirdropController {
             RxJS.of(filter).pipe(
               RxJS.filter(filterVal => filterVal && isUUID(filterVal)),
               RxJS.mergeMap(filterVal => this._airdropService.findAllBalance(
-                (page - 1) * offset, offset, sortType, sortBy, filterBy, filterVal)),
+                (page - 1) * offset,
+                offset,
+                sortType ? sortType : SortType.ASC,
+                sortBy ? sortBy : BalanceSortBy.TOTAL,
+                filterBy,
+                filterVal
+              )),
               RxJS.mergeMap((result: FindAllBalanceType) =>
                 RxJS.merge(
                   RxJS.of(result).pipe(

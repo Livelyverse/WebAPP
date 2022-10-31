@@ -9,17 +9,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RoleUpdateDto {
-  // public static from(dto: RoleUpdateDto): RoleUpdateDto | null {
-  //   if (dto) {
-  //     const updateDto = new RoleUpdateDto();
-  //     updateDto.id = dto?.id;
-  //     updateDto.name = dto?.name;
-  //     updateDto.description = dto?.description;
-  //     return updateDto;
-  //   }
-  //   return null;
-  // }
-
   @IsUUID()
   @ApiProperty()
   public id: string;

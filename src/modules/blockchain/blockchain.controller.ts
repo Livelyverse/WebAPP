@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  HttpCode,
-  HttpStatus,
-  Logger,
-  HttpException, UseGuards
-} from "@nestjs/common";
+import { Controller, Get, HttpCode, HttpException, HttpStatus, Logger, Query, UseGuards } from "@nestjs/common";
 import { BlockchainService, BlockchainSortBy, FindAllType, NetworkType, SortType } from "./blockchain.service";
 import { FindAllTxViewDto } from "./domain/dto/findAllTxView.dto";
 import { ApiBearerAuth, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
@@ -67,7 +59,12 @@ export class BlockchainController {
     @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
     @Query('sortBy', new EnumPipe(BlockchainSortBy)) sortBy: BlockchainSortBy,
   ): RxJS.Observable<FindAllTxViewDto> {
-    return RxJS.from(this._blockchainService.findAll((page - 1) * offset, offset, sortType, sortBy)).pipe(
+    return RxJS.from(this._blockchainService.findAll(
+      (page - 1) * offset,
+      offset,
+      sortType ? sortType : SortType.ASC,
+      sortBy ? sortBy : BlockchainSortBy.TIMESTAMP
+    )).pipe(
       RxJS.mergeMap((result:FindAllType) =>
         RxJS.merge(
           RxJS.of(result).pipe(

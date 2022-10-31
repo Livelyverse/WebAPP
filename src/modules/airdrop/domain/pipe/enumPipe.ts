@@ -36,24 +36,21 @@ export class EnumPipe<T = any> implements PipeTransform<T> {
    * Method that accesses and performs optional transformation on argument for
    * in-flight requests.
    *
-   * @param value currently processed route argument
+   * @param key currently processed route argument
    * @param metadata contains metadata about the currently processed route argument
    */
-  async transform(value: T, metadata: ArgumentMetadata): Promise<T | null> {
-    if (value && !this.isEnum(value)) {
+  async transform(key: T, metadata: ArgumentMetadata): Promise<T | null> {
+    if (key && !this.isEnum(key)) {
       throw this.exceptionFactory(
         'Validation failed (enum string is expected)',
       );
-    } else if(!value) {
+    } else if(!key) {
       return null
     }
-    return value;
+    return this.enumType[key.toString()];
   }
 
-  protected isEnum(value: T): boolean {
-    const enumValues = Object.keys(this.enumType).map(
-      item => this.enumType[item],
-    );
-    return enumValues.includes(value);
+  protected isEnum(key: T): boolean {
+    return Object.keys(this.enumType).includes(key.toString());
   }
 }

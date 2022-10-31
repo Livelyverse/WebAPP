@@ -1,10 +1,4 @@
-import {
-  ApiBearerAuth,
-  ApiParam,
-  ApiQuery,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import {
   Body,
   Controller,
@@ -17,18 +11,20 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  UseGuards, UsePipes
+  UseGuards,
+  UsePipes
 } from "@nestjs/common";
 import { RoleService, RoleSortBy } from "../services/role.service";
 import { RoleCreateDto, RoleUpdateDto, RoleViewDto } from "../domain/dto";
-import { RoleEntity } from '../domain/entity';
-import { JwtAuthGuard } from '../../authentication/domain/gurad/jwt-auth.guard';
-import RoleGuard from '../../authentication/domain/gurad/role.guard';
-import { FindAllViewDto } from '../domain/dto/findAllView.dto';
+import { RoleEntity } from "../domain/entity";
+import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
+import RoleGuard from "../../authentication/domain/gurad/role.guard";
+import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { ValidationPipe } from "../../airdrop/domain/pipe/validationPipe";
 import { SortType } from "../services/IService";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { EnumPipe } from "../domain/pipe/enumPipe";
+
 
 @ApiBearerAuth()
 @ApiTags('/api/profiles/roles')
@@ -192,8 +188,8 @@ export class RoleController {
     const { data, total } = await this._roleService.findAll(
       (page - 1) * offset,
       offset,
-      sortType,
-      sortBy,
+      sortType ? sortType : SortType.ASC,
+      sortBy ? sortBy : RoleSortBy.TIMESTAMP,
     );
     if (total === 0 || data.length === 0) {
       throw new HttpException({

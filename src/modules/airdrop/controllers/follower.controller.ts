@@ -6,11 +6,11 @@ import * as RxJS from "rxjs";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { FindAllType, SortType } from "../services/IAirdrop.service";
-import { EnumPipe } from "../domain/pipe/enumPipe";
 import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
 import { FollowerService, FollowerSortBy } from "../services/follower.service";
 import { FollowerViewDto } from "../domain/dto/followerView.dto";
 import { SocialFollowerEntity } from "../domain/entity/socialFollower.entity";
+import { EnumPipe } from "../domain/pipe/enumPipe";
 
 @ApiBearerAuth()
 @ApiTags('/api/airdrops/socials/followers')
@@ -69,7 +69,12 @@ export class FollowerController {
     @Query('filter', new EnumPipe(SocialType)) filter: SocialType
   ): RxJS.Observable<FindAllViewDto<FollowerViewDto>> {
     return RxJS.from(this._followerService.findAll(
-        (page - 1) * offset, offset, sortType, sortBy, filter)).pipe(
+        (page - 1) * offset,
+      offset,
+      sortType ? sortType : SortType.ASC,
+      sortBy ? sortBy : FollowerSortBy.TIMESTAMP,
+      filter
+    )).pipe(
       RxJS.mergeMap((result: FindAllType<SocialFollowerEntity>) =>
         RxJS.merge(
           RxJS.of(result).pipe(

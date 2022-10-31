@@ -1,12 +1,4 @@
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiConsumes,
-  ApiParam,
-  ApiQuery,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import {
   Body,
   Controller,
@@ -15,26 +7,26 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-  Param, ParseUUIDPipe,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
   Res,
   UploadedFile,
   UseGuards,
-  UseInterceptors, UsePipes
+  UseInterceptors,
+  UsePipes
 } from "@nestjs/common";
 import { UserService, UserSortBy } from "../services/user.service";
-import { UserCreateDto } from "../domain/dto";
-import { UserUpdateDto } from "../domain/dto";
-import { UserViewDto } from "../domain/dto";
-import { UserEntity } from '../domain/entity';
-import { JwtAuthGuard } from '../../authentication/domain/gurad/jwt-auth.guard';
-import RoleGuard from '../../authentication/domain/gurad/role.guard';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
-import { createReadStream } from 'fs';
-import { FindAllViewDto } from '../domain/dto/findAllView.dto';
+import { UserCreateDto, UserUpdateDto, UserViewDto } from "../domain/dto";
+import { UserEntity } from "../domain/entity";
+import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
+import RoleGuard from "../../authentication/domain/gurad/role.guard";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { Response } from "express";
+import { createReadStream } from "fs";
+import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { ValidationPipe } from "../../airdrop/domain/pipe/validationPipe";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SortType } from "../services/IService";
@@ -209,7 +201,10 @@ export class UserController {
     @Query('sortBy', new EnumPipe(UserSortBy)) sortBy: UserSortBy,
   ): Promise<FindAllViewDto> {
     const { data, total } = await this._userService.findAll(
-      (page - 1) * offset, offset, sortType, sortBy,
+      (page - 1) * offset,
+      offset,
+      sortType ? sortType : SortType.ASC,
+      sortBy ? sortBy : UserSortBy.TIMESTAMP,
     );
     if (total === 0 || data.length === 0) {
       throw new HttpException({

@@ -1,10 +1,4 @@
-import {
-  ApiBearerAuth,
-  ApiParam,
-  ApiQuery,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import {
   Body,
   Controller,
@@ -13,22 +7,23 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-  Param, ParseUUIDPipe,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
-  Req,
-  UseGuards, UsePipes
+  UseGuards,
+  UsePipes
 } from "@nestjs/common";
 import { UserGroupService, UserGroupSortBy } from "../services/userGroup.service";
-import { UserGroupCreateDto, UserGroupViewDto, UserGroupUpdateDto } from "../domain/dto";
-import { UserGroupEntity } from '../domain/entity';
-import { JwtAuthGuard } from '../../authentication/domain/gurad/jwt-auth.guard';
-import RoleGuard from '../../authentication/domain/gurad/role.guard';
-import { FindAllViewDto } from '../domain/dto/findAllView.dto';
+import { UserGroupCreateDto, UserGroupUpdateDto, UserGroupViewDto } from "../domain/dto";
+import { UserGroupEntity } from "../domain/entity";
+import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
+import RoleGuard from "../../authentication/domain/gurad/role.guard";
+import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { ValidationPipe } from "../../airdrop/domain/pipe/validationPipe";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
-import { EnumPipe } from "../domain/pipe/enumPipe";
 import { SortType } from "../services/IService";
+import { EnumPipe } from "../domain/pipe/enumPipe";
 
 @ApiBearerAuth()
 @ApiTags('/api/profiles/user-groups')
@@ -190,8 +185,8 @@ export class UserGroupController {
     const { data, total } = await this._userGroupService.findAll(
       (page - 1) * offset,
       offset,
-      sortType,
-      sortBy,
+      sortType ? sortType : SortType.ASC,
+      sortBy ? sortBy : UserGroupSortBy.TIMESTAMP,
     );
     if (total === 0 || data.length === 0) {
       throw new HttpException({
