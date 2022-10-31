@@ -75,10 +75,9 @@ export class BlockchainService {
     let systemAdminConfig = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'systemadmin');
     let livelyTokenConfig = this._blockchainOptions.config.tokens.find((token) => token.name.toUpperCase() === 'LVL')
     this._jsonRpcProvider = new ethers.providers.JsonRpcProvider(this._blockchainOptions.config.network.url,{
-      name: 'mumbai',
-      chainId: 80001,
+      name: this._blockchainOptions.config.network.name,
+      chainId: this._blockchainOptions.config.network.chainId,
       _defaultProvider: (providers) => new providers.JsonRpcProvider(this._blockchainOptions.config.network.url)
-      // url: this._blockchainOptions.config.network.url
     });
     const livelyTokenAddress = ethers.utils.getAddress(livelyTokenConfig.address)
     this._systemAdmin = new ethers.Wallet(systemAdminConfig.privateKey, this._jsonRpcProvider);
