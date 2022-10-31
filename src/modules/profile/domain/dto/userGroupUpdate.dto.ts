@@ -8,18 +8,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UserGroupUpdateDto {
-  // public static from(dto: UserGroupUpdateDto): UserGroupUpdateDto | null {
-  //   if (dto) {
-  //     const updateDto = new UserGroupUpdateDto();
-  //     updateDto.id = dto?.id;
-  //     updateDto.name = dto?.name;
-  //     updateDto.role = dto?.role;
-  //     updateDto.description = dto?.description;
-  //     return updateDto;
-  //   }
-  //   return null;
-  // }
-
   @IsUUID()
   @ApiProperty()
   public id: string;

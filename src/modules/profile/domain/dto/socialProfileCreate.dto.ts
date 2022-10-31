@@ -18,15 +18,15 @@ export class SocialProfileCreateDto {
 
   @IsNotEmpty({ message: 'SocialType must not empty' })
   @IsDefined({ message: 'SocialType must be defined' })
-  @IsEnum(SocialType, { message: `SocialType must one of these values, ${Object.values(SocialType).toString()}` } )
+  @IsEnum(SocialType, { message: `SocialType must one of these values, ${Object.keys(SocialType).toString()}` } )
   @ApiProperty()
   socialType: SocialType
 
-  @IsNotEmpty({ message: 'UserId must not empty' })
-  @IsDefined({ message: 'UserId must be defined' })
-  @IsString({ message: 'UserId must be string' })
-  @ApiProperty()
-  userId: string
+  // @IsNotEmpty({ message: 'UserId must not empty' })
+  // @IsDefined({ message: 'UserId must be defined' })
+  // @IsString({ message: 'UserId must be string' })
+  // @ApiProperty()
+  // userId: string
 
   @IsNotEmpty({ message: 'ProfileName must not empty' })
   @IsDefined({ message: 'ProfileName must be defined' })

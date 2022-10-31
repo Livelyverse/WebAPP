@@ -1,7 +1,6 @@
-import { Entity, Column, ManyToOne, OneToMany, OneToOne, JoinColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn } from "typeorm";
 import { BaseEntity } from './base.entity';
 import { UserGroupEntity } from './userGroup.entity';
-import { RoleEntity } from "./role.entity";
 
 @Entity({ name: 'user' })
 export class UserEntity extends BaseEntity {
@@ -9,11 +8,11 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 256, unique: true, nullable: false })
   email: string;
 
-  @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
-  firstname: string;
+  @Column({ type: 'varchar', length: 256, unique: false, nullable: true })
+  fullName: string;
 
-  @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
-  lastname: string;
+  // @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
+  // lastname: string;
 
   @Column({ type: 'boolean', default: false })
   isEmailConfirmed: boolean;
@@ -49,8 +48,7 @@ export class UserEntity extends BaseEntity {
       const user = new UserEntity();
       user.id = entity?.id;
       user.email = entity?.email;
-      user.firstname = entity?.firstname;
-      user.lastname = entity?.lastname;
+      user.fullName = entity?.fullName;
       user.walletAddress = entity?.walletAddress;
       user.password = entity?.password;
       user.isEmailConfirmed = entity?.isEmailConfirmed;

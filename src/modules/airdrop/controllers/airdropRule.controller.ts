@@ -6,7 +6,8 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-  Param, ParseUUIDPipe,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -27,7 +28,7 @@ import { AirdropRuleCreateDto } from "../domain/dto/airdropRuleCreate.dto";
 import { AirdropRuleViewDto } from "../domain/dto/airdropRuleView.dto";
 import { AirdropRuleUpdateDto } from "../domain/dto/airdropRuleUpdate.dto";
 import { SocialAirdropRuleEntity } from "../domain/entity/socialAirdropRule.entity";
-import { EnumPipe } from "../../profile/domain/pipe/enumPipe";
+import { EnumPipe } from "../domain/pipe/enumPipe";
 
 @ApiBearerAuth()
 @ApiTags('/api/airdrops/rules/')
@@ -176,7 +177,12 @@ export class AirdropRuleController {
     @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
     @Query('sortBy', new EnumPipe(AirdropRuleSortBy)) sortBy: AirdropRuleSortBy,
   ): RxJS.Observable<FindAllViewDto<AirdropRuleViewDto>> {
-    return RxJS.from(this._airdropRuleService.findAll((page - 1) * offset, offset, sortType, sortBy)).pipe(
+    return RxJS.from(this._airdropRuleService.findAll(
+      (page - 1) * offset,
+      offset,
+      sortType ? sortType : SortType.ASC,
+      sortBy ? sortBy : AirdropRuleSortBy.TIMESTAMP
+    )).pipe(
       RxJS.mergeMap((result: FindAllType<SocialAirdropRuleEntity>) =>
         RxJS.merge(
           RxJS.of(result).pipe(

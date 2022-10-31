@@ -6,8 +6,12 @@ import {
   HttpCode,
   HttpException,
   HttpStatus,
-  Logger, Param, ParseUUIDPipe,
-  Post, Query, Req,
+  Logger,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
   UseGuards,
   UsePipes
 } from "@nestjs/common";
@@ -20,9 +24,9 @@ import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SocialProfileEntity } from "../domain/entity";
 import { SocialType } from "../domain/entity/socialProfile.entity";
-import { EnumPipe } from "../../blockchain/domain/pipe/enumPipe";
 import { ValidationPipe } from "../domain/pipe/validationPipe";
 import { FindAllType, SortType } from "../services/IService";
+import { EnumPipe } from "../domain/pipe/enumPipe";
 
 @ApiBearerAuth()
 @ApiTags('/api/profiles/socials')
@@ -50,8 +54,8 @@ export class SocialProfileController {
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  socialProfileCreate(@Body() socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileViewDto> {
-    return RxJS.from(this._socialProfileService.create(socialProfileDto)).pipe(
+  socialProfileCreate(@Req() req, @Body() socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileViewDto> {
+    return RxJS.from(this._socialProfileService.create(req.user, socialProfileDto)).pipe(
       RxJS.map(entity => SocialProfileViewDto.from(entity)),
       RxJS.tap({
         error: err => this._logger.error(`socialProfileCreate failed, dto: ${JSON.stringify(socialProfileDto)}`, err)
@@ -160,6 +164,12 @@ export class SocialProfileController {
     description: `data sort type can be one of ${Object.keys(SortType)}`,
     schema: { enum: Object.keys(SortType) },
   })
+  @ApiQuery({
+    name: 'filterBy',
+    required: false,
+    description: `filter by ${Object.keys(SocialType)} `,
+    schema: { enum: Object.keys(SocialType) },
+  })
   @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -174,7 +184,12 @@ export class SocialProfileController {
     @Query('sortBy', new EnumPipe(SocialProfileSortBy)) sortBy: SocialProfileSortBy,
     @Query('filterBy', new EnumPipe(SocialType)) filterBy: SocialType,
   ): RxJS.Observable<FindAllViewDto> {
-    return RxJS.from(this._socialProfileService.findAll((page - 1) * offset, offset, sortType, sortBy, filterBy)).pipe(
+    return RxJS.from(this._socialProfileService.findAll(
+      (page - 1) * offset,
+      offset,
+      sortType ? sortType : SortType.DESC,
+      sortBy ? sortBy : SocialProfileSortBy.TIMESTAMP,
+      filterBy)).pipe(
       RxJS.mergeMap((result: FindAllType<SocialProfileEntity>) =>
         RxJS.merge(
           RxJS.of(result).pipe(
@@ -240,8 +255,8 @@ export class SocialProfileController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   socialProfileFindByUserId(@Req() req): RxJS.Observable<SocialProfileViewDto[]> {
     return RxJS.from(this._socialProfileService.find({
-        user: { id: req.user.id }
-      })).pipe(
+      where: { user: { id: req.user.id } }
+    })).pipe(
       RxJS.concatMap(entities =>
         RxJS.from(entities).pipe(
           RxJS.map(entity => SocialProfileViewDto.from(entity)),

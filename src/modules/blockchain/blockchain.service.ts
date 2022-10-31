@@ -72,11 +72,17 @@ export class BlockchainService {
     private readonly _blockchainOptions: BlockchainOptions,
     private readonly _configService: ConfigService)
   {
-    let systemAdmin = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'systemadmin');
-    let livelyToken = this._blockchainOptions.config.tokens.find((token) => token.name.toUpperCase() === 'LVL')
-    this._jsonRpcProvider = new ethers.providers.JsonRpcProvider(this._blockchainOptions.config.network.url);
-    this._systemAdmin = new ethers.Wallet(systemAdmin.privateKey, this._jsonRpcProvider);
-    this._livelyToken = LivelyToken__factory.connect(livelyToken.address, this._systemAdmin);
+    let systemAdminConfig = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'systemadmin');
+    let livelyTokenConfig = this._blockchainOptions.config.tokens.find((token) => token.name.toUpperCase() === 'LVL')
+    this._jsonRpcProvider = new ethers.providers.JsonRpcProvider(this._blockchainOptions.config.network.url,{
+      name: 'mumbai',
+      chainId: 80001,
+      _defaultProvider: (providers) => new providers.JsonRpcProvider(this._blockchainOptions.config.network.url)
+      // url: this._blockchainOptions.config.network.url
+    });
+    const livelyTokenAddress = ethers.utils.getAddress(livelyTokenConfig.address)
+    this._systemAdmin = new ethers.Wallet(systemAdminConfig.privateKey, this._jsonRpcProvider);
+    this._livelyToken = LivelyToken__factory.connect(livelyTokenAddress, this._systemAdmin);
     this._eventEmitter = new EventEmitter();
     this._safeMode = false;
     this._confirmationCount = this._blockchainOptions.appMode == APP_MODE.DEV ? 0 : this._blockchainOptions.appMode == APP_MODE.TEST ? 3 : 7
@@ -157,7 +163,7 @@ export class BlockchainService {
         ),
         RxJS.concatMap((airdropReq:AirdropRequestDto) =>
           RxJS.from(airdropReq.data).pipe(
-            RxJS.map((data) => (<IERC20Extra.BatchTransferRequestStruct>{recipient: data.destination, amount: BigNumber.from(data.amount)})),
+            RxJS.map((data) => (<IERC20Extra.BatchTransferRequestStruct>{to: data.destination, amount: BigNumber.from(data.amount)})),
             RxJS.toArray(),
             RxJS.map((batchTransfers) => [airdropReq, batchTransfers])
           )

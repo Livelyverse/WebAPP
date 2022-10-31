@@ -22,8 +22,10 @@ import { TwitterFollowerError } from "../../error/twitterFollower.error";
 @Injectable()
 export class TwitterFollowerJob {
   private readonly _logger = new Logger(TwitterFollowerJob.name);
-  private readonly _authToken: string
-  private readonly _twitterClient: TwitterApiv2ReadOnly
+  private readonly _authToken: string;
+  private readonly _twitterClient: TwitterApiv2ReadOnly;
+  private readonly _startAt: Date;
+  private readonly _endAt: Date;
 
   constructor(
     @InjectEntityManager()
@@ -35,12 +37,27 @@ export class TwitterFollowerJob {
       throw new Error("airdrop.twitter.authToken config is empty");
     }
 
+    const startTimestamp = this._configService.get<number>('airdrop.twitter.startAt');
+    const endTimestamp = this._configService.get<number>('airdrop.twitter.endAt');
+    this._startAt = new Date(startTimestamp);
+    this._endAt = new Date(endTimestamp);
+
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
     this.fetchTwitterFollowers();
   }
 
   @Cron(CronExpression.EVERY_6_HOURS)
   fetchTwitterFollowers() {
+
+    if (this._startAt.getTime() > Date.now()) {
+      this._logger.debug(`fetchTwitterFollowers this._startAt ${this._startAt.getTime()} greater than now ${Date.now()}`);
+      return
+    }
+
+    if (this._endAt.getTime() < Date.now()) {
+      this._logger.debug(`fetchTwitterFollowers this._endAt ${this._endAt.getTime()} less than now ${Date.now()}`);
+      return
+    }
 
     let socialLivelyQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(SocialLivelyEntity, "socialLively")
       .where('"socialLively"."socialType" = \'TWITTER\'')
@@ -54,6 +71,7 @@ export class TwitterFollowerJob {
     this._logger.debug("tweets follower job starting . . . ");
 
     RxJS.from(socialLivelyQueryResultObservable).pipe(
+      // fetch social twitter airdrop rules
       RxJS.mergeMap((socialLively) =>
         RxJS.from(this._entityManager.createQueryBuilder(SocialAirdropRuleEntity, "airdropRule")
           .select()

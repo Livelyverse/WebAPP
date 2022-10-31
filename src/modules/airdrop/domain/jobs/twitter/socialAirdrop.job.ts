@@ -15,20 +15,22 @@ import { BlockchainError, ErrorCode } from "../../../../blockchain/domain/error/
 export class SocialAirdropJob {
   private readonly _logger = new Logger(SocialAirdropJob.name);
   private _safeMode = false;
+  private readonly _bufferCount: number;
 
   constructor(
     @InjectEntityManager()
     private readonly _entityManager: EntityManager,
     private readonly _configService: ConfigService,
-    private readonly _blockchainService: BlockchainService
+    private readonly _blockchainService: BlockchainService,
   ) {
+    this._bufferCount = this._configService.get<number>('airdrop.twitter.bufferCount');
     this.airdropTokens()
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_11PM)
   airdropTokens() {
     let airdropQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(UserEntity, "users")
-      .select('"users"."username" as "username", "users"."walletAddress" as "walletAddress"')
+      .select('"users"."email" as "email", "users"."walletAddress" as "walletAddress"')
       .addSelect('"socialProfile"."username" as "socialUsername", "socialProfile"."socialType" as "socialType"')
       .addSelect('"airdropRule"."actionType" as "actionType", "airdropRule"."unit" "token"')
       .addSelect('"airdropRule"."amount" as "amount", "airdropRule"."decimal" "decimal"')
@@ -38,6 +40,7 @@ export class SocialAirdropJob {
       .innerJoin("social_airdrop", "airdrop", '"airdrop"."socialTrackerId" = "socialTracker"."id"')
       .innerJoin("social_airdrop_rule", "airdropRule", '"airdropRule"."id" = "airdrop"."airdropRuleId"')
       .where('"airdrop"."blockchainTxId" IS NULL')
+      .andWhere('"users"."walletAddress" IS NOT NULL')
       .getRawMany()).pipe(
         RxJS.tap({
           next: (queryResult) => this._logger.log(`fetch LVL token airdrops, count: ${queryResult.length}`),
@@ -46,8 +49,8 @@ export class SocialAirdropJob {
         RxJS.mergeMap((queryResult) =>
           RxJS.from(queryResult).pipe(
             RxJS.map(value => {
-              let {username, walletAddress, socialUsername, socialType, actionType, token, amount, decimal, ...airdrop} = value;
-              return {username, walletAddress, socialUsername, socialType, actionType, token, amount, decimal, airdrop};
+              let {email, walletAddress, socialUsername, socialType, actionType, token, amount, decimal, ...airdrop} = value;
+              return {email, walletAddress, socialUsername, socialType, actionType, token, amount, decimal, airdrop};
             }),
           )
         ),
@@ -66,7 +69,7 @@ export class SocialAirdropJob {
         RxJS.filter(safeMode => !safeMode),
         RxJS.mergeMap(_ =>
           RxJS.from(airdropQueryResultObservable).pipe(
-            RxJS.groupBy((data) => data.username),
+            RxJS.groupBy((data) => data.email),
             RxJS.mergeMap(group => group.pipe(RxJS.toArray())),
             // RxJS.mergeMap(userDataArray =>
             //   RxJS.from(userDataArray).pipe(
@@ -88,7 +91,7 @@ export class SocialAirdropJob {
                 ),
                 RxJS.of(airdropInfo).pipe(
                   RxJS.filter(data => !!!data.userAirdrops[0].walletAddress),
-                  RxJS.tap(data => this._logger.warn(`token airdrops of user profile ignored, wallet address is null, username: ${data.userAirdrops[0].username}`)),
+                  RxJS.tap(data => this._logger.warn(`token airdrops of user profile ignored, wallet address is null, username: ${data.userAirdrops[0].email}`)),
                   RxJS.mergeMap(_ => RxJS.EMPTY),
                 )
               )
@@ -96,13 +99,13 @@ export class SocialAirdropJob {
             RxJS.tap(data => {
               const airdropIds = data.userAirdrops.map(userAirdrop => userAirdrop.airdrop.id).reduce((acc, value) => [...acc, value], [])
               const userAirdrop = data.userAirdrops[0]
-              this._logger.log(`airdropInfo, username: ${userAirdrop.username}, walletAddress: ${userAirdrop.walletAddress}, socialUsername: ${userAirdrop.socialUsername}, socialType: ${userAirdrop.socialType}, actionType: ${userAirdrop.actionType}, totalAmount: ${data.total.toString()}, airdropIds: ${JSON.stringify(airdropIds)}`)
+              this._logger.log(`airdropInfo, email: ${userAirdrop.email}, walletAddress: ${userAirdrop.walletAddress}, socialUsername: ${userAirdrop.socialUsername}, socialType: ${userAirdrop.socialType}, actionType: ${userAirdrop.actionType}, totalAmount: ${data.total.toString()}, airdropIds: ${JSON.stringify(airdropIds)}`)
             }),
-            RxJS.bufferCount(32),
+            RxJS.bufferCount(this._bufferCount),
             RxJS.concatMap(buffers =>
               RxJS.from(buffers).pipe(
                 RxJS.reduce((acc, buffer) => {
-                    acc['data'].push({ destination: buffer.userAirdrops[0].walletAddress, amount: buffer.total })
+                    acc['data'].push({ destination: buffer.userAirdrops[0].walletAddress, amount: BigInt(buffer.total) * (10n ** BigInt(buffer.userAirdrops[0].decimal))})
                     return acc;
                   },
                   AirdropRequestDto.from(Symbol.for('AirdropRequestId'), TokenType.LVL)

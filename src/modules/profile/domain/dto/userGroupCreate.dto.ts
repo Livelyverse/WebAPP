@@ -8,17 +8,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UserGroupCreateDto {
-  // public static from(dto: UserGroupCreateDto): UserGroupCreateDto | null {
-  //   if (dto) {
-  //     const createDto = new UserGroupCreateDto();
-  //     createDto.name = dto?.name;
-  //     createDto.role = dto?.role;
-  //     createDto.description = dto?.description;
-  //     return createDto;
-  //   }
-  //   return null;
-  // }
-
   @Length(4, 128, { message: 'Name length at least 4 characters' })
   @IsNotEmpty({ message: 'Name must not empty' })
   @IsDefined({ message: 'Name must be defined' })

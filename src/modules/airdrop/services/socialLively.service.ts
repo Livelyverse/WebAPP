@@ -10,7 +10,7 @@ import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
 
 export enum SocialLivelySortBy {
   TIMESTAMP = 'createdAt',
-  SOCIAL_TYPE = 'socialType'
+  SOCIALTYPE = 'socialType'
 }
 
 @Injectable()
