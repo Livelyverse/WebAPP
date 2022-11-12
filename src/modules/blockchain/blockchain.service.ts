@@ -57,7 +57,7 @@ export type FindAllType = {
 @Injectable()
 export class BlockchainService {
   private readonly _logger = new Logger(BlockchainService.name);
-  private readonly _systemAdmin: Wallet;
+  private readonly _airdropAccount: Wallet;
   private readonly _livelyToken: LivelyToken;
   private readonly _jsonRpcProvider: JsonRpcProvider;
   private readonly _eventEmitter: EventEmitter;
@@ -72,7 +72,7 @@ export class BlockchainService {
     private readonly _blockchainOptions: BlockchainOptions,
     private readonly _configService: ConfigService)
   {
-    let systemAdminConfig = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'systemadmin');
+    let airdropAccountConfig = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'airdropaccount');
     let livelyTokenConfig = this._blockchainOptions.config.tokens.find((token) => token.name.toUpperCase() === 'LVL')
     this._jsonRpcProvider = new ethers.providers.JsonRpcProvider(this._blockchainOptions.config.network.url,{
       name: this._blockchainOptions.config.network.name,
@@ -80,8 +80,8 @@ export class BlockchainService {
       _defaultProvider: (providers) => new providers.JsonRpcProvider(this._blockchainOptions.config.network.url)
     });
     const livelyTokenAddress = ethers.utils.getAddress(livelyTokenConfig.address)
-    this._systemAdmin = new ethers.Wallet(systemAdminConfig.privateKey, this._jsonRpcProvider);
-    this._livelyToken = LivelyToken__factory.connect(livelyTokenAddress, this._systemAdmin);
+    this._airdropAccount = new ethers.Wallet(airdropAccountConfig.privateKey, this._jsonRpcProvider);
+    this._livelyToken = LivelyToken__factory.connect(livelyTokenAddress, this._airdropAccount);
     this._eventEmitter = new EventEmitter();
     this._safeMode = false;
     this._confirmationCount = this._blockchainOptions.appMode == APP_MODE.DEV ? 0 : this._blockchainOptions.appMode == APP_MODE.TEST ? 3 : 7
@@ -170,8 +170,9 @@ export class BlockchainService {
         RxJS.concatMap(([airdropReq, batchTransfers]) =>
           RxJS.of([airdropReq, batchTransfers]).pipe(
             RxJS.filter((_) => !this._safeMode),
+            // send tx to blockchain
             RxJS.switchMap(([airdropReq, batchTransfers]:[AirdropRequestDto, IERC20Extra.BatchTransferRequestStruct[]]) =>
-              RxJS.defer(() => RxJS.from(this._livelyToken.connect(this._systemAdmin).batchTransfer(batchTransfers))).pipe(
+              RxJS.defer(() => RxJS.from(this._livelyToken.connect(this._airdropAccount).batchTransfer(batchTransfers))).pipe(
                 RxJS.concatMap( (airdropTx: ContractTransaction) =>
                   RxJS.of(airdropTx).pipe(
                     RxJS.map(tx => {
@@ -251,12 +252,12 @@ export class BlockchainService {
                   RxJS.merge(
                     RxJS.of(err).pipe(
                       // block chain error handling
-                      RxJS.filter((error) => error instanceof Error && Object.hasOwn(error, 'event') && Object.hasOwn(error, 'code')),
+                      RxJS.filter((error) => error instanceof Error && (Object.hasOwn(error, 'event') || Object.hasOwn(error, 'code'))),
                       RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", error))),
                     ),
                     RxJS.of(err).pipe(
                       // general error handling
-                      RxJS.filter((error) => error instanceof Error),
+                      RxJS.filter((error) => error instanceof Error && !(Object.hasOwn(error, 'event') && Object.hasOwn(error, 'code'))),
                       RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
                     )
                   )
@@ -268,7 +269,7 @@ export class BlockchainService {
                   error: err => this._logger.error(`send airdrop tx to blockchain failed\n${err.stack}\n${err?.cause?.stack}`)
                 }),
               )
-            ), // send tx to blockchain
+            ),
             RxJS.mergeMap((tuple:[AirdropRequestDto, ContractTransaction, BlockchainTxEntity]) =>
               RxJS.of(this._confirmationCount).pipe(
                 RxJS.switchMap((confirmationCount) =>
