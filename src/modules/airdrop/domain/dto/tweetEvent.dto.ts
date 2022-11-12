@@ -16,25 +16,27 @@ export class TweetEventDto {
       tweetEvent.replySettings = tweetV2?.reply_settings
       tweetEvent.authorId = tweetV2.author_id;
       tweetEvent.lang = tweetV2?.lang;
+      tweetEvent.hashTags = tweetV2?.entities?.hashtags?.reduce((acc, hashtag) => [...acc, hashtag.tag.toLowerCase()], [])
       return tweetEvent;
     }
     return null;
   }
 
-  public text: string
-  public source: string
-  public referencedTweets: Array<{type: string, id: string}>
-  public id: string
-  public createdAt: Date
-  public conversationId: string
-  public publicMetrics: {
+  text: string;
+  source: string;
+  referencedTweets: Array<{type: string, id: string}>
+  id: string;
+  createdAt: Date;
+  conversationId: string;
+  publicMetrics: {
     retweet_count: number,
     reply_count: number,
     like_count: number,
     quote_count: number,
   }
-  public possiblySensitive: boolean
-  public replySettings: string
-  public authorId: string
-  public lang: string
+  possiblySensitive: boolean;
+  replySettings: string;
+  authorId: string;
+  lang: string;
+  hashTags: string[]
 }

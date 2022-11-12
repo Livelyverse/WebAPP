@@ -44,7 +44,7 @@ export class SocialAirdropJob {
       .getRawMany()).pipe(
         RxJS.tap({
           next: (queryResult) => this._logger.log(`fetch LVL token airdrops, count: ${queryResult.length}`),
-          error: err => this._logger.error(`fetch LVL token airdrops failed, ${err.stack}`)
+          error: err => this._logger.error(`fetch LVL token airdrops failed`, err)
         }),
         RxJS.mergeMap((queryResult) =>
           RxJS.from(queryResult).pipe(
@@ -83,29 +83,33 @@ export class SocialAirdropJob {
                 RxJS.map((total) => ({userAirdrops, total}))
               )
             ),
-            RxJS.mergeMap((airdropInfo) =>
-              RxJS.merge(
-                RxJS.of(airdropInfo).pipe(
-                  RxJS.filter(data => !!data.userAirdrops[0].walletAddress),
-                  RxJS.identity
-                ),
-                RxJS.of(airdropInfo).pipe(
-                  RxJS.filter(data => !!!data.userAirdrops[0].walletAddress),
-                  RxJS.tap(data => this._logger.warn(`token airdrops of user profile ignored, wallet address is null, username: ${data.userAirdrops[0].email}`)),
-                  RxJS.mergeMap(_ => RxJS.EMPTY),
-                )
-              )
-            ),
+            // RxJS.mergeMap((airdropInfo) =>
+            //   RxJS.merge(
+            //     RxJS.of(airdropInfo).pipe(
+            //       RxJS.filter(data => !!data.userAirdrops[0]?.walletAddress),
+            //       RxJS.identity
+            //     ),
+            //     RxJS.of(airdropInfo).pipe(
+            //       RxJS.filter(data => !data.userAirdrops[0]?.walletAddress),
+            //       RxJS.tap(data => this._logger.warn(`token airdrops of user profile ignored, wallet address is null, username: ${data.userAirdrops[0].email}`)),
+            //       RxJS.identity
+            //     )
+            //   )
+            // ),
             RxJS.tap(data => {
               const airdropIds = data.userAirdrops.map(userAirdrop => userAirdrop.airdrop.id).reduce((acc, value) => [...acc, value], [])
               const userAirdrop = data.userAirdrops[0]
-              this._logger.log(`airdropInfo, email: ${userAirdrop.email}, walletAddress: ${userAirdrop.walletAddress}, socialUsername: ${userAirdrop.socialUsername}, socialType: ${userAirdrop.socialType}, actionType: ${userAirdrop.actionType}, totalAmount: ${data.total.toString()}, airdropIds: ${JSON.stringify(airdropIds)}`)
+              this._logger.log(`airdropInfo, email: ${userAirdrop.email}, walletAddress: ${userAirdrop.walletAddress}, 
+                                socialUsername: ${userAirdrop.socialUsername}, socialType: ${userAirdrop.socialType}, 
+                                actionType: ${userAirdrop.actionType}, totalAmount: ${data.total.toString()}, 
+                                airdropIds: ${JSON.stringify(airdropIds)}`)
             }),
             RxJS.bufferCount(this._bufferCount),
             RxJS.concatMap(buffers =>
               RxJS.from(buffers).pipe(
                 RxJS.reduce((acc, buffer) => {
-                    acc['data'].push({ destination: buffer.userAirdrops[0].walletAddress, amount: BigInt(buffer.total) * (10n ** BigInt(buffer.userAirdrops[0].decimal))})
+                    acc['data'].push({ destination: buffer.userAirdrops[0].walletAddress,
+                      amount: BigInt(buffer.total) * (10n ** BigInt(buffer.userAirdrops[0].decimal))})
                     return acc;
                   },
                   AirdropRequestDto.from(Symbol.for('AirdropRequestId'), TokenType.LVL)
@@ -123,7 +127,7 @@ export class SocialAirdropJob {
                           RxJS.tap({
                             next: err => {
                               this._safeMode = true
-                              this._logger.warn(`airdrop request in blockchain service failed, ${err}`)
+                              this._logger.warn(`airdrop request in blockchain service failed, error: ${err?.message}`)
                               this._logger.warn(`social airdrop safe mode enabled`)
                             },
                           }),
@@ -134,7 +138,7 @@ export class SocialAirdropJob {
                           RxJS.tap({
                             next: err => {
                               this._safeMode = true
-                              this._logger.error(`airdrop request failed, ${err.stack}`)
+                              this._logger.error(`airdrop request failed`, err)
                               this._logger.warn(`social airdrop safe mode enabled`)
                             },
                           }),
@@ -190,7 +194,7 @@ export class SocialAirdropJob {
                           error: err => {
                             this._safeMode = true
                             let airdropIds = airdrops.map(airdrop => airdrop.id).reduce((acc, airdrop) => [...acc, airdrop], [])
-                            this._logger.error(`airdrop updates failed for blockchainTxId: ${airdrops[0].blockchainTx.id}, airdropIds: ${airdropIds}\n${err.stack}\n cause:${err?.cause?.stack}`)
+                            this._logger.error(`airdrop updates failed for blockchainTxId: ${airdrops[0].blockchainTx.id}, airdropIds: ${airdropIds}\ncause:${err?.cause?.stack}`, err)
                           }
                         }),
                         RxJS.catchError(err => RxJS.EMPTY)
@@ -205,7 +209,7 @@ export class SocialAirdropJob {
       )
     ).subscribe({
       next: RxJS.noop,
-      error: err => this._logger.error(`airdrop job failed, ${err.stack}`),
+      error: err => this._logger.error(`airdrop job failed`, err),
       complete: () => this._logger.debug(`airdrop job completed`),
     })
   }
