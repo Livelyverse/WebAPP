@@ -30,11 +30,22 @@ export enum UserSortBy {
   USERNAME = 'username'
 }
 
+type AuthAccessToken = {
+  accessTokenId: string,
+  accessToken: string,
+  authTokenEntity: AuthTokenEntity
+}
+
+type AuthRefreshToken = {
+  refreshToken: string,
+  authTokenEntity: AuthTokenEntity
+}
 
 @Injectable()
 export class UserService implements IService<UserEntity> {
   private readonly _logger = new Logger(UserService.name);
   private readonly _uploadPath;
+  private _accessTokenTTL;
 
   constructor(
     @InjectRepository(AuthTokenEntity)
@@ -53,6 +64,8 @@ export class UserService implements IService<UserEntity> {
       '/' +
       this._configService.get<string>('http.upload.path') +
       '/';
+
+    this._accessTokenTTL = this._configService.get<number>('app.accessTokenTTL');
   }
 
   async create(userDto: UserCreateDto): Promise<UserEntity> {
@@ -472,19 +485,44 @@ export class UserService implements IService<UserEntity> {
 
   async update(userDto: UserUpdateDto, entity: UserEntity): Promise<UserEntity> {
 
-    try {
-      entity.walletAddress = ethers.utils.getAddress(userDto.walletAddress);
-    } catch (err) {
-      throw new HttpException({
-        statusCode: '400',
-        message: 'invalid wallet address',
-        error: 'Bad Request'
-      }, HttpStatus.BAD_REQUEST)
+    if(userDto?.walletAddress) {
+      try {
+        entity.walletAddress = ethers.utils.getAddress(userDto.walletAddress);
+      } catch (err) {
+        throw new HttpException({
+          statusCode: '400',
+          message: 'invalid wallet address',
+          error: 'Bad Request'
+        }, HttpStatus.BAD_REQUEST)
+      }
     }
 
     try {
-      entity.fullName = userDto.fullName;
-      return await this._userRepository.save(entity);
+      entity.fullName = userDto?.fullName ? userDto.fullName : null;
+      await this._userRepository.save(entity);
+      await this._cacheManager.set(`USER.EMAIL:${entity.email}`, entity, {ttl: 0});
+      let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${entity.id}`);
+      if (authAccessToken) {
+        authAccessToken.authTokenEntity.user = entity;
+        await this._cacheManager.set(
+          `AUTH_ACCESS_TOKEN.USER_ID:${entity.id}`,
+          {
+            accessTokenId: authAccessToken.accessTokenId,
+            accessToken: authAccessToken.accessToken,
+            authTokenEntity: authAccessToken.authTokenEntity
+          },
+          { ttl: this._accessTokenTTL / 1000 }
+        );
+      }
+      let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${entity.id}`);
+      if (authRefreshToken) {
+        authRefreshToken.authTokenEntity.user = entity;
+        const refreshTokenExpiredAt = new Date(authRefreshToken.authTokenEntity.refreshTokenExpiredAt);
+        await this._cacheManager.set(`AUTH_REFRESH_TOKEN.USER_ID:${entity.id}`,
+          { refreshToken: authRefreshToken.refreshToken, authTokenEntity: authRefreshToken.authTokenEntity },
+          { ttl: Math.round((refreshTokenExpiredAt.getTime() - Date.now()) / 1000) });
+      }
+      return entity;
     } catch (err) {
       this._logger.error(`userRepository.save of update failed, mail: ${entity.email}, dto: ${JSON.stringify(userDto)}`, err);
       if (err?.code === PostgresErrorCode.UniqueViolation) {
@@ -557,6 +595,28 @@ export class UserService implements IService<UserEntity> {
       user.imageMimeType = file.mimetype;
       user.imageFilename = filename;
       await this._userRepository.save(user);
+      await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, {ttl: 0});
+      let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
+      if (authAccessToken) {
+        authAccessToken.authTokenEntity.user = user;
+        await this._cacheManager.set(
+          `AUTH_ACCESS_TOKEN.USER_ID:${user.id}`,
+          {
+            accessTokenId: authAccessToken.accessTokenId,
+            accessToken: authAccessToken.accessToken,
+            authTokenEntity: authAccessToken.authTokenEntity
+          },
+          { ttl: this._accessTokenTTL / 1000 }
+        );
+      }
+      let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+      if (authRefreshToken) {
+        authRefreshToken.authTokenEntity.user = user;
+        const refreshTokenExpiredAt = new Date(authRefreshToken.authTokenEntity.refreshTokenExpiredAt);
+        await this._cacheManager.set(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`,
+          { refreshToken: authRefreshToken.refreshToken, authTokenEntity: authRefreshToken.authTokenEntity },
+          { ttl: Math.round((refreshTokenExpiredAt.getTime() - Date.now()) / 1000) });
+      }
     } catch (error) {
       this._logger.error(
         `userRepository.save of uploadImage failed, email: ${JSON.stringify(
