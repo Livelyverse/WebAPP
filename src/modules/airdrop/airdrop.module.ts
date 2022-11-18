@@ -14,13 +14,15 @@ import { BlockchainModule } from "../blockchain/blockchain.module";
 import { TwitterFollowerJob } from "./domain/jobs/twitter/followerTracker.job";
 import { TweetTrackerJob } from "./domain/jobs/twitter/tweetTracker.job";
 import { SocialFollowerEntity } from "./domain/entity/socialFollower.entity";
-import { SocialAirdropJob } from "./domain/jobs/twitter/socialAirdrop.job";
+import { SocialAirdropJob } from "./domain/jobs/socialAirdrop.job";
 import { AirdropRuleService } from "./services/airdropRule.service";
 import { AirdropRuleController } from "./controllers/airdropRule.controller";
 import { AirdropService } from "./services/airdrop.service";
 import { FollowerService } from "./services/follower.service";
 import { AirdropController } from "./controllers/airdrop.controller";
 import { FollowerController } from "./controllers/follower.controller";
+import { InstagramPostTrackerJob } from "./domain/jobs/instagram/instagramPostTracker.job";
+
 
 @Module({
   imports: [
@@ -43,9 +45,10 @@ import { FollowerController } from "./controllers/follower.controller";
     AirdropRuleService,
     AirdropService,
     FollowerService,
-    TwitterFollowerJob,
-    TweetTrackerJob,
-    SocialAirdropJob
+    // TwitterFollowerJob,
+    // TweetTrackerJob,
+    // SocialAirdropJob
+    InstagramPostTrackerJob
   ]
 })
 export class AirdropModule {}

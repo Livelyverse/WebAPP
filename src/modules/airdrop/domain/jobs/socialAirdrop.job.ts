@@ -4,12 +4,12 @@ import { EntityManager } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import * as RxJS from "rxjs";
-import { UserEntity } from "../../../../profile/domain/entity";
-import { BlockchainService } from "../../../../blockchain/blockchain.service";
-import { AirdropRequestDto, TokenType } from "../../../../blockchain/domain/dto/airdropRequest.dto";
-import { SocialAirdropEntity } from "../../entity/socialAirdrop.entity";
-import { BlockchainTxEntity } from "../../../../blockchain/domain/entity/blockchainTx.entity";
-import { BlockchainError, ErrorCode } from "../../../../blockchain/domain/error/blockchainError";
+import { UserEntity } from "../../../profile/domain/entity";
+import { BlockchainService } from "../../../blockchain/blockchain.service";
+import { AirdropRequestDto, TokenType } from "../../../blockchain/domain/dto/airdropRequest.dto";
+import { SocialAirdropEntity } from "../entity/socialAirdrop.entity";
+import { BlockchainTxEntity } from "../../../blockchain/domain/entity/blockchainTx.entity";
+import { BlockchainError, ErrorCode } from "../../../blockchain/domain/error/blockchainError";
 
 @Injectable()
 export class SocialAirdropJob {
@@ -23,7 +23,7 @@ export class SocialAirdropJob {
     private readonly _configService: ConfigService,
     private readonly _blockchainService: BlockchainService,
   ) {
-    this._bufferCount = this._configService.get<number>('airdrop.twitter.bufferCount');
+    this._bufferCount = this._configService.get<number>('airdrop.bufferCount');
     this.airdropTokens()
   }
 
@@ -99,10 +99,9 @@ export class SocialAirdropJob {
             RxJS.tap(data => {
               const airdropIds = data.userAirdrops.map(userAirdrop => userAirdrop.airdrop.id).reduce((acc, value) => [...acc, value], [])
               const userAirdrop = data.userAirdrops[0]
-              this._logger.log(`airdropInfo, email: ${userAirdrop.email}, walletAddress: ${userAirdrop.walletAddress}, 
-                                socialUsername: ${userAirdrop.socialUsername}, socialType: ${userAirdrop.socialType}, 
-                                actionType: ${userAirdrop.actionType}, totalAmount: ${data.total.toString()}, 
-                                airdropIds: ${JSON.stringify(airdropIds)}`)
+              this._logger.log(`airdropInfo, email: ${userAirdrop.email}, walletAddress: ${userAirdrop.walletAddress},`+
+                               `socialUsername: ${userAirdrop.socialUsername}, socialType: ${userAirdrop.socialType},`+
+                               `actionType: ${userAirdrop.actionType}, totalAmount: ${data.total.toString()}, airdropIds: ${JSON.stringify(airdropIds)}`)
             }),
             RxJS.bufferCount(this._bufferCount),
             RxJS.concatMap(buffers =>

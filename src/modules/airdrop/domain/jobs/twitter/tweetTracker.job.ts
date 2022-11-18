@@ -25,7 +25,6 @@ import { TweetUserTimelineV2Paginator } from "twitter-api-v2/dist/paginators";
 import { SocialAirdropRuleEntity } from "../../entity/socialAirdropRule.entity";
 import { SocialAirdropEntity } from "../../entity/socialAirdrop.entity";
 import { TweetTrackerError } from "../../error/tweetTracker.error";
-import { TwitterFollowerError } from "../../error/twitterFollower.error";
 import { TypeORMError } from "typeorm/error/TypeORMError";
 
 @Injectable()
@@ -61,16 +60,19 @@ export class TweetTrackerJob {
 
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
     const startTimestamp = this._configService.get<number>('airdrop.twitter.startAt');
-    const endTimestamp = this._configService.get<number>('airdrop.twitter.endAt');
-    this._startAt = startTimestamp < Date.now() ? new Date(startTimestamp) : new Date();
-    // this._endAt = endTimestamp > Date.now() ? new Date : new Date(endTimestamp);
+    this._startAt = new Date(startTimestamp);
 
     const interval = setInterval(this.fetchTweetsFromPage.bind(this), this._trackerInterval);
-    this._schedulerRegistry.addInterval('TweetsTrackerJob', interval);
+    this._schedulerRegistry.addInterval('TwitterTweetTrackerJob', interval);
     this.fetchTweetsFromPage();
   }
 
-  fetchTweetsFromPage() {
+  private fetchTweetsFromPage() {
+
+    if(this._startAt > new Date()) {
+      this._logger.log(`fetchTweetsFromPage ignored, startAt: ${this._startAt}`);
+      return;
+    }
 
     let socialLivelyQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(SocialLivelyEntity, "socialLively")
       .where('"socialLively"."socialType" = \'TWITTER\'')
@@ -279,7 +281,7 @@ export class TweetTrackerJob {
                             RxJS.defer(() =>
                               RxJS.from(this._twitterClient.userTimeline(data.socialLively.userId, {
                                 max_results: 100,
-                                start_time: this._startAt.getTime() < Date.now() ? this._startAt.toISOString() : new Date().toISOString(),
+                                start_time: this._startAt.toISOString(),
                                 // end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
                                 "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source", "entities"],
                               }))

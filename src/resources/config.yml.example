@@ -4,11 +4,15 @@ app:
   accessTokenTTL: 7200000
   refreshTokenTTL: 172800000
   mailTokenTTL: 3600000
+  cache:
+      ttl: 10
+      host: 'localhost'
+      port: 6379
 
 http:
   host: 'localhost'
   port: 3000
-  domain: 'livelyplanet.io'
+  domain: 'livelyverse.io'
     upload:
       path: 'uploads'
       sizeLimit: 1048576
@@ -43,6 +47,8 @@ blog:
 airdrop:
   twitter:
     authToken: 'auth token'
+    startAt: 1635579838000
+    bufferCount: 64
     tracker:
       duration: 604800
       interval: 14400000
@@ -57,19 +63,9 @@ blockchain:
     apiKey: ''
 
 accounts:
-    - name: 'systemAdmin'
+    - name: 'airdropAccount'
       privateKey: '0x0000000000000000000000000000000000000000'
       address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    - name: 'admin'
-      privateKey: '0x0000000000000000000000000000000000000000'
-      address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-    - name: 'assetManager'
-      privateKey: '0x00000000000000000000000000000000000000000'
-      address: '0xccccccccccccccccccccccccccccccccccccccccc'
-    - name: 'taxTreasury'
-      privateKey: '0x00000000000000000000000000000000000000000'
-      address: '0xdddddddddddddddddddddddddddddddddddddddddddd'
-
 tokens:
     - name: 'LVL'
       address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'

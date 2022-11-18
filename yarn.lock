@@ -1521,15 +1521,15 @@
     "@jridgewell/resolve-uri" "^3.0.3"
     "@jridgewell/sourcemap-codec" "^1.4.10"
 
-"@livelyverse/lively-core-onchain@^2.0.0":
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/@livelyverse/lively-core-onchain/-/lively-core-onchain-2.0.0.tgz#e4b1eeed01f79705a0f6a77a713fb6689d72978d"
-  integrity sha512-agEAoNR/MMj4Kmw6vePHA2vhNcbqsfK39qG9vKmAMMxJEgvOwZDX/UsL+/hLIJoWFKAjyP4rB4PDtlxSOHlV6Q==
+"@livelyverse/lively-core-onchain@^2.0.2":
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/@livelyverse/lively-core-onchain/-/lively-core-onchain-2.0.2.tgz#3edf50023429f65abe477b7c775caaeeb90a8424"
+  integrity sha512-mu/8x/Q+bDZqvi+cC9wDU5O468g+LBtsQd5uRJ1qTBq7YRxAEEYPbbrtp/XyCFouFTzXRdZZbZIPUsa9KTNlLg==
   dependencies:
     "@openzeppelin/contracts" "^4.7.3"
     "@openzeppelin/contracts-upgradeable" "^4.7.3"
     "@openzeppelin/test-helpers" "^0.5.16"
-    "@remix-project/remixd" "^0.6.7"
+    "@remix-project/remixd" "^0.6.5"
 
 "@mapbox/node-pre-gyp@^1.0.9":
   version "1.0.9"
@@ -1805,10 +1805,10 @@
   resolved "https://registry.yarnpkg.com/@redis/time-series/-/time-series-1.0.3.tgz#4cfca8e564228c0bddcdf4418cba60c20b224ac4"
   integrity sha512-OFp0q4SGrTH0Mruf6oFsHGea58u8vS/iI5+NpYdicaM+7BgqBZH8FFvNZ8rYYLrUO/QRqMq72NpXmxLVNcdmjA==
 
-"@remix-project/remixd@^0.6.7":
-  version "0.6.7"
-  resolved "https://registry.yarnpkg.com/@remix-project/remixd/-/remixd-0.6.7.tgz#dbbee4526e2bda80ca4657dd9601ecba96fc1aa2"
-  integrity sha512-o21d5/5Jxgu9xH+HiQh1OBTsEni2TDSOhTaCaO05Ggu/DfQQCLmMvw40u6Ab+0dh4qtD25Z+WjjXmamkgdVGog==
+"@remix-project/remixd@^0.6.5":
+  version "0.6.8"
+  resolved "https://registry.yarnpkg.com/@remix-project/remixd/-/remixd-0.6.8.tgz#bc17971a095d19dc3509281593ffab3109d6e2e5"
+  integrity sha512-8gPTjJFHJ4Shhfj4bps6301OlhzPmZ27zGqQNqR/SMmrE1CcAzHHZfGvBQ+5Cgxs/vM9y0pjDaMakK0cHgU4WQ==
   dependencies:
     "@remixproject/plugin" "^0.3.11"
     "@remixproject/plugin-api" "^0.3.11"
