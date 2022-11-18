@@ -9,13 +9,6 @@ import { ErrorHttpStatusCode, HttpErrorByCode } from "@nestjs/common/utils/http-
 import { ValidatorOptions } from "@nestjs/common/interfaces/external/validator-options.interface";
 import { loadPackage } from "@nestjs/common/utils/load-package.util";
 import { isNil } from "@nestjs/common/utils/shared.utils";
-// import { SocialType } from "../entity/socialProfile.entity";
-// import { SocialProfileCreateDto } from "../dto";
-//
-// export enum ContextType {
-//   CREATE,
-//   UPDATE
-// }
 
 export interface ValidationPipeOptions extends ValidatorOptions {
   transform?: boolean;
@@ -27,7 +20,6 @@ export interface ValidationPipeOptions extends ValidatorOptions {
   expectedType?: Type<any>;
   validatorPackage?: ValidatorPackage;
   transformerPackage?: TransformerPackage;
-  // validationContext?: ContextType;
 }
 
 let classValidator: ValidatorPackage = {} as any;
@@ -43,7 +35,6 @@ export class ValidationPipe implements PipeTransform<any> {
   protected expectedType: Type<any>;
   protected exceptionFactory: (errors: ValidationError[]) => any;
   protected validateCustomDecorators: boolean;
-  // protected validationContext?: ContextType;
 
   constructor(@Optional() options?: ValidationPipeOptions) {
     options = options || {};
@@ -54,7 +45,6 @@ export class ValidationPipe implements PipeTransform<any> {
       expectedType,
       transformOptions,
       validateCustomDecorators,
-      // validationContext,
       ...validatorOptions
     } = options;
 
@@ -65,7 +55,6 @@ export class ValidationPipe implements PipeTransform<any> {
     this.validateCustomDecorators = validateCustomDecorators || false;
     this.errorHttpStatusCode = errorHttpStatusCode || HttpStatus.BAD_REQUEST;
     this.expectedType = expectedType;
-    // this.validationContext = validationContext;
     this.exceptionFactory =
       options.exceptionFactory || this.createExceptionFactory();
 

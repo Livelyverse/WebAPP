@@ -22,8 +22,6 @@ export class UserViewDto {
   @ApiResponseProperty()
   public id: string;
 
-  // @ApiResponseProperty()
-  // public username: string;
 
   @ApiResponseProperty()
   public userGroup: string;
