@@ -199,7 +199,7 @@ export class TweetTrackerJob {
                                       socialEvent.contentId = tweet.id;
                                       socialEvent.content = ContentDto.from(tweetEventDto);
                                       socialEvent.lang = tweet.lang;
-                                      socialEvent.publishedAt = tweetEventDto.createdAt;
+                                      socialEvent.publishedAt = tweetEventDto?.createdAt ? new Date(tweetEventDto?.createdAt) : new Date();
                                       socialEvent.contentUrl = 'https://twitter.com/' + data.socialLively.username + '/status/' + tweet.id;
                                       socialEvent.trackingStartedAt = moment().toDate();
                                       socialEvent.trackingEndAt = moment().add(this._trackerDuration, 'seconds').toDate();
@@ -302,7 +302,7 @@ export class TweetTrackerJob {
                                     socialEvent.contentId = tweet.id;
                                     socialEvent.content = ContentDto.from(tweetEventDto);
                                     socialEvent.lang = tweet.lang;
-                                    socialEvent.publishedAt = tweetEventDto.createdAt;
+                                    socialEvent.publishedAt = tweetEventDto?.createdAt ? new Date(tweetEventDto?.createdAt) : new Date();
                                     socialEvent.contentUrl = 'https://twitter.com/' + data.socialLively.username + '/status/' + tweet.id;
                                     socialEvent.trackingStartedAt = moment().toDate();
                                     socialEvent.trackingEndAt = moment().add(this._trackerDuration, 'seconds').toDate();
@@ -437,7 +437,7 @@ export class TweetTrackerJob {
                                 socialEvent.contentId = tweet.id;
                                 socialEvent.content = ContentDto.from(tweetEventDto);
                                 socialEvent.lang = tweet.lang;
-                                socialEvent.publishedAt = tweetEventDto.createdAt;
+                                socialEvent.publishedAt = tweetEventDto?.createdAt ? new Date(tweetEventDto?.createdAt) : new Date();
                                 socialEvent.contentUrl = 'https://twitter.com/' + data.socialLively.username + '/status/' + tweet.id;
                                 socialEvent.trackingStartedAt = moment().toDate();
                                 socialEvent.trackingEndAt = moment().add(this._trackerDuration, 's').toDate();

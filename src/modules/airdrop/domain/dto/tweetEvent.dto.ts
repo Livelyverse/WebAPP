@@ -9,7 +9,7 @@ export class TweetEventDto {
       tweetEvent.source = tweetV2?.source;
       tweetEvent.referencedTweets = tweetV2?.referenced_tweets;
       tweetEvent.id = tweetV2.id;
-      tweetEvent.createdAt = tweetV2.created_at ? new Date(tweetV2.created_at) : new Date();
+      tweetEvent.createdAt = tweetV2?.created_at;
       tweetEvent.conversationId = tweetV2?.conversation_id;
       tweetEvent.publicMetrics = tweetV2?.public_metrics;
       tweetEvent.possiblySensitive = tweetV2?.possibly_sensitive;
@@ -26,7 +26,7 @@ export class TweetEventDto {
   source: string;
   referencedTweets: Array<{type: string, id: string}>
   id: string;
-  createdAt: Date;
+  createdAt: string;
   conversationId: string;
   publicMetrics: {
     retweet_count: number,

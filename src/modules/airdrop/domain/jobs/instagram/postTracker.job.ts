@@ -8,18 +8,29 @@ import * as RxJS from "rxjs";
 import { SocialLivelyEntity } from "../../entity/socialLively.entity";
 import { FollowerError } from "../../error/follower.error";
 import { Observable } from "rxjs";
+import { InstagramPostDto } from "../../dto/instagramPost.dto";
+import { TweetEventDto } from "../../dto/tweetEvent.dto";
+import { SocialEventEntity } from "../../entity/socialEvent.entity";
+import { ContentDto } from "../../dto/content.dto";
+import * as moment from "moment";
 
 
 @Injectable()
-export class InstagramPostTrackerJob {
-  private readonly _logger = new Logger(InstagramPostTrackerJob.name);
+export class PostTrackerJob {
+  private readonly _logger = new Logger(PostTrackerJob.name);
   private readonly _apiKey: string;
   private readonly _apiHost: string;
   private readonly _commentFilter: string;
   private readonly _airdropFilter: string;
+  private readonly _followFilter: string;
+  private readonly _commentFilterRegex: RegExp;
+  private readonly _airdropFilterRegex: RegExp;
+  private readonly _followFilterRegex: RegExp;
   private readonly _trackerDuration: number;
   private readonly _trackerInterval: number;
   private readonly _startAt: Date;
+  private readonly _FETCH_COUNT = 50;
+  private readonly _apiDelay: number;
 
   constructor(
     private readonly _httpService: HttpService,
@@ -48,6 +59,11 @@ export class InstagramPostTrackerJob {
       throw new Error("airdrop.instagram.airdropFilter config is empty");
     }
 
+    this._followFilter = this._configService.get<string>('airdrop.instagram.followFilter');
+    if (!this._airdropFilter) {
+      throw new Error("airdrop.instagram.followFilter config is empty");
+    }
+
     this._trackerDuration = this._configService.get<number>('airdrop.instagram.tracker.duration');
     if (!this._trackerDuration) {
       throw new Error("airdrop.instagram.tracker.duration config is empty");
@@ -57,6 +73,11 @@ export class InstagramPostTrackerJob {
     if (!this._trackerInterval) {
       throw new Error("airdrop.instagram.tracker.interval config is empty");
     }
+
+    this._airdropFilterRegex = new RegExp(this._airdropFilter, 'g');
+    this._commentFilterRegex = new RegExp(this._commentFilter, 'g');
+    this._followFilterRegex = new RegExp(this._followFilter, 'g');
+    this._apiDelay = this._configService.get<number>('airdrop.instagram.apiDelay');
 
     const startTimestamp = this._configService.get<number>('airdrop.instagram.startAt');
     this._startAt = new Date(startTimestamp);
@@ -78,16 +99,43 @@ export class InstagramPostTrackerJob {
       )
 
     RxJS.from(socialLivelyQueryResultObservable).pipe(
-      RxJS.mergeMap(socialLively => this._getDataFromApi(socialLively))
+      RxJS.mergeMap(socialLively => this._fetchLivelyPosts(socialLively)),
+      RxJS.concatMap(([socialLively, response]) =>
+        // RxJS.merge(
+        //   RxJS.of([socialLively, response]).pipe(
+        //     RxJS.filter(tuple =>
+        //       response?.data?.data?.edges && response?.data?.data?.edges?.length > 0
+        //
+        //     )
+        //   )
+        // )
+
+        RxJS.from(response.data.data.edges).pipe(
+          RxJS.filter((edge: any) => edge?.node?.edge_media_to_caption?.edges[0]?.node?.text?.match(this._airdropFilterRegex)),
+          RxJS.map(edge => {
+            const postDto = InstagramPostDto.from(edge);
+            const socialEvent = new SocialEventEntity();
+            socialEvent.contentId = postDto.id;
+            socialEvent.content = ContentDto.from(postDto);
+            socialEvent.lang = null;
+            socialEvent.publishedAt = postDto?.createdAt ? new Date(postDto.createdAt * 1000) : new Date();
+            socialEvent.contentUrl = 'https://www.instagram.com/p/' +  postDto.shortcode;
+            socialEvent.trackingStartedAt = moment().toDate();
+            socialEvent.trackingEndAt = moment().add(this._trackerDuration, 'seconds').toDate();
+            socialEvent.socialLively = socialLively;
+            return socialEvent;
+          })
+        )
+      )
     ).subscribe({
-      // next: value => this._logger.log(`received value: ${JSON.stringify(value, null, 2)}`),
+      next: value => this._logger.log(`socialEvent, id: ${value.contentId}, url: ${value.contentUrl} `),
       error: err => this._logger.error(`error`, err),
       complete: () => this._logger.log(`complete . . .`)
     })
   }
 
-  private _getDataFromApi(socialLively: SocialLivelyEntity): Observable<any> {
-    return this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${socialLively.userId}/3/%7Bend_cursor%7D`, {
+  private _fetchLivelyPosts(socialLively: SocialLivelyEntity): Observable<any> {
+    return this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${socialLively.userId}/${this._FETCH_COUNT}/%7Bend_cursor%7D`, {
       headers: {
         'X-RapidAPI-Key': this._apiKey,
         'X-RapidAPI-Host': this._apiHost
@@ -101,15 +149,15 @@ export class InstagramPostTrackerJob {
               axiosResponse?.data?.data?.has_next_page &&
               axiosResponse?.data?.data?.end_cursor
             ),
-            RxJS.delay(4000),
+            RxJS.delay(this._apiDelay),
             RxJS.mergeMap(axiosResponse =>
-              this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${socialLively.userId}/3/${axiosResponse.data.data.end_cursor}`, {
+              this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${socialLively.userId}/${this._FETCH_COUNT}/${axiosResponse.data.data.end_cursor}`, {
                 headers: {
                   'X-RapidAPI-Key': this._apiKey,
                   'X-RapidAPI-Host': this._apiHost
                 }
               })
-            )
+            ),
           ),
           RxJS.of(response).pipe(
             RxJS.filter(axiosResponse =>
@@ -122,9 +170,10 @@ export class InstagramPostTrackerJob {
         ),
         1
       ),
+      RxJS.map(response => [socialLively, response]),
       RxJS.tap({
-        next: value => this._logger.log(`api data: ${JSON.stringify(value.data)}\n`),
-        error: err => this._logger.log(`api error`, err)
+        next: tuple => this._logger.debug(`fetch lively instagram posts success, count: ${tuple[1]?.data?.data?.edges?.length}`),
+        error: err => this._logger.error(`fetch lively instagram posts failed`, err)
       })
     )
   }
