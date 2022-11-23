@@ -14,7 +14,7 @@ export class AirdropRuleUpdateDto {
   @IsDefined({ message: 'Id must be defined' })
   @IsUUID("all", { message: 'Id must be valid UUID'})
   @ApiProperty()
-  public id: string;
+  id: string;
 
   @IsNotEmpty({ message: 'UnitType must not empty' })
   @IsDefined({ message: 'UnitType must be defined' })

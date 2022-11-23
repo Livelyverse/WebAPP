@@ -13,6 +13,7 @@ import { TweetEventDto } from "../../dto/tweetEvent.dto";
 import { SocialEventEntity } from "../../entity/socialEvent.entity";
 import { ContentDto } from "../../dto/content.dto";
 import * as moment from "moment";
+import { SocialAirdropScheduleEntity } from "../../entity/socialAirdropSchedule.entity";
 
 
 @Injectable()
@@ -89,18 +90,20 @@ export class PostTrackerJob {
 
   private fetchPostFromPage() {
 
-    const socialLivelyQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(SocialLivelyEntity, "socialLively")
+    const airdropScheduleQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(SocialAirdropScheduleEntity, "airdropSchedule")
+      .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
       .where('"socialLively"."socialType" = \'INSTAGRAM\'')
       .andWhere('"socialLively"."isActive" = \'true\'')
+      .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
       .getOneOrFail())
       .pipe(
-        RxJS.tap((socialLively) => this._logger.debug(`fetch social lively success, socialType: ${socialLively.socialType}`)),
-        RxJS.catchError(err => RxJS.throwError(() => new FollowerError('fetch INSTAGRAM social lively failed', err)))
+        RxJS.tap((airdropSchedule) => this._logger.debug(`fetch airdropSchedule success, socialType: ${airdropSchedule.socialLively.socialType}`)),
+        RxJS.catchError(err => RxJS.throwError(() => new FollowerError('fetch INSTAGRAM airdrop schedule failed', err)))
       )
 
-    RxJS.from(socialLivelyQueryResultObservable).pipe(
-      RxJS.mergeMap(socialLively => this._fetchLivelyPosts(socialLively)),
-      RxJS.concatMap(([socialLively, response]) =>
+    RxJS.from(airdropScheduleQueryResultObservable).pipe(
+      RxJS.mergeMap(airdropSchedule => this._fetchLivelyPosts(airdropSchedule)),
+      RxJS.concatMap(([airdropSchedule, response]) =>
         // RxJS.merge(
         //   RxJS.of([socialLively, response]).pipe(
         //     RxJS.filter(tuple =>
@@ -120,9 +123,9 @@ export class PostTrackerJob {
             socialEvent.lang = null;
             socialEvent.publishedAt = postDto?.createdAt ? new Date(postDto.createdAt * 1000) : new Date();
             socialEvent.contentUrl = 'https://www.instagram.com/p/' +  postDto.shortcode;
-            socialEvent.trackingStartedAt = moment().toDate();
-            socialEvent.trackingEndAt = moment().add(this._trackerDuration, 'seconds').toDate();
-            socialEvent.socialLively = socialLively;
+            // socialEvent.trackingStartedAt = moment().toDate();
+            // socialEvent.trackingEndAt = moment().add(this._trackerDuration, 'seconds').toDate();
+            socialEvent.airdropSchedule = airdropSchedule;
             return socialEvent;
           })
         )
@@ -134,8 +137,8 @@ export class PostTrackerJob {
     })
   }
 
-  private _fetchLivelyPosts(socialLively: SocialLivelyEntity): Observable<any> {
-    return this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${socialLively.userId}/${this._FETCH_COUNT}/%7Bend_cursor%7D`, {
+  private _fetchLivelyPosts(airdropSchedule: SocialAirdropScheduleEntity): Observable<any> {
+    return this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${airdropSchedule.socialLively.userId}/${this._FETCH_COUNT}/%7Bend_cursor%7D`, {
       headers: {
         'X-RapidAPI-Key': this._apiKey,
         'X-RapidAPI-Host': this._apiHost
@@ -151,7 +154,7 @@ export class PostTrackerJob {
             ),
             RxJS.delay(this._apiDelay),
             RxJS.mergeMap(axiosResponse =>
-              this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${socialLively.userId}/${this._FETCH_COUNT}/${axiosResponse.data.data.end_cursor}`, {
+              this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${airdropSchedule.socialLively.userId}/${this._FETCH_COUNT}/${axiosResponse.data.data.end_cursor}`, {
                 headers: {
                   'X-RapidAPI-Key': this._apiKey,
                   'X-RapidAPI-Host': this._apiHost
@@ -170,7 +173,7 @@ export class PostTrackerJob {
         ),
         1
       ),
-      RxJS.map(response => [socialLively, response]),
+      RxJS.map(response => [airdropSchedule.socialLively, response]),
       RxJS.tap({
         next: tuple => this._logger.debug(`fetch lively instagram posts success, count: ${tuple[1]?.data?.data?.edges?.length}`),
         error: err => this._logger.error(`fetch lively instagram posts failed`, err)

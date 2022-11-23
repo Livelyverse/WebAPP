@@ -4,7 +4,7 @@ import { SocialActionType } from "./enums";
 import { SocialProfileEntity } from "../../../profile/domain/entity";
 import { SocialAirdropEntity } from "./socialAirdrop.entity";
 import { SocialEventEntity } from "./socialEvent.entity";
-import { SocialFollowerEntity } from "./socialFollower.entity";
+// import { SocialFollowerEntity } from "./socialFollower.entity";
 
 
 @Entity({ name: 'social_tracker' })
@@ -35,16 +35,16 @@ export class SocialTrackerEntity extends BaseEntity {
   @JoinColumn({name:"socialProfileId"})
   socialProfile: SocialProfileEntity
 
-  @OneToOne((type) => SocialFollowerEntity, (follower) => follower.socialTracker, {
-    cascade: ['soft-remove'],
-    onDelete: 'NO ACTION',
-    nullable: true,
-    lazy: false,
-    eager: true,
-    orphanedRowAction: 'nullify',
-  })
-  @JoinColumn({ name: 'socialFollowerId' })
-  follower: SocialFollowerEntity
+  // @OneToOne((type) => SocialFollowerEntity, (follower) => follower.socialTracker, {
+  //   cascade: ['soft-remove'],
+  //   onDelete: 'NO ACTION',
+  //   nullable: true,
+  //   lazy: false,
+  //   eager: true,
+  //   orphanedRowAction: 'nullify',
+  // })
+  // @JoinColumn({ name: 'socialFollowerId' })
+  // follower: SocialFollowerEntity
 
   @OneToOne(() => SocialAirdropEntity, (airdrop) => airdrop.socialTracker)
   airdrop?: SocialAirdropEntity

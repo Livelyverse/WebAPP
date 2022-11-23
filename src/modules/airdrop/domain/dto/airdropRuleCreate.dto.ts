@@ -1,7 +1,4 @@
 import {
-  IsString,
-  Matches,
-  IsOptional,
   IsNotEmpty,
   IsDefined,
   IsEnum, IsNumberString, IsInt
@@ -13,19 +10,19 @@ import { SocialActionType, UnitType } from "../entity/enums";
 export class AirdropRuleCreateDto {
   @IsNotEmpty({ message: 'SocialType must not empty' })
   @IsDefined({ message: 'SocialType must be defined' })
-  @IsEnum(SocialType, { message: `SocialType must one of these values, ${Object.values(SocialType).toString()}` } )
+  @IsEnum(SocialType, { message: `SocialType must one of these values, ${Object.keys(SocialType).toString()}` } )
   @ApiProperty()
   socialType: SocialType
 
   @IsNotEmpty({ message: 'SocialActionType must not empty' })
   @IsDefined({ message: 'SocialActionType must be defined' })
-  @IsEnum(SocialActionType, { message: `SocialActionType must one of these values, ${Object.values(SocialActionType).toString()}` } )
+  @IsEnum(SocialActionType, { message: `SocialActionType must one of these values, ${Object.keys(SocialActionType).toString()}` } )
   @ApiProperty()
   actionType: SocialActionType
 
   @IsNotEmpty({ message: 'UnitType must not empty' })
   @IsDefined({ message: 'UnitType must be defined' })
-  @IsEnum(UnitType, { message: `UnitType must one of these values, ${Object.values(UnitType).toString()}` } )
+  @IsEnum(UnitType, { message: `UnitType must one of these values, ${Object.keys(UnitType).toString()}` } )
   @ApiProperty()
   unit: UnitType
 

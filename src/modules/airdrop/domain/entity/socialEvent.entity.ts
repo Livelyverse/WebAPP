@@ -1,7 +1,8 @@
-import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../profile/domain/entity";
 import { ContentDto } from "../dto/content.dto";
 import { SocialLivelyEntity } from "./socialLively.entity";
+import { SocialAirdropScheduleEntity } from "./socialAirdropSchedule.entity";
 
 @Entity({ name: 'social_event' })
 export class SocialEventEntity extends BaseEntity {
@@ -20,14 +21,14 @@ export class SocialEventEntity extends BaseEntity {
 
   @Column({ type: 'timestamptz', unique: false, nullable: false })
   publishedAt: Date
+  //
+  // @Column({ type: 'timestamptz', nullable: false })
+  // trackingStartedAt: Date
+  //
+  // @Column({ type: 'timestamptz', nullable: false })
+  // trackingEndAt: Date
 
-  @Column({ type: 'timestamptz', nullable: false })
-  trackingStartedAt: Date
-
-  @Column({ type: 'timestamptz', nullable: false })
-  trackingEndAt: Date
-
-  @ManyToOne((type) => SocialLivelyEntity, {
+  @OneToOne((type) => SocialAirdropScheduleEntity, {
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
     nullable: true,
@@ -35,6 +36,17 @@ export class SocialEventEntity extends BaseEntity {
     eager: true,
     orphanedRowAction: 'nullify',
   })
-  @JoinColumn({name:"socialLivelyId"})
-  socialLively: SocialLivelyEntity
+  @JoinColumn({name:"airdropScheduleId"})
+  airdropSchedule: SocialAirdropScheduleEntity;
+
+  // @ManyToOne((type) => SocialLivelyEntity, {
+  //   cascade: ['soft-remove'],
+  //   onDelete: 'NO ACTION',
+  //   nullable: false,
+  //   lazy: false,
+  //   eager: true,
+  //   orphanedRowAction: 'nullify',
+  // })
+  // @JoinColumn({name:"socialLivelyId"})
+  // socialLively: SocialLivelyEntity
 }

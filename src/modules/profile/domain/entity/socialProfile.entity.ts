@@ -1,6 +1,8 @@
-import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { UserEntity } from "./user.entity";
+import { SocialTrackerEntity } from "../../../airdrop/domain/entity/socialTracker.entity";
+// import { SocialFollowerEntity } from "../../../airdrop/domain/entity/socialFollower.entity";
 
 export enum SocialType {
   TWITTER = "TWITTER",
@@ -37,7 +39,7 @@ export class SocialProfileEntity extends BaseEntity {
   @ManyToOne((type) => UserEntity,{
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
-    nullable: false,
+    nullable: true,
     lazy: false,
     eager: true,
     orphanedRowAction: 'nullify',

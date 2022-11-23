@@ -13,15 +13,16 @@ import { SocialAirdropRuleEntity } from "./domain/entity/socialAirdropRule.entit
 import { BlockchainModule } from "../blockchain/blockchain.module";
 import { TwitterFollowerJob } from "./domain/jobs/twitter/followerTracker.job";
 import { TweetTrackerJob } from "./domain/jobs/twitter/tweetTracker.job";
-import { SocialFollowerEntity } from "./domain/entity/socialFollower.entity";
+// import { SocialFollowerEntity } from "./domain/entity/socialFollower.entity";
 import { SocialAirdropJob } from "./domain/jobs/socialAirdrop.job";
 import { AirdropRuleService } from "./services/airdropRule.service";
 import { AirdropRuleController } from "./controllers/airdropRule.controller";
 import { AirdropService } from "./services/airdrop.service";
-import { FollowerService } from "./services/follower.service";
+// import { FollowerService } from "./services/follower.service";
 import { AirdropController } from "./controllers/airdrop.controller";
-import { FollowerController } from "./controllers/follower.controller";
+// import { FollowerController } from "./controllers/follower.controller";
 import { PostTrackerJob } from "./domain/jobs/instagram/postTracker.job";
+import { SocialAirdropScheduleEntity } from "./domain/entity/socialAirdropSchedule.entity";
 
 
 
@@ -34,22 +35,28 @@ import { PostTrackerJob } from "./domain/jobs/instagram/postTracker.job";
     TypeOrmModule.forFeature([
       SocialLivelyEntity,
       SocialEventEntity,
-      SocialFollowerEntity,
+      // SocialFollowerEntity,
       SocialTrackerEntity,
       SocialAirdropEntity,
-      SocialAirdropRuleEntity
+      SocialAirdropRuleEntity,
+      SocialAirdropScheduleEntity
     ]),
   ],
-  controllers: [SocialLivelyController, AirdropRuleController, AirdropController, FollowerController],
+  controllers: [
+    SocialLivelyController,
+    AirdropRuleController,
+    AirdropController,
+    // FollowerController
+  ],
   providers: [
     SocialLivelyService,
     AirdropRuleService,
     AirdropService,
-    FollowerService,
+    // FollowerService,
     // TwitterFollowerJob,
-    // TweetTrackerJob,
+    TweetTrackerJob,
     // SocialAirdropJob
-    PostTrackerJob
+    // PostTrackerJob
   ]
 })
 export class AirdropModule {}

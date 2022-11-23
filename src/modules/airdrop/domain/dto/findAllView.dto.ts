@@ -6,8 +6,8 @@ import { SocialAirdropEntity } from "../entity/socialAirdrop.entity";
 import { AirdropRuleViewDto } from "./airdropRuleView.dto";
 import { SocialAirdropRuleEntity } from "../entity/socialAirdropRule.entity";
 import { AirdropInfoViewDto } from "./airdropInfoView.dto";
-import { SocialFollowerEntity } from "../entity/socialFollower.entity";
-import { FollowerViewDto } from "./followerView.dto";
+// import { SocialFollowerEntity } from "../entity/socialFollower.entity";
+// import { FollowerViewDto } from "./followerView.dto";
 
 export class FindAllViewDto<K> {
 
@@ -36,10 +36,10 @@ export class FindAllViewDto<K> {
       findAllDto.data = entities.map(entity => AirdropInfoViewDto.from(<SocialAirdropEntity><unknown>entity))
         .reduce((acc, view) => [...acc, view], []);
       return findAllDto;
-    } else if (Array.isArray(entities) && entities[0] instanceof SocialFollowerEntity) {
-      findAllDto.data = entities.map(entity => FollowerViewDto.from(<SocialFollowerEntity><unknown>entity))
-        .reduce((acc, view) => [...acc, view], []);
-      return findAllDto;
+    // } else if (Array.isArray(entities) && entities[0] instanceof SocialFollowerEntity) {
+    //   findAllDto.data = entities.map(entity => FollowerViewDto.from(<SocialFollowerEntity><unknown>entity))
+    //     .reduce((acc, view) => [...acc, view], []);
+    //   return findAllDto;
     }
     return null
   }
