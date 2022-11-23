@@ -563,7 +563,7 @@ export class UserService implements IService<UserEntity> {
       'https://' +
       this._configService.get<string>('http.domain') +
       tmpArray.splice(0, tmpArray.length - 1).join('/') +
-      '/get/' +
+      '/image/' +
       filename;
 
     if (user.imageFilename) {
