@@ -348,6 +348,7 @@ export class UserController {
 
   @Get('/image/:image')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'image',
     required: true,
@@ -358,12 +359,20 @@ export class UserController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 404, description: 'Image Not Found.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  getImage(
+  async getImage(
     @Param('image') image: string,
     @Req() request: any,
     @Res() response: Response,
   ) {
-    const file = createReadStream(this._userService.getImage(image));
+
+    const {path, size} = await this._userService.getImage(image);
+
+    response.writeHead(200, {
+      'Content-Type': request.user.imageMimeType,
+      'Content-Length': size
+    });
+
+    const file = createReadStream(path);
     file.pipe(response);
   }
 }

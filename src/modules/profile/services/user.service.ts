@@ -15,7 +15,7 @@ import { UserEntity } from '../domain/entity';
 import { UserGroupService } from './userGroup.service';
 import * as argon2 from 'argon2';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
-import { extname, join } from 'path';
+import * as path from 'path';
 import * as fs from 'fs';
 import {
   AuthMailEntity,
@@ -540,9 +540,9 @@ export class UserService implements IService<UserEntity> {
     }
   }
 
-  async updateEntity(user: UserEntity): Promise<UserEntity> {
+  async updateEntity(user: UserEntity): Promise<void> {
     try {
-      return await this._userRepository.save(user);
+      await this._userRepository.save(user);
     } catch (err) {
       this._logger.error(`userRepository.save failed, mail: ${user.email}`, err);
       throw new HttpException({
@@ -555,8 +555,9 @@ export class UserService implements IService<UserEntity> {
 
   async uploadImage(request: any, file: Express.Multer.File): Promise<URL> {
     const user = request.user as UserEntity;
-    const fileExtName = extname(file.originalname);
+    const fileExtName = path.extname(file.originalname);
     const filename = `profilePhoto_${user.id}_${Date.now()}${fileExtName}`;
+    const newFilePath = path.join(this._uploadPath,filename);
     const tmpArray = request.url.split('/');
     const absoluteUrl =
       'https://' +
@@ -566,21 +567,21 @@ export class UserService implements IService<UserEntity> {
       filename;
 
     if (user.imageFilename) {
-      const oldImageFile = this._uploadPath + user.imageFilename;
+      const oldImageFile = path.join(this._uploadPath, user.imageFilename);
       if (fs.existsSync(oldImageFile)) {
         try {
           fs.rmSync(oldImageFile);
         } catch (error) {
-          this._logger.error(`could not remove file ${oldImageFile}`, error);
+          this._logger.error(`remove file ${oldImageFile} failed`, error);
         }
       }
     }
 
     try {
-      fs.writeFileSync(this._uploadPath + filename, file.buffer);
+      fs.writeFileSync(newFilePath, file.buffer);
     } catch (error) {
       this._logger.error(
-        `could not write file ${this._uploadPath + filename}`,
+        `write file ${newFilePath} failed`,
         error,
       );
       throw new HttpException({
@@ -634,17 +635,21 @@ export class UserService implements IService<UserEntity> {
     return new URL(absoluteUrl);
   }
 
-  public getImage(image: string): string {
-    const imageFile = this._uploadPath + image;
-    if (fs.existsSync(imageFile)) {
-      return imageFile;
-    } else {
-      this._logger.error(`could not found file ${imageFile}`);
+  public async getImage(image: string): Promise<{path: string, size: number}> {
+
+    const imageFile = path.join(this._uploadPath, image);
+    try {
+        await fs.promises.access(imageFile)
+        const stat = await fs.promises.stat(imageFile);
+        return { path: imageFile, size: stat.size }
+    } catch (err) {
+      this._logger.error(`get file ${imageFile} failed`, err);
+      this._logger.debug(`file ${imageFile} not found`);
       throw new HttpException({
-        statusCode: '500',
-        message: 'Something Went Wrong',
-        error: 'Internal Server Error'
-      }, HttpStatus.INTERNAL_SERVER_ERROR)
+        statusCode: '404',
+        message: `Image file ${imageFile} Not Found`,
+        error: 'NotFound'
+      }, HttpStatus.NOT_FOUND)
     }
   }
 }
