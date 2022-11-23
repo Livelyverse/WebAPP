@@ -139,6 +139,8 @@ export class AuthenticationService {
     user.password = hashPassword;
     await this._userService.updateEntity(user);
     await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, {ttl: 0});
+    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
+    await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
   }
 
   public async userAuthentication(dto: LoginDto, res: Response): Promise<void> {
@@ -589,8 +591,8 @@ export class AuthenticationService {
       }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${userId}`);
-    await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${userId}`);
+      await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${userId}`);
+      await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${userId}`);
     return authTokenEntity;
   }
 
