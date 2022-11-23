@@ -348,7 +348,6 @@ export class UserController {
 
   @Get('/image/:image')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'image',
     required: true,
@@ -368,7 +367,7 @@ export class UserController {
     const {path, size} = await this._userService.getImage(image);
 
     response.writeHead(200, {
-      'Content-Type': request.user.imageMimeType,
+      // 'Content-Type': request.user.imageMimeType,
       'Content-Length': size
     });
 
