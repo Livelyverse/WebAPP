@@ -647,7 +647,7 @@ export class UserService implements IService<UserEntity> {
       this._logger.debug(`file ${imageFile} not found`);
       throw new HttpException({
         statusCode: '404',
-        message: `Image file ${imageFile} Not Found`,
+        message: `Image file ${image} Not Found`,
         error: 'NotFound'
       }, HttpStatus.NOT_FOUND)
     }
