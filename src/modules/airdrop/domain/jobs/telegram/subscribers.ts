@@ -45,6 +45,7 @@ export class TelegramSubscriberJob {
 
       // creating new airdrop post
       this.bot.hears('new airdrop 🤑', (ctx) => {
+        if (this.admins.includes(ctx.update.message.from.id)) return;
         (ctx as any).scene.enter('createAirdrop', { user_id: ctx.update.message.from.id });
       });
 
