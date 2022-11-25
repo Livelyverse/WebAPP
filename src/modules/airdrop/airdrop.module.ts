@@ -1,26 +1,27 @@
 import { Module } from '@nestjs/common';
 import { SocialLivelyService } from './services/socialLively.service';
 import { SocialLivelyController } from './controllers/socialLively.controller';
-import { ProfileModule } from "../profile/profile.module";
-import { HttpModule } from "@nestjs/axios";
-import { ConfigModule } from "@nestjs/config";
-import { TypeOrmModule } from "@nestjs/typeorm";
-import { SocialLivelyEntity } from "./domain/entity/socialLively.entity";
-import { SocialEventEntity } from "./domain/entity/socialEvent.entity";
-import { SocialTrackerEntity } from "./domain/entity/socialTracker.entity";
-import { SocialAirdropEntity } from "./domain/entity/socialAirdrop.entity";
-import { SocialAirdropRuleEntity } from "./domain/entity/socialAirdropRule.entity";
-import { BlockchainModule } from "../blockchain/blockchain.module";
-import { TwitterFollowerJob } from "./domain/jobs/twitter/followerTracker.job";
-import { TweetTrackerJob } from "./domain/jobs/twitter/tweetTracker.job";
-import { SocialFollowerEntity } from "./domain/entity/socialFollower.entity";
-import { SocialAirdropJob } from "./domain/jobs/twitter/socialAirdrop.job";
-import { AirdropRuleService } from "./services/airdropRule.service";
-import { AirdropRuleController } from "./controllers/airdropRule.controller";
-import { AirdropService } from "./services/airdrop.service";
-import { FollowerService } from "./services/follower.service";
-import { AirdropController } from "./controllers/airdrop.controller";
-import { FollowerController } from "./controllers/follower.controller";
+import { ProfileModule } from '../profile/profile.module';
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { SocialLivelyEntity } from './domain/entity/socialLively.entity';
+import { SocialEventEntity } from './domain/entity/socialEvent.entity';
+import { SocialTrackerEntity } from './domain/entity/socialTracker.entity';
+import { SocialAirdropEntity } from './domain/entity/socialAirdrop.entity';
+import { SocialAirdropRuleEntity } from './domain/entity/socialAirdropRule.entity';
+import { BlockchainModule } from '../blockchain/blockchain.module';
+import { TwitterFollowerJob } from './domain/jobs/twitter/followerTracker.job';
+import { TweetTrackerJob } from './domain/jobs/twitter/tweetTracker.job';
+import { SocialFollowerEntity } from './domain/entity/socialFollower.entity';
+import { SocialAirdropJob } from './domain/jobs/twitter/socialAirdrop.job';
+import { AirdropRuleService } from './services/airdropRule.service';
+import { AirdropRuleController } from './controllers/airdropRule.controller';
+import { AirdropService } from './services/airdrop.service';
+import { FollowerService } from './services/follower.service';
+import { AirdropController } from './controllers/airdrop.controller';
+import { FollowerController } from './controllers/follower.controller';
+import { TelegramSubscriberJob } from './domain/jobs/telegram/subscribers';
 
 @Module({
   imports: [
@@ -34,10 +35,15 @@ import { FollowerController } from "./controllers/follower.controller";
       SocialFollowerEntity,
       SocialTrackerEntity,
       SocialAirdropEntity,
-      SocialAirdropRuleEntity
+      SocialAirdropRuleEntity,
     ]),
   ],
-  controllers: [SocialLivelyController, AirdropRuleController, AirdropController, FollowerController],
+  controllers: [
+    SocialLivelyController,
+    AirdropRuleController,
+    AirdropController,
+    FollowerController,
+  ],
   providers: [
     SocialLivelyService,
     AirdropRuleService,
@@ -45,7 +51,8 @@ import { FollowerController } from "./controllers/follower.controller";
     FollowerService,
     TwitterFollowerJob,
     TweetTrackerJob,
-    SocialAirdropJob
-  ]
+    SocialAirdropJob,
+    TelegramSubscriberJob,
+  ],
 })
 export class AirdropModule {}
