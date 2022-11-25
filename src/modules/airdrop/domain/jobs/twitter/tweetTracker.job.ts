@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { EntityManager, MoreThan } from "typeorm";
+import { Brackets, EntityManager, MoreThan } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import TwitterApiv2ReadOnly from "twitter-api-v2/dist/v2/client.v2.read";
 import { InjectEntityManager } from "@nestjs/typeorm";
@@ -36,7 +36,7 @@ export class TweetTrackerJob {
   private readonly _trackerDuration: number;
   private readonly _trackerInterval: number;
   private readonly _startAt: Date;
-  private readonly _endAt: Date;
+  // private readonly _endAt: Date;
 
   constructor(
       @InjectEntityManager()
@@ -62,8 +62,8 @@ export class TweetTrackerJob {
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
     const startTimestamp = this._configService.get<number>('airdrop.twitter.startAt');
     const endTimestamp = this._configService.get<number>('airdrop.twitter.endAt');
-    this._startAt = new Date(startTimestamp);
-    this._endAt = new Date(endTimestamp);
+    this._startAt = startTimestamp < Date.now() ? new Date(startTimestamp) : new Date();
+    // this._endAt = endTimestamp > Date.now() ? new Date : new Date(endTimestamp);
 
     const interval = setInterval(this.fetchTweetsFromPage.bind(this), this._trackerInterval);
     this._schedulerRegistry.addInterval('TweetsTrackerJob', interval);
@@ -91,9 +91,12 @@ export class TweetTrackerJob {
       RxJS.mergeMap((socialLively) =>
         RxJS.from(this._entityManager.createQueryBuilder(SocialAirdropRuleEntity, "airdropRule")
           .select()
-          .where('"airdropRule"."socialType" = :socialType', {socialType: SocialType.TWITTER})
-          .andWhere('"airdropRule"."actionType" = \'LIKE\'')
-          .orWhere('"airdropRule"."actionType" = \'RETWEET\'')
+          .where('"airdropRule"."socialType" = \'TWITTER\'')
+          .andWhere(new Brackets((qb) => {
+              qb.where('"airdropRule"."actionType" = \'LIKE\'').
+              orWhere('"airdropRule"."actionType" = \'RETWEET\'')
+            }),
+          )
           .getMany()
         ).pipe(
           RxJS.tap({
@@ -143,6 +146,7 @@ export class TweetTrackerJob {
         ).pipe(
           RxJS.switchMap((queryResult) =>
             RxJS.merge(
+              //SocialEvent with active tracker not found
               RxJS.of(queryResult).pipe(
                 RxJS.filter((queryResult) => !queryResult.length),
                 RxJS.tap((_) => this._logger.log(`pipe(1-0): SocialEvent with active tracker not found . . .`)),
@@ -162,6 +166,7 @@ export class TweetTrackerJob {
                     }),
                     RxJS.switchMap((socialEventEntities) =>
                       RxJS.merge(
+                        // at least one SocialEvent found
                         RxJS.of(socialEventEntities).pipe(
                             RxJS.filter((socialEvents) => !!socialEvents.length),
                             RxJS.map((socialEvents) => socialEvents[0]),
@@ -172,8 +177,8 @@ export class TweetTrackerJob {
                                  RxJS.from(this._twitterClient.userTimeline(data.socialLively.userId, {
                                       max_results: 100,
                                       since_id: socialEvent.contentId,
-                                      end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
-                                      "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source"],
+                                      // end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
+                                      "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source", "entities"],
                                  }))
                               ).pipe(
                                 RxJS.expand((paginator:TweetUserTimelineV2Paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
@@ -184,8 +189,8 @@ export class TweetTrackerJob {
                                 RxJS.filter((paginator) => paginator.data.meta.result_count > 0),
                                 RxJS.concatMap((paginator) =>
                                   RxJS.from(paginator.data.data).pipe(
-                                    RxJS.tap((tweet: TweetV2) => this._logger.log(`pipe(1-1), tweet.id: ${tweet?.id}, tweet.referenced_tweet: ${JSON.stringify(tweet?.referenced_tweets)}`)),
-                                    RxJS.filter((tweet: TweetV2) => !!!tweet.referenced_tweets),
+                                    RxJS.tap((tweet: TweetV2) => this._logger.log(`pipe(1-1), tweet.id: ${tweet?.id}, tweet.referenced_tweet: ${JSON.stringify(tweet?.referenced_tweets)}, hashtags: ${tweet?.entities?.hashtags?.reduce((acc, hashtag) => [...acc, hashtag.tag], [])}`)),
+                                    RxJS.filter((tweet: TweetV2) => !!!tweet.referenced_tweets && tweet?.entities?.hashtags?.reduce((acc, hashtag) => [...acc, hashtag.tag.toLowerCase()], [])?.find(tag => /airdrops?/.test(tag)) ),
                                     RxJS.map((tweet: TweetV2) => {
                                       const tweetEventDto = TweetEventDto.from(tweet);
                                       const socialEvent = new SocialEventEntity();
@@ -265,6 +270,7 @@ export class TweetTrackerJob {
                               )
                             )
                         ),
+                        // SocialEvent not found
                         RxJS.of(socialEventEntities).pipe(
                           RxJS.filter((socialEventEntities) => !socialEventEntities.length),
                           RxJS.tap((_) => this._logger.log(`pipe(1-2): SocialEvent not found . . .`)),
@@ -274,8 +280,8 @@ export class TweetTrackerJob {
                               RxJS.from(this._twitterClient.userTimeline(data.socialLively.userId, {
                                 max_results: 100,
                                 start_time: this._startAt.getTime() < Date.now() ? this._startAt.toISOString() : new Date().toISOString(),
-                                end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
-                                "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source"],
+                                // end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
+                                "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source", "entities"],
                               }))
                             ).pipe(
                               RxJS.expand((paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
@@ -286,8 +292,8 @@ export class TweetTrackerJob {
                               RxJS.filter((paginator) => paginator.data.meta.result_count > 0),
                               RxJS.concatMap((paginator) =>
                                 RxJS.from(paginator.data.data).pipe(
-                                  RxJS.tap((tweet: TweetV2) => this._logger.log(`pipe(1-2), tweet.id: ${tweet.id}, tweet.referenced_tweet: ${JSON.stringify(tweet?.referenced_tweets)}`)),
-                                  RxJS.filter((tweet: TweetV2) => !!!tweet.referenced_tweets),
+                                  RxJS.tap((tweet: TweetV2) => this._logger.log(`pipe(1-2), tweet.id: ${tweet.id}, tweet.referenced_tweet: ${JSON.stringify(tweet?.referenced_tweets)}, hashtags: ${tweet?.entities?.hashtags?.reduce((acc, hashtag) => [...acc, hashtag.tag], [])}`)),
+                                  RxJS.filter((tweet: TweetV2) => !!!tweet.referenced_tweets && tweet?.entities?.hashtags?.reduce((acc, hashtag) => [...acc, hashtag.tag.toLowerCase()], [])?.find(tag => /airdrops?/.test(tag))),
                                   RxJS.map((tweet: TweetV2) => {
                                     const tweetEventDto = TweetEventDto.from(tweet);
                                     const socialEvent = new SocialEventEntity();
@@ -394,6 +400,7 @@ export class TweetTrackerJob {
                   )
                 ),
               ),
+              // SocialEvents with tracker found
               RxJS.of(queryResult).pipe(
                 RxJS.filter((socialEventEntities) => !!socialEventEntities.length),
                 RxJS.tap((socialEventEntities) => this._logger.debug(`pipe(2): SocialEvents with tracker found, count: ${socialEventEntities.length}`)),
@@ -408,8 +415,8 @@ export class TweetTrackerJob {
                           RxJS.from(this._twitterClient.userTimeline(data.socialLively.userId, {
                             max_results: 100,
                             since_id: socialEvent.contentId,
-                            end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
-                            "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source"],
+                            // end_time: this._endAt.getTime() < Date.now() ? this._endAt.toISOString() : new Date().toISOString(),
+                            "tweet.fields": ["id", "public_metrics", "conversation_id", "lang", "referenced_tweets", "created_at", "source", "entities"],
                           }))
                         ).pipe(
                           RxJS.expand((paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY),
@@ -420,8 +427,8 @@ export class TweetTrackerJob {
                           RxJS.filter((paginator) => paginator.data.meta.result_count > 0),
                           RxJS.concatMap((paginator) =>
                             RxJS.from(paginator.data.data).pipe(
-                              RxJS.tap((tweet: TweetV2) => this._logger.log(`pipe(2): tweet.id: ${tweet?.id}, tweet.referenced_tweet: ${JSON.stringify(tweet?.referenced_tweets)}`)),
-                              RxJS.filter((tweet: TweetV2) => !!!tweet.referenced_tweets),
+                              RxJS.tap((tweet: TweetV2) => this._logger.log(`pipe(2): tweet.id: ${tweet?.id}, tweet.referenced_tweet: ${JSON.stringify(tweet?.referenced_tweets)}, hashtags: ${tweet?.entities?.hashtags?.reduce((acc, hashtag) => [...acc, hashtag.tag], [])}`)),
+                              RxJS.filter((tweet: TweetV2) => !!!tweet.referenced_tweets && tweet?.entities?.hashtags?.reduce((acc, hashtag) => [...acc, hashtag.tag.toLowerCase()], [])?.find(tag => /airdrops?/.test(tag))),
                               RxJS.map((tweet: TweetV2) => {
                                 const tweetEventDto = TweetEventDto.from(tweet);
                                 const socialEvent = new SocialEventEntity();

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { EntityManager, Repository } from "typeorm";
-import { InjectEntityManager, InjectRepository } from "@nestjs/typeorm";
+import { EntityManager } from "typeorm";
+import { InjectEntityManager } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { TwitterApi } from "twitter-api-v2";
@@ -16,16 +16,17 @@ import { SocialTrackerEntity } from "../../entity/socialTracker.entity";
 import { SocialActionType } from "../../entity/enums";
 import { SocialAirdropRuleEntity } from "../../entity/socialAirdropRule.entity";
 import { SocialAirdropEntity } from "../../entity/socialAirdrop.entity";
-import { SocialFollowerEntity } from "../../entity/socialFollower.entity";
 import { TwitterFollowerError } from "../../error/twitterFollower.error";
+import { SocialEventEntity } from "../../entity/socialEvent.entity";
+import { SocialFollowerEntity } from "../../entity/socialFollower.entity";
 
 @Injectable()
 export class TwitterFollowerJob {
   private readonly _logger = new Logger(TwitterFollowerJob.name);
   private readonly _authToken: string;
   private readonly _twitterClient: TwitterApiv2ReadOnly;
-  private readonly _startAt: Date;
-  private readonly _endAt: Date;
+  // private readonly _startAt: Date;
+  // private readonly _endAt: Date;
 
   constructor(
     @InjectEntityManager()
@@ -37,10 +38,10 @@ export class TwitterFollowerJob {
       throw new Error("airdrop.twitter.authToken config is empty");
     }
 
-    const startTimestamp = this._configService.get<number>('airdrop.twitter.startAt');
-    const endTimestamp = this._configService.get<number>('airdrop.twitter.endAt');
-    this._startAt = new Date(startTimestamp);
-    this._endAt = new Date(endTimestamp);
+    // const startTimestamp = this._configService.get<number>('airdrop.twitter.startAt');
+    // const endTimestamp = this._configService.get<number>('airdrop.twitter.endAt');
+    // this._startAt = new Date(startTimestamp);
+    // this._endAt = new Date(endTimestamp);
 
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
     this.fetchTwitterFollowers();
@@ -49,17 +50,17 @@ export class TwitterFollowerJob {
   @Cron(CronExpression.EVERY_6_HOURS)
   fetchTwitterFollowers() {
 
-    if (this._startAt.getTime() > Date.now()) {
-      this._logger.debug(`fetchTwitterFollowers this._startAt ${this._startAt.getTime()} greater than now ${Date.now()}`);
-      return
-    }
+    // if (this._startAt.getTime() > Date.now()) {
+    //   this._logger.debug(`fetchTwitterFollowers this._startAt ${this._startAt.getTime()} greater than now ${Date.now()}`);
+    //   return
+    // }
+    //
+    // if (this._endAt.getTime() < Date.now()) {
+    //   this._logger.debug(`fetchTwitterFollowers this._endAt ${this._endAt.getTime()} less than now ${Date.now()}`);
+    //   return
+    // }
 
-    if (this._endAt.getTime() < Date.now()) {
-      this._logger.debug(`fetchTwitterFollowers this._endAt ${this._endAt.getTime()} less than now ${Date.now()}`);
-      return
-    }
-
-    let socialLivelyQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(SocialLivelyEntity, "socialLively")
+    const socialLivelyQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(SocialLivelyEntity, "socialLively")
       .where('"socialLively"."socialType" = \'TWITTER\'')
       .andWhere('"socialLively"."isActive" = \'true\'')
       .getOneOrFail())
@@ -68,11 +69,35 @@ export class TwitterFollowerJob {
         RxJS.catchError(err => RxJS.throwError(() => new TwitterFollowerError('fetch social lively failed', err)))
       )
 
+    const socialEventQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(SocialEventEntity, "socialEvent")
+      .select()
+      .leftJoin("social_lively", "socialLively", '"socialLively"."id" = "socialEvent"."socialLivelyId"')
+      .where('"socialLively"."socialType" = \'TWITTER\'')
+      .andWhere('"socialEvent"."isActive" = \'true\'')
+      .andWhere('("socialEvent"."content"->\'data\'->>\'hashTags\')::jsonb ? \'follow\'')
+      .andWhere('"socialEvent"."trackingEndAt" > NOW()')
+      .getOne())
+      .pipe(
+        RxJS.mergeMap((queryResult) =>
+          RxJS.merge(
+            RxJS.of(queryResult).pipe(
+              RxJS.filter((socialEvent) => !!socialEvent),
+              RxJS.tap((socialEvent) => this._logger.debug(`fetch social event airdrop follow found, socialEventId: ${socialEvent?.id}, contentUrl: ${socialEvent?.contentUrl}`)),
+            ),
+            RxJS.of(queryResult).pipe(
+              RxJS.filter((socialEvent) => !socialEvent),
+              RxJS.tap((_) => this._logger.debug(`fetch social event airdrop follow not found`)),
+            )
+          )
+        ),
+        RxJS.catchError(err => RxJS.throwError(() => new TwitterFollowerError('fetch social event airdrop follow failed', err)))
+      )
+
     this._logger.debug("tweets follower job starting . . . ");
 
-    RxJS.from(socialLivelyQueryResultObservable).pipe(
+    RxJS.zip(socialLivelyQueryResultObservable, socialEventQueryResultObservable).pipe(
       // fetch social twitter airdrop rules
-      RxJS.mergeMap((socialLively) =>
+      RxJS.mergeMap(([socialLively, socialEvent]) =>
         RxJS.from(this._entityManager.createQueryBuilder(SocialAirdropRuleEntity, "airdropRule")
           .select()
           .where('"airdropRule"."socialType" = :socialType', {socialType: SocialType.TWITTER})
@@ -81,13 +106,13 @@ export class TwitterFollowerJob {
         ).pipe(
           RxJS.tap({
             next: (airdropRule) => this._logger.debug(`tweeter follower airdrop rule found, token: ${airdropRule.unit},  amount: ${airdropRule.amount}, decimal: ${airdropRule.decimal}`),
-            // error: (err) => this._logger.error(`find tweeter follower airdrop rule failed, ${err}`)
+            error: (err) => this._logger.error(`find tweeter follower airdrop rule failed`,err)
           }),
-          RxJS.map((airdropRule) => [ socialLively, airdropRule ]),
+          RxJS.map((airdropRule) => [ socialLively, socialEvent, airdropRule ]),
           RxJS.catchError(err => RxJS.throwError(() => new TwitterFollowerError('fetch tweeter follower airdrop rule failed', err)))
         )
       ),
-      RxJS.concatMap(([socialLively, airdropRule ]: [SocialLivelyEntity, SocialAirdropRuleEntity]) =>
+      RxJS.concatMap(([socialLively, socialEvent, airdropRule ]: [SocialLivelyEntity, SocialEventEntity, SocialAirdropRuleEntity]) =>
         RxJS.from(this._twitterClient.followers(socialLively.userId, {
             max_results: 128,
             asPaginator: true,
@@ -112,11 +137,11 @@ export class TwitterFollowerJob {
           ),
           RxJS.tap({
             next: (paginator) => this._logger.log(`tweeter client paginator users count: ${paginator.meta.result_count}`),
-            error: (error) => this._logger.error(`tweeter client paginator users failed, ${error}`)
+            error: (error) => this._logger.error(`tweeter client paginator users failed`, error)
           }),
           RxJS.concatMap((paginator) =>
             RxJS.from(paginator.users).pipe(
-              RxJS.map((follower) => [socialLively, airdropRule, follower]),
+              RxJS.map((follower) => [socialLively, socialEvent, airdropRule, follower]),
             )
           ),
           RxJS.retry({
@@ -155,7 +180,7 @@ export class TwitterFollowerJob {
           this.retryWithDelay(30000, 3),
         )
       ),
-      RxJS.concatMap(([socialLively, airdropRule, twitterUser]: [SocialLivelyEntity, SocialAirdropRuleEntity, UserV2]) =>
+      RxJS.concatMap(([socialLively, socialEvent, airdropRule, twitterUser]: [SocialLivelyEntity, SocialEventEntity, SocialAirdropRuleEntity, UserV2]) =>
         RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity, "socialProfile")
           .select('"socialProfile".*')
           .addSelect('"socialFollower"."id" as "followerId"')
@@ -170,25 +195,26 @@ export class TwitterFollowerJob {
                 RxJS.filter((data) => !!data),
                 RxJS.map((data) => {
                   let {followerId, ...socialProfile } = data;
-                  return {followerId, socialProfile, socialLively, airdropRule, twitterUser};
+                  return {followerId, socialProfile, socialLively, socialEvent, airdropRule, twitterUser};
                 })
               ),
               RxJS.of(socialProfileExt).pipe(
-                RxJS.filter((data) => !!!data),
+                RxJS.filter((data) => !data),
                 RxJS.map((_) => {
                   return {
                     followerId: null,
                     socialProfile: null,
-                    airdropRule: airdropRule,
-                    socialLively: socialLively,
-                    twitterUser: twitterUser
+                    socialLively,
+                    socialEvent,
+                    airdropRule,
+                    twitterUser
                   }
                 })
               ),
             )
           ),
           RxJS.tap({
-            error: err => this._logger.error(`fetch lively socialProfile failed, ${err}`)
+            error: err => this._logger.error(`fetch lively socialProfile failed`, err)
           }),
           RxJS.catchError(error => RxJS.throwError(() => new TwitterFollowerError('fetch lively socialProfile failed', error)))
         ),
@@ -208,18 +234,22 @@ export class TwitterFollowerJob {
               socialFollower.socialProfile = data.socialProfile;
               socialFollower.socialLively = data.socialLively;
 
-              const socialTracker = new SocialTrackerEntity();
-              socialTracker.actionType = SocialActionType.FOLLOW;
-              socialTracker.socialProfile = data.socialProfile;
-              socialTracker.follower = socialFollower;
+              if(data.socialEvent) {
+                const socialTracker = new SocialTrackerEntity();
+                socialTracker.actionType = SocialActionType.FOLLOW;
+                socialTracker.socialProfile = data.socialProfile;
+                socialTracker.socialEvent = data.socialEvent;
+                socialTracker.follower = socialFollower;
 
-              socialFollower.socialTracker = socialTracker;
+                socialFollower.socialTracker = socialTracker;
 
-              const socialAirdrop = new SocialAirdropEntity();
-              socialAirdrop.airdropRule = data.airdropRule;
-              socialAirdrop.socialTracker = socialTracker;
-
-              return ({socialFollower, socialTracker, socialAirdrop, ...data})
+                const socialAirdrop = new SocialAirdropEntity();
+                socialAirdrop.airdropRule = data.airdropRule;
+                socialAirdrop.socialTracker = socialTracker;
+                return ({socialFollower, socialTracker, socialAirdrop, ...data})
+              } else {
+                return ({socialFollower, socialTracker: null, socialAirdrop: null, ...data})
+              }
             }),
             RxJS.concatMap((data) =>
               RxJS.from(
@@ -230,17 +260,19 @@ export class TwitterFollowerJob {
                     .values([data.socialFollower])
                     .execute();
 
-                  await manager.createQueryBuilder()
-                    .insert()
-                    .into(SocialTrackerEntity)
-                    .values([data.socialTracker])
-                    .execute();
+                  if(data.socialTracker) {
+                    await manager.createQueryBuilder()
+                      .insert()
+                      .into(SocialTrackerEntity)
+                      .values([data.socialTracker])
+                      .execute();
 
-                  await manager.createQueryBuilder()
-                    .insert()
-                    .into(SocialAirdropEntity)
-                    .values([data.socialAirdrop])
-                    .execute();
+                    await manager.createQueryBuilder()
+                      .insert()
+                      .into(SocialAirdropEntity)
+                      .values([data.socialAirdrop])
+                      .execute();
+                  }
 
                   await manager.getRepository(SocialProfileEntity).save(data.socialProfile)
                 })
@@ -254,16 +286,16 @@ export class TwitterFollowerJob {
                   };
                 }),
                 RxJS.tap({
-                  error: err => this._logger.error(`twitter follower transaction failed, socialUsername: ${data.socialProfile.username}, socialProfileId: ${data.socialProfile.Id}, error: ${err}`)
+                  error: err => this._logger.error(`twitter follower transaction failed, socialUsername: ${data.socialProfile.username}, socialProfileId: ${data.socialProfile.Id}`,err)
                 }),
                 RxJS.catchError(error => RxJS.throwError(() => new TwitterFollowerError('twitter follower transaction failed', error)))
               )
             ),
           ),
           RxJS.of(inputData).pipe(
-            RxJS.filter((data) => !!!data.socialProfile),
+            RxJS.filter((data) => !data.socialProfile),
             RxJS.map((data) => { data.socialProfile }),
-            RxJS.tap((mapData) => this._logger.debug(`twitter follower hasn't still registered, username: ${inputData.twitterUser.username}`))
+            RxJS.tap((_) => this._logger.debug(`twitter follower hasn't still registered, username: ${inputData.twitterUser.username}`))
           ),
           RxJS.of(inputData).pipe(
             RxJS.filter((data)=> data.followerId && data.socialProfile),
@@ -273,14 +305,14 @@ export class TwitterFollowerJob {
         )
       ),
     ).subscribe({
-      next: (data: {socialProfile: SocialProfileEntity, socialTracker: SocialTrackerEntity, socialAirdrop: SocialAirdropEntity, socialFollower: SocialFollowerEntity}) => {
-        if (!!data?.socialFollower) {
+      next: (data: {socialFollower: SocialFollowerEntity, socialProfile: SocialProfileEntity, socialTracker: SocialTrackerEntity, socialAirdrop: SocialAirdropEntity}) => {
+        if (data?.socialFollower) {
           this._logger.log(`new follower persist successfully, follower: ${data.socialProfile.username}`);
-        } else if (!!data?.socialProfile) {
+        } else if (data?.socialProfile) {
           this._logger.log(`social profile has updated successfully, username: ${data.socialProfile.username}`);
         }
       },
-      error: (error) => this._logger.error(`fetch tweeter followers failed\n error: ${error.stack}\n cause: ${error?.cause?.stack}`),
+      error: (error) => this._logger.error(`fetch tweeter followers failed\n cause: ${error?.cause?.stack}`, error),
       complete: () => this._logger.debug(`fetch tweeter followers completed`)
     });
   }
