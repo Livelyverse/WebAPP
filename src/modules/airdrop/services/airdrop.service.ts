@@ -40,9 +40,9 @@ export interface SocialAirdropUserView {
   contentUrl: string;
   socialProfileUrl: string;
   eventPublishedAt: Date;
-  trackingStartedAt: Date;
-  trackingEndAt: Date;
-  hashTags: string[];
+  airdropStartAt: Date;
+  airdropEndAt: Date;
+  hashtags: string[];
   userId: string;
   email: string;
   wallet: string;
@@ -83,7 +83,7 @@ export class AirdropService {
             RxJS.from(this._entityManager.query(`
               select "airdropView"."eventId", "airdropView"."airdropId", "airdropView"."contentId",
               "airdropView"."contentUrl", "airdropView"."socialProfileUrl", "airdropView"."eventPublishedAt",
-              "airdropView"."trackingStartedAt", "airdropView"."trackingEndAt", "airdropView"."hashTags",
+              "airdropView"."airdropStartAt", "airdropView"."airdropEndAt", "airdropView"."hashtags",
               "airdropView"."userId", "airdropView"."email", "airdropView"."wallet",
               "airdropView"."socialName", "airdropView"."socialUsername",
               "airdropView"."socialType", "airdropView"."actionType",
@@ -130,7 +130,7 @@ export class AirdropService {
             RxJS.from(this._entityManager.query(`
                 select "airdropView"."eventId", "airdropView"."airdropId", "airdropView"."contentId",
                 "airdropView"."contentUrl", "airdropView"."socialProfileUrl", "airdropView"."eventPublishedAt",
-                "airdropView"."trackingStartedAt", "airdropView"."trackingEndAt", "airdropView"."hashTags",
+                "airdropView"."airdropStartAt", "airdropView"."airdropEndAt", "airdropView"."hashtags",
                 "airdropView"."userId", "airdropView"."email", "airdropView"."wallet",
                 "airdropView"."socialName", "airdropView"."socialUsername",
                 "airdropView"."socialType", "airdropView"."actionType",
@@ -176,7 +176,7 @@ export class AirdropService {
             RxJS.from(this._entityManager.query(`
                 select "airdropView"."eventId", "airdropView"."airdropId", "airdropView"."contentId",
                 "airdropView"."contentUrl", "airdropView"."socialProfileUrl", "airdropView"."eventPublishedAt",
-                "airdropView"."trackingStartedAt", "airdropView"."trackingEndAt", "airdropView"."hashTags",
+                "airdropView"."airdropStartAt", "airdropView"."airdropEndAt", "airdropView"."hashtags",
                 "airdropView"."userId", "airdropView"."email", "airdropView"."wallet",
                 "airdropView"."socialName", "airdropView"."socialUsername",
                 "airdropView"."socialType", "airdropView"."actionType",
@@ -220,7 +220,7 @@ export class AirdropService {
             RxJS.from(this._entityManager.query(`
                 select "airdropView"."eventId", "airdropView"."airdropId", "airdropView"."contentId",
                 "airdropView"."contentUrl", "airdropView"."socialProfileUrl", "airdropView"."eventPublishedAt",
-                "airdropView"."trackingStartedAt", "airdropView"."trackingEndAt", "airdropView"."hashTags",
+                "airdropView"."airdropStartAt", "airdropView"."airdropEndAt", "airdropView"."hashtags",
                 "airdropView"."userId", "airdropView"."email", "airdropView"."wallet",
                 "airdropView"."socialName", "airdropView"."socialUsername",
                 "airdropView"."socialType", "airdropView"."actionType",
@@ -264,7 +264,7 @@ export class AirdropService {
             RxJS.from(this._entityManager.query(`
               select "airdropView"."eventId", "airdropView"."airdropId", "airdropView"."contentId",
               "airdropView"."contentUrl", "airdropView"."socialProfileUrl", "airdropView"."eventPublishedAt",
-              "airdropView"."trackingStartedAt", "airdropView"."trackingEndAt", "airdropView"."hashTags",
+              "airdropView"."airdropStartAt", "airdropView"."airdropEndAt", "airdropView"."hashtags",
               "airdropView"."userId", "airdropView"."email", "airdropView"."wallet",
               "airdropView"."socialName", "airdropView"."socialUsername",
               "airdropView"."socialType", "airdropView"."actionType",
@@ -310,7 +310,7 @@ export class AirdropService {
             RxJS.from(this._entityManager.query(`
               select "airdropView"."eventId", "airdropView"."airdropId", "airdropView"."contentId",
               "airdropView"."contentUrl", "airdropView"."socialProfileUrl", "airdropView"."eventPublishedAt",
-              "airdropView"."trackingStartedAt", "airdropView"."trackingEndAt", "airdropView"."hashTags",
+              "airdropView"."airdropStartAt", "airdropView"."airdropEndAt", "airdropView"."hashtags",
               "airdropView"."userId", "airdropView"."email", "airdropView"."wallet",
               "airdropView"."socialName", "airdropView"."socialUsername",
               "airdropView"."socialType", "airdropView"."actionType",
@@ -356,7 +356,7 @@ export class AirdropService {
             RxJS.from(this._entityManager.query(`
               select "airdropView"."eventId", "airdropView"."airdropId", "airdropView"."contentId",
               "airdropView"."contentUrl", "airdropView"."socialProfileUrl", "airdropView"."eventPublishedAt",
-              "airdropView"."trackingStartedAt", "airdropView"."trackingEndAt", "airdropView"."hashTags",
+              "airdropView"."airdropStartAt", "airdropView"."airdropEndAt", "airdropView"."hashtags",
               "airdropView"."userId", "airdropView"."email", "airdropView"."wallet",
               "airdropView"."socialName", "airdropView"."socialUsername",
               "airdropView"."socialType", "airdropView"."actionType",
@@ -400,7 +400,7 @@ export class AirdropService {
             RxJS.from(this._entityManager.query(`
               select "airdropView"."eventId", "airdropView"."airdropId", "airdropView"."contentId",
               "airdropView"."contentUrl", "airdropView"."socialProfileUrl", "airdropView"."eventPublishedAt",
-              "airdropView"."trackingStartedAt", "airdropView"."trackingEndAt", "airdropView"."hashTags",
+              "airdropView"."airdropStartAt", "airdropView"."airdropEndAt", "airdropView"."hashtags",
               "airdropView"."userId", "airdropView"."email", "airdropView"."wallet",
               "airdropView"."socialName", "airdropView"."socialUsername",
               "airdropView"."socialType", "airdropView"."actionType",
@@ -815,7 +815,7 @@ export class AirdropService {
         )
       ),
       RxJS.of(filterBy).pipe(
-        RxJS.filter(filterByType => !!!filterByType),
+        RxJS.filter(filterByType => !filterByType),
         RxJS.concatMap(_ =>
           RxJS.merge(
             RxJS.of(isSettlement).pipe(
@@ -823,11 +823,11 @@ export class AirdropService {
               RxJS.switchMap( _ =>
                 RxJS.from(this._entityManager.getRepository(SocialAirdropEntity)
                   .findAndCount({
-                    relations: [
-                      'airdropRule',
-                      'socialTracker',
-                      'blockchainTx'
-                    ],
+                    relations: {
+                      airdropRule: true,
+                      blockchainTx: true,
+                      socialTracker: true,
+                    },
                     join: {
                       alias: "airdrop",
                       leftJoinAndSelect: {

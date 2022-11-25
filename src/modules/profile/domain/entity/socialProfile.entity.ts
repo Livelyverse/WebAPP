@@ -2,7 +2,6 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { UserEntity } from "./user.entity";
 import { SocialTrackerEntity } from "../../../airdrop/domain/entity/socialTracker.entity";
-// import { SocialFollowerEntity } from "../../../airdrop/domain/entity/socialFollower.entity";
 
 export enum SocialType {
   TWITTER = "TWITTER",

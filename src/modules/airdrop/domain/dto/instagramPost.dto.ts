@@ -14,7 +14,7 @@ export class InstagramPostDto {
       dto.ownerUsername = instagramPost.node.owner.username;
       dto.location = instagramPost.node.location;
       dto.thumbnailSrc = instagramPost.node.thumbnail_src;
-      dto.hashTags = [...instagramPost.node.edge_media_to_caption.edges[0].node.text.matchAll(/#\b\w*\b/g)]
+      dto.hashtags = [...instagramPost.node.edge_media_to_caption.edges[0].node.text.matchAll(/#\b\w*\b/g)]
         .reduce((acc, match) => [...acc, match[0]], []);
       dto.createdAt = instagramPost.node.taken_at_timestamp;
       return dto;
@@ -33,6 +33,6 @@ export class InstagramPostDto {
   ownerUsername: string;
   location: string;
   thumbnailSrc: string;
-  hashTags: string[];
+  hashtags: string[];
   createdAt: number;
 }

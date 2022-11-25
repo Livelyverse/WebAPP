@@ -28,10 +28,10 @@ export class SocialEventEntity extends BaseEntity {
   // @Column({ type: 'timestamptz', nullable: false })
   // trackingEndAt: Date
 
-  @OneToOne((type) => SocialAirdropScheduleEntity, {
+  @ManyToOne((type) => SocialAirdropScheduleEntity, {
     cascade: ['soft-remove'],
     onDelete: 'NO ACTION',
-    nullable: true,
+    nullable: false,
     lazy: false,
     eager: true,
     orphanedRowAction: 'nullify',

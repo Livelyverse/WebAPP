@@ -16,7 +16,7 @@ export class TweetEventDto {
       tweetEvent.replySettings = tweetV2?.reply_settings
       tweetEvent.authorId = tweetV2.author_id;
       tweetEvent.lang = tweetV2?.lang;
-      tweetEvent.hashTags = tweetV2?.entities?.hashtags?.reduce((acc, hashtag) => [...acc, hashtag.tag.toLowerCase()], [])
+      tweetEvent.hashtags = tweetV2?.entities?.hashtags?.reduce((acc, hashtag) => [...acc, hashtag.tag.toLowerCase()], [])
       return tweetEvent;
     }
     return null;
@@ -38,5 +38,5 @@ export class TweetEventDto {
   replySettings: string;
   authorId: string;
   lang: string;
-  hashTags: string[]
+  hashtags: string[]
 }

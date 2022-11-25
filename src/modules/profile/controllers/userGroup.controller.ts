@@ -12,7 +12,7 @@ import {
   Post,
   Query,
   UseGuards,
-  UsePipes
+  UsePipes, ValidationPipe
 } from "@nestjs/common";
 import { UserGroupService, UserGroupSortBy } from "../services/userGroup.service";
 import { UserGroupCreateDto, UserGroupUpdateDto, UserGroupViewDto } from "../domain/dto";
@@ -20,7 +20,6 @@ import { UserGroupEntity } from "../domain/entity";
 import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
 import RoleGuard from "../../authentication/domain/gurad/role.guard";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
-import { ValidationPipe } from "../../airdrop/domain/pipe/validationPipe";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SortType } from "../services/IService";
 import { EnumPipe } from "../domain/pipe/enumPipe";

@@ -13,15 +13,15 @@ export class AirdropInfoViewDto {
     if(entity) {
       const airdropDto = new AirdropInfoViewDto();
       airdropDto.id = entity.id;
-      airdropDto.email = entity.socialTracker.socialProfile.user.email;
-      airdropDto.userId = entity.socialTracker.socialProfile.user.id;
-      airdropDto.socialName = entity.socialTracker.socialProfile.socialName;
-      airdropDto.socialUsername = entity.socialTracker.socialProfile.username;
-      airdropDto.socialAction = entity.socialTracker.actionType;
-      airdropDto.socialType = entity.socialTracker.socialProfile.socialType;
-      airdropDto.wallet = entity.socialTracker.socialProfile.user.walletAddress;
-      airdropDto.amount = entity.airdropRule.amount.toString();
-      airdropDto.unit = entity.airdropRule.unit;
+      airdropDto.email = entity?.socialTracker?.socialProfile?.user?.email;
+      airdropDto.userId = entity?.socialTracker?.socialProfile?.user?.id;
+      airdropDto.socialName = entity?.socialTracker?.socialProfile?.socialName;
+      airdropDto.socialUsername = entity?.socialTracker?.socialProfile?.username;
+      airdropDto.socialAction = entity?.socialTracker?.actionType;
+      airdropDto.socialType = entity?.socialTracker?.socialProfile?.socialType;
+      airdropDto.wallet = entity?.socialTracker?.socialProfile?.user?.walletAddress;
+      airdropDto.amount = entity?.airdropRule?.amount?.toString();
+      airdropDto.unit = entity?.airdropRule?.unit;
       airdropDto.txHash = entity?.blockchainTx?.txHash ? entity.blockchainTx.txHash : null;
       airdropDto.txTimestamp = entity?.blockchainTx?.createdAt ? entity.blockchainTx.createdAt : null;
       airdropDto.timestamp = entity.createdAt;

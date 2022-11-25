@@ -1,6 +1,6 @@
 import { ApiResponseProperty } from "@nestjs/swagger";
 import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
-import { AirdropHashTagsValueObject, SocialAirdropScheduleEntity } from "../entity/socialAirdropSchedule.entity";
+import { AirdropHashtagsValueObject, SocialAirdropScheduleEntity } from "../entity/socialAirdropSchedule.entity";
 
 
 export class AirdropScheduleViewDto {
@@ -12,7 +12,7 @@ export class AirdropScheduleViewDto {
       dto.socialType = entity.socialLively.socialType;
       dto.airdropName = entity.airdropName;
       dto.description = entity.description;
-      dto.hashTags = entity.hashTags;
+      dto.hashtags = entity.hashtags;
       dto.airdropStartAt = entity.airdropStartAt;
       dto.airdropEndAt = entity.airdropEndAt;
       dto.createdAt = entity.createdAt;
@@ -35,7 +35,7 @@ export class AirdropScheduleViewDto {
   description: string;
 
   @ApiResponseProperty()
-  hashTags: AirdropHashTagsValueObject;
+  hashtags: AirdropHashtagsValueObject;
 
   @ApiResponseProperty()
   airdropStartAt: Date;

@@ -14,8 +14,9 @@ import { BlockchainError, ErrorCode } from "../../../blockchain/domain/error/blo
 @Injectable()
 export class SocialAirdropJob {
   private readonly _logger = new Logger(SocialAirdropJob.name);
-  private _safeMode = false;
   private readonly _bufferCount: number;
+  private _safeMode = false;
+  private _isRunning = false;
 
   constructor(
     @InjectEntityManager()
@@ -29,6 +30,13 @@ export class SocialAirdropJob {
 
   @Cron(CronExpression.EVERY_DAY_AT_11PM)
   airdropTokens() {
+    if(!this._isRunning) {
+      this._isRunning = true;
+    } else {
+      this._logger.warn("airdropTokens is already running . . .");
+      return;
+    }
+
     let airdropQueryResultObservable = RxJS.from(this._entityManager.createQueryBuilder(UserEntity, "users")
       .select('"users"."email" as "email", "users"."walletAddress" as "walletAddress"')
       .addSelect('"socialProfile"."username" as "socialUsername", "socialProfile"."socialType" as "socialType"')
@@ -83,19 +91,6 @@ export class SocialAirdropJob {
                 RxJS.map((total) => ({userAirdrops, total}))
               )
             ),
-            // RxJS.mergeMap((airdropInfo) =>
-            //   RxJS.merge(
-            //     RxJS.of(airdropInfo).pipe(
-            //       RxJS.filter(data => !!data.userAirdrops[0]?.walletAddress),
-            //       RxJS.identity
-            //     ),
-            //     RxJS.of(airdropInfo).pipe(
-            //       RxJS.filter(data => !data.userAirdrops[0]?.walletAddress),
-            //       RxJS.tap(data => this._logger.warn(`token airdrops of user profile ignored, wallet address is null, username: ${data.userAirdrops[0].email}`)),
-            //       RxJS.identity
-            //     )
-            //   )
-            // ),
             RxJS.tap(data => {
               const airdropIds = data.userAirdrops.map(userAirdrop => userAirdrop.airdrop.id).reduce((acc, value) => [...acc, value], [])
               const userAirdrop = data.userAirdrops[0]
@@ -208,8 +203,14 @@ export class SocialAirdropJob {
       )
     ).subscribe({
       next: RxJS.noop,
-      error: err => this._logger.error(`airdrop job failed`, err),
-      complete: () => this._logger.debug(`airdrop job completed`),
+      error: err => {
+        this._logger.error(`airdropToken job failed`, err);
+        this._isRunning = false;
+      },
+      complete: () => {
+        this._logger.debug(`airdropToken job completed`);
+        this._isRunning = false;
+      },
     })
   }
 }

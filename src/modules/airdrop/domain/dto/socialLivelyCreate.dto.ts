@@ -18,7 +18,7 @@ export class SocialLivelyCreateDto {
 
   @IsNotEmpty({ message: 'SocialType must not empty' })
   @IsDefined({ message: 'SocialType must be defined' })
-  @IsEnum(SocialType, { message: `SocialType must one of these values, ${Object.values(SocialType).toString()}` } )
+  @IsEnum(SocialType, { message: `SocialType must one of these values, ${Object.keys(SocialType).toString()}` } )
   @ApiProperty()
   socialType: SocialType
 

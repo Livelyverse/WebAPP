@@ -1,4 +1,3 @@
-import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import {
   Body,
   Controller,
@@ -11,29 +10,31 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  Req,
   UseGuards,
   UsePipes, ValidationPipe
 } from "@nestjs/common";
+import * as RxJS from "rxjs";
+import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import RoleGuard from "../../authentication/domain/gurad/role.guard";
 import { JwtAuthGuard } from "../../authentication/domain/gurad/jwt-auth.guard";
-import * as RxJS from "rxjs";
-import { SocialProfileService, SocialProfileSortBy } from "../services/socialProfile.service";
-import { SocialProfileCreateDto, SocialProfileUpdateDto, SocialProfileViewDto } from "../domain/dto";
 import { FindAllViewDto } from "../domain/dto/findAllView.dto";
+import { FindAllType, SortType } from "../services/IAirdrop.service";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
-import { SocialProfileEntity } from "../domain/entity";
-import { SocialType } from "../domain/entity/socialProfile.entity";
-import { FindAllType, SortType } from "../services/IService";
 import { EnumPipe } from "../domain/pipe/enumPipe";
+import { AirdropScheduleService, AirdropScheduleSortBy } from "../services/airdropSchedule.service";
+import { AirdropScheduleCreateDto } from "../domain/dto/airdropScheduleCreate.dto";
+import { AirdropScheduleViewDto } from "../domain/dto/airdropSheduleView.dto";
+import { AirdropScheduleUpdateDto } from "../domain/dto/airdropScheduleUpdate.dto";
+import { SocialAirdropScheduleEntity } from "../domain/entity/socialAirdropSchedule.entity";
+
 
 @ApiBearerAuth()
-@ApiTags('/api/profiles/socials')
-@Controller('/api/profiles/socials')
-export class SocialProfileController {
+@ApiTags('/api/airdrops/socials/schedules')
+@Controller('/api/airdrops/socials/schedules')
+export class AirdropScheduleController {
 
-  private readonly _logger = new Logger(SocialProfileController.name);
-  constructor(private readonly _socialProfileService: SocialProfileService) {}
+  private readonly _logger = new Logger(AirdropScheduleController.name);
+  constructor(private readonly _airdropScheduleService: AirdropScheduleService) {}
 
   @Post('create')
   @UsePipes(new ValidationPipe({
@@ -42,22 +43,23 @@ export class SocialProfileController {
     validationError: { target: false }
   }))
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
     description: 'Record Created Successfully.',
-    type: SocialProfileViewDto
+    type: AirdropScheduleViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  socialProfileCreate(@Req() req, @Body() socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileViewDto> {
-    return RxJS.from(this._socialProfileService.create(req.user, socialProfileDto)).pipe(
-      RxJS.map(entity => SocialProfileViewDto.from(entity)),
+  airdropScheduleCreate(@Body() airdropScheduleDto: AirdropScheduleCreateDto): RxJS.Observable<AirdropScheduleViewDto> {
+    return RxJS.from(this._airdropScheduleService.create(airdropScheduleDto)).pipe(
+      RxJS.map(entity => AirdropScheduleViewDto.from(entity)),
       RxJS.tap({
-        error: err => this._logger.error(`socialProfileCreate failed, dto: ${JSON.stringify(socialProfileDto)}`, err)
+        error: err => this._logger.error(`airdropScheduleCreate failed, dto: ${JSON.stringify(airdropScheduleDto)}`, err)
       }),
       RxJS.catchError(error =>
         RxJS.merge(
@@ -93,18 +95,19 @@ export class SocialProfileController {
   @ApiResponse({
     status: 200,
     description: 'Record Updated Successfully.',
-    type: SocialProfileViewDto
+    type: AirdropScheduleViewDto
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  socialProfileUpdate(@Req() req, @Body() socialProfileDto: SocialProfileUpdateDto): RxJS.Observable<SocialProfileViewDto> {
-    return RxJS.from(this._socialProfileService.update(socialProfileDto, req.user)).pipe(
-      RxJS.map(entity => SocialProfileViewDto.from(entity)),
+  airdropScheduleUpdate(@Body() airdropScheduleDto: AirdropScheduleUpdateDto): RxJS.Observable<AirdropScheduleViewDto> {
+
+    return RxJS.from(this._airdropScheduleService.update(airdropScheduleDto)).pipe(
+      RxJS.map(entity => AirdropScheduleViewDto.from(entity)),
       RxJS.tap({
-        error: err => this._logger.error(`socialProfileUpdate failed, dto: ${JSON.stringify(socialProfileDto)}, user id: ${req.user.id}`, err)
+        error: err => this._logger.error(`airdropScheduleUpdate failed, dto: ${JSON.stringify(airdropScheduleDto)}`, err)
       }),
       RxJS.catchError(error =>
         RxJS.merge(
@@ -146,16 +149,10 @@ export class SocialProfileController {
     schema: { type: 'number' },
   })
   @ApiQuery({
-    name: 'sortType',
-    required: false,
-    description: `data sort type can be one of ${Object.keys(SortType)}`,
-    schema: { enum: Object.keys(SortType) },
-  })
-  @ApiQuery({
     name: 'sortBy',
     required: false,
-    description: `data sort field can be one of ${Object.keys(SocialProfileSortBy)}`,
-    schema: { enum: Object.keys(SocialProfileSortBy) },
+    description: `data sort field can be one of ${Object.keys(AirdropScheduleSortBy)}`,
+    schema: { enum: Object.keys(AirdropScheduleSortBy) },
   })
   @ApiQuery({
     name: 'sortType',
@@ -163,48 +160,41 @@ export class SocialProfileController {
     description: `data sort type can be one of ${Object.keys(SortType)}`,
     schema: { enum: Object.keys(SortType) },
   })
-  @ApiQuery({
-    name: 'filterBy',
-    required: false,
-    description: `filter by ${Object.keys(SocialType)} `,
-    schema: { enum: Object.keys(SocialType) },
-  })
-  @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto })
+  @ApiResponse({ status: 200, description: 'Record Found.', type: FindAllViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  socialProfileFindAll(
+  airdropScheduleFindAll(
     @Query('page', new PaginationPipe()) page: number,
     @Query('offset', new PaginationPipe()) offset: number,
     @Query('sortType', new EnumPipe(SortType)) sortType: SortType,
-    @Query('sortBy', new EnumPipe(SocialProfileSortBy)) sortBy: SocialProfileSortBy,
-    @Query('filterBy', new EnumPipe(SocialType)) filterBy: SocialType,
-  ): RxJS.Observable<FindAllViewDto> {
-    return RxJS.from(this._socialProfileService.findAll(
+    @Query('sortBy', new EnumPipe(AirdropScheduleSortBy)) sortBy: AirdropScheduleSortBy,
+  ): RxJS.Observable<FindAllViewDto<AirdropScheduleViewDto>> {
+    return RxJS.from(this._airdropScheduleService.findAll(
       (page - 1) * offset,
       offset,
-      sortType ? sortType : SortType.DESC,
-      sortBy ? sortBy : SocialProfileSortBy.TIMESTAMP,
-      filterBy)).pipe(
-      RxJS.mergeMap((result: FindAllType<SocialProfileEntity>) =>
+      sortType ? sortType : SortType.ASC,
+      sortBy ? sortBy : AirdropScheduleSortBy.TIMESTAMP
+    )).pipe(
+      RxJS.mergeMap((result: FindAllType<SocialAirdropScheduleEntity>) =>
         RxJS.merge(
           RxJS.of(result).pipe(
             RxJS.filter((findAllResult) => findAllResult.total === 0),
             RxJS.mergeMap(_ => RxJS.throwError(() => new HttpException({
                 statusCode: '404',
-                message: 'SocialProfile Not Found',
+                message: 'Social Airdrop Schedule Not Found',
                 error: 'Not Found'
               }, HttpStatus.NOT_FOUND))
             )
           ),
           RxJS.of(result).pipe(
-            RxJS.filter((findAllResult) => findAllResult.total > 0),
+            RxJS.filter((findAllResult) => findAllResult.total >= 0),
             RxJS.map(findAllResult =>
               FindAllViewDto.from(page, offset, findAllResult.total,
-                Math.ceil(findAllResult.total / offset), findAllResult.data) as FindAllViewDto,
+                Math.ceil(findAllResult.total / offset), findAllResult.data) as FindAllViewDto<AirdropScheduleViewDto> ,
             ),
             RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
               {
@@ -217,53 +207,7 @@ export class SocialProfileController {
         )
       ),
       RxJS.tap({
-        error: err => this._logger.error(`socialProfileFindAll failed, filterBy: ${filterBy}`, err)
-      }),
-      RxJS.catchError(error =>
-        RxJS.merge(
-          RxJS.of(error).pipe(
-            RxJS.filter(err => err instanceof HttpException),
-            RxJS.mergeMap(err => RxJS.throwError(err)),
-          ),
-          RxJS.of(error).pipe(
-            RxJS.filter(err => !(err instanceof HttpException)),
-            RxJS.mergeMap(err =>
-              RxJS.throwError(() => new HttpException(
-                {
-                  statusCode: '500',
-                  message: 'Something Went Wrong',
-                  error: 'Internal Server Error'
-                }, HttpStatus.INTERNAL_SERVER_ERROR)
-              )
-            )
-          )
-        )
-      ),
-    )
-  }
-
-  @Get('/find')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Record Found.', type: SocialProfileViewDto })
-  @ApiResponse({ status: 400, description: 'Bad Request.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 404, description: 'Record Not Found.' })
-  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  socialProfileFindByUserId(@Req() req): RxJS.Observable<SocialProfileViewDto[]> {
-    return RxJS.from(this._socialProfileService.find({
-      where: { user: { id: req.user.id } }
-    })).pipe(
-      RxJS.concatMap(entities =>
-        RxJS.from(entities).pipe(
-          RxJS.map(entity => SocialProfileViewDto.from(entity)),
-          RxJS.reduce( (acc,dto) => [...acc, dto], [])
-        )
-      ),
-      RxJS.tap({
-        error: err => this._logger.error(`socialProfileFindByUserId failed, user: ${req.user.id}`, err)
+        error: err => this._logger.error(`socialLivelyFindAll failed, sortBy: ${sortBy}`, err)
       }),
       RxJS.catchError(error =>
         RxJS.merge(
@@ -290,44 +234,26 @@ export class SocialProfileController {
 
   @Get('/find/id/:uuid')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
   @ApiParam({
     name: 'uuid',
     required: true,
-    description: 'find by social profile Id',
-    schema: { type: 'string' },
+    description: `find social airdrop schedule by id `,
+    schema: { type: 'uuid' },
   })
-  @ApiResponse({ status: 200, description: 'Record Found.', type: SocialProfileViewDto })
+  @ApiResponse({ status: 200, description: 'Record Found.', type: AirdropScheduleViewDto})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Record Not Found.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  socialProfileFindById(@Req() req, @Param('uuid', new ParseUUIDPipe()) uuid): RxJS.Observable<SocialProfileViewDto> {
-    return RxJS.from(this._socialProfileService.findById(uuid)).pipe(
-      RxJS.mergeMap(socialFind =>
-        RxJS.merge(
-          RxJS.of(socialFind).pipe(
-            RxJS.filter(socialProfile => socialProfile.user.id === req.user.id),
-            RxJS.map(socialProfile => SocialProfileViewDto.from(socialProfile)),
-          ),
-          RxJS.of(socialFind).pipe(
-            RxJS.filter(socialProfile => socialProfile.user.id !== req.user.id),
-            RxJS.mergeMap(_ =>
-              RxJS.throwError(() => new HttpException(
-                {
-                  statusCode: '403',
-                  message: 'Update Forbidden',
-                  error: 'FORBIDDEN'
-                }, HttpStatus.FORBIDDEN)
-              )
-            )
-          )
-        )
-      ),
+  airdropScheduleFindById(@Param('uuid', new ParseUUIDPipe()) uuid): RxJS.Observable<AirdropScheduleViewDto> {
+    return RxJS.from(this._airdropScheduleService.findById(uuid)).pipe(
+      RxJS.map(entity => AirdropScheduleViewDto.from(entity)),
       RxJS.tap({
-        error: err => this._logger.error(`socialProfileFindById failed, id: ${uuid}`, err)
+        error: err => this._logger.error(`airdropScheduleFindById failed, id: ${uuid}`, err)
       }),
       RxJS.catchError(error =>
         RxJS.merge(
@@ -348,7 +274,7 @@ export class SocialProfileController {
             )
           )
         )
-      )
+      ),
     )
   }
 
@@ -356,17 +282,17 @@ export class SocialProfileController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Record Found.' })
+  @ApiResponse({ status: 200, description: 'Record Found.'})
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
-  socialProfileFindTotalCount(): RxJS.Observable<object> {
-    return this._socialProfileService.findTotal().pipe(
+  airdropScheduleFindTotalCount(): RxJS.Observable<object> {
+    return this._airdropScheduleService.findTotal().pipe(
       RxJS.map(total => ({total})),
       RxJS.tap({
-        error: err => this._logger.error(`socialProfileFindTotalCount failed`, err)
+        error: err => this._logger.error(`airdropScheduleFindTotalCount failed`, err)
       }),
       RxJS.catchError(error =>
         RxJS.merge(
@@ -387,7 +313,7 @@ export class SocialProfileController {
             )
           )
         )
-      )
+      ),
     )
   }
 }

@@ -1,6 +1,36 @@
-import { IsDate, IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import {
+  IsDate,
+  IsDefined,
+  IsEnum,
+  IsNotEmpty,
+  IsNotEmptyObject,
+  IsOptional,
+  IsString,
+  ValidateNested
+} from "class-validator";
 import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
 import { ApiProperty } from "@nestjs/swagger";
+import { Transform, Type } from "class-transformer";
+
+export class AirdropHashtagsCreateDto {
+  @IsNotEmpty({ message: 'Airdrop must not empty' })
+  @IsDefined({ message: 'Airdrop must be defined' })
+  @IsString({ message: 'Airdrop must be string' })
+  @ApiProperty()
+  airdrop: string
+
+  @IsNotEmpty({ message: 'Join must not empty' })
+  @IsString({ message: 'Join must be string' })
+  @IsOptional()
+  @ApiProperty()
+  join: string
+
+  @IsNotEmpty({ message: 'Comment must not empty' })
+  @IsString({ message: 'Comment must be string' })
+  @IsOptional()
+  @ApiProperty()
+  comment: string
+}
 
 export class AirdropScheduleCreateDto {
   @IsNotEmpty({ message: 'SocialType must not empty' })
@@ -22,29 +52,23 @@ export class AirdropScheduleCreateDto {
   @ApiProperty()
   description: string
 
-  @IsDate({ message: 'AirdropStartAt must not empty' })
+  @IsDate({ message: 'AirdropStartAt must be valid date' })
+  @Transform( ({ value }) => new Date(value))
   @IsDefined({ message: 'AirdropStartAt must be defined' })
   @ApiProperty()
   airdropStartAt: Date
 
-  @IsDate({ message: 'AirdropEndAt must not empty' })
+  @IsDate({ message: 'AirdropEndAt must be valid date' })
+  @Transform( ({ value }) => new Date(value))
   @IsDefined({ message: 'AirdropEndAt must be defined' })
   @ApiProperty()
   airdropEndAt: Date
 
-  hashTags: AirdropHashTagsCreateDto
+  @IsDefined({ message: 'Hashtags must be defined' })
+  @IsNotEmptyObject()
+  @ValidateNested({ each: true })
+  @Type(() => AirdropHashtagsCreateDto)
+  @ApiProperty()
+  hashtags: AirdropHashtagsCreateDto;
 }
 
-export class AirdropHashTagsCreateDto {
-  @IsNotEmpty({ message: 'AirdropTag must not empty' })
-  @IsDefined({ message: 'AirdropTag must be defined' })
-  @IsString({ message: 'AirdropTag must be string' })
-  @ApiProperty()
-  airdropTag: string
-
-  @IsNotEmpty({ message: 'JoinTag must not empty' })
-  @IsString({ message: 'JoinTag must be string' })
-  @IsOptional()
-  @ApiProperty()
-  joinTag: string
-}

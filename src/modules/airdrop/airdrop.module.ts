@@ -13,18 +13,15 @@ import { SocialAirdropRuleEntity } from "./domain/entity/socialAirdropRule.entit
 import { BlockchainModule } from "../blockchain/blockchain.module";
 import { TwitterFollowerJob } from "./domain/jobs/twitter/followerTracker.job";
 import { TweetTrackerJob } from "./domain/jobs/twitter/tweetTracker.job";
-// import { SocialFollowerEntity } from "./domain/entity/socialFollower.entity";
 import { SocialAirdropJob } from "./domain/jobs/socialAirdrop.job";
 import { AirdropRuleService } from "./services/airdropRule.service";
 import { AirdropRuleController } from "./controllers/airdropRule.controller";
 import { AirdropService } from "./services/airdrop.service";
-// import { FollowerService } from "./services/follower.service";
 import { AirdropController } from "./controllers/airdrop.controller";
-// import { FollowerController } from "./controllers/follower.controller";
 import { PostTrackerJob } from "./domain/jobs/instagram/postTracker.job";
 import { SocialAirdropScheduleEntity } from "./domain/entity/socialAirdropSchedule.entity";
-
-
+import { AirdropScheduleController } from "./controllers/airdropSchedule.controller";
+import { AirdropScheduleService } from "./services/airdropSchedule.service";
 
 @Module({
   imports: [
@@ -35,7 +32,6 @@ import { SocialAirdropScheduleEntity } from "./domain/entity/socialAirdropSchedu
     TypeOrmModule.forFeature([
       SocialLivelyEntity,
       SocialEventEntity,
-      // SocialFollowerEntity,
       SocialTrackerEntity,
       SocialAirdropEntity,
       SocialAirdropRuleEntity,
@@ -46,15 +42,15 @@ import { SocialAirdropScheduleEntity } from "./domain/entity/socialAirdropSchedu
     SocialLivelyController,
     AirdropRuleController,
     AirdropController,
-    // FollowerController
+    AirdropScheduleController
   ],
   providers: [
     SocialLivelyService,
     AirdropRuleService,
     AirdropService,
-    // FollowerService,
+    AirdropScheduleService
     // TwitterFollowerJob,
-    TweetTrackerJob,
+    // TweetTrackerJob,
     // SocialAirdropJob
     // PostTrackerJob
   ]

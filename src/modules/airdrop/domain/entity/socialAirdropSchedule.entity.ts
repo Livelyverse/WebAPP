@@ -3,17 +3,23 @@ import { BaseEntity } from "../../../profile/domain/entity";
 import { SocialType } from "../../../profile/domain/entity/socialProfile.entity";
 import { SocialLivelyEntity } from "./socialLively.entity";
 
+export class AirdropHashtagsValueObject {
+  public airdrop: string;
+  public join?: string;
+  public comment?: string;
+}
+
 @Entity({ name: 'social_airdrop_schedule' })
 export class SocialAirdropScheduleEntity extends BaseEntity {
 
-  @Column({ type: 'varchar', length: 128, unique: false, nullable: true })
+  @Column({ type: 'varchar', length: 128, unique: false, nullable: false })
   airdropName: string
 
   @Column({ type: 'varchar', length: 1024, unique: false, nullable: true })
   description: string
 
-  @Column({ type: 'jsonb', unique: false, nullable: true })
-  hashTags = new AirdropHashTagsValueObject()
+  @Column({ type: 'jsonb', unique: false, nullable: false })
+  hashtags: AirdropHashtagsValueObject;
 
   @Column({ type: 'timestamptz', nullable: false })
   airdropStartAt: Date
@@ -31,9 +37,4 @@ export class SocialAirdropScheduleEntity extends BaseEntity {
   })
   @JoinColumn({name:"socialLivelyId"})
   socialLively: SocialLivelyEntity
-}
-
-export class AirdropHashTagsValueObject {
-  public airdrop: string;
-  public join: string;
 }
