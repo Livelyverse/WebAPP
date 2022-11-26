@@ -365,7 +365,7 @@ export class InstagramFollowerJob {
                 !axiosResponse?.data?.data?.end_cursor
               ),
               RxJS.tap({
-                next: response => this._logger.warn('_fetchPostComments call api failed,' +
+                next: response => this._logger.debug('_fetchPostComments call api complete,' +
                   `data.success: ${response?.data?.success}`)
               }),
               RxJS.mergeMap(_ => RxJS.EMPTY)

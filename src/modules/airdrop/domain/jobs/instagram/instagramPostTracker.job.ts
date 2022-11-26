@@ -345,100 +345,116 @@ export class InstagramPostTrackerJob {
             ))
           ).pipe(
             RxJS.tap({
-              next: (data:any) => this._logger.debug(`pipe(3-0): instagram httpClient post Likes count: ${data.postLikes?.has_next_page?.data?.length}`),
+              next: (data) => this._logger.debug(`pipe(3-0): instagram httpClient post Likes count: ${data.postLikes?.has_next_page?.data?.length}`),
             }),
-            RxJS.filter(data => !!data?.postLikes?.has_next_page?.data && data?.postLikes?.has_next_page?.data.length > 0),
-            RxJS.concatMap((data:any) =>
-              RxJS.from(data.postLikes.has_next_page.data).pipe(
-                RxJS.concatMap((nodeIndo: any) =>
-                  RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity, "socialProfile")
-                    .select('"socialProfile"."id" as "profileId", "socialProfile"."username" as "profileUsername"')
-                    .addSelect('"sub"."tid" as "trackerId"')
-                    .addSelect('"sub"."eid" as "eventId"')
-                    .addSelect('"users"."email"')
-                    .innerJoin("user", "users", '"users"."id" = "socialProfile"."userId"')
-                    .leftJoin(qb =>
-                        qb.select('"profile"."id" as "pid", "tracker"."id" as "tid", "event"."id" as "eid"')
-                          .from(SocialProfileEntity, "profile")
-                          .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
-                          .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
-                          .where('"event"."contentId" = :contentId', {contentId: data.socialEvent.contentId})
-                          .andWhere('"tracker"."actionType" = \'LIKE\'')
-                          .andWhere('"profile"."username" = :username', {username: nodeIndo.node.username})
-                          .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
-                      "sub", '"sub"."pid" = "socialProfile"."id"')
-                    .where('"socialProfile"."username" = :username', {username: nodeIndo.node.username})
-                    .getRawOne()
-                  ).pipe(
-                    RxJS.tap( {
-                      error: (error) => this._logger.error(`pipe(3-0): find socialProfile and socialTracker failed, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}`, error),
-                    }),
-                    RxJS.mergeMap((queryResult) =>
-                      RxJS.merge(
-                        RxJS.of(queryResult).pipe(
-                          RxJS.filter((queryResult) => !queryResult),
+            RxJS.mergeMap(data =>
+              RxJS.merge(
+                RxJS.of(data).pipe(
+                  RxJS.filter(data => !!data?.postLikes?.has_next_page?.data && data?.postLikes?.has_next_page?.data?.length > 0),
+                  RxJS.concatMap((data:any) =>
+                    RxJS.from(data.postLikes.has_next_page.data).pipe(
+                      RxJS.concatMap((nodeIndo: any) =>
+                        RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity, "socialProfile")
+                          .select('"socialProfile"."id" as "profileId", "socialProfile"."username" as "profileUsername"')
+                          .addSelect('"sub"."tid" as "trackerId"')
+                          .addSelect('"sub"."eid" as "eventId"')
+                          .addSelect('"users"."email"')
+                          .innerJoin("user", "users", '"users"."id" = "socialProfile"."userId"')
+                          .leftJoin(qb =>
+                              qb.select('"profile"."id" as "pid", "tracker"."id" as "tid", "event"."id" as "eid"')
+                                .from(SocialProfileEntity, "profile")
+                                .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
+                                .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
+                                .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "event"."airdropScheduleId"')
+                                .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
+                                .where('"event"."contentId" = :contentId', {contentId: data.socialEvent.contentId})
+                                .andWhere('"tracker"."actionType" = \'LIKE\'')
+                                .andWhere('"profile"."username" = :username', {username: nodeIndo.node.username})
+                                .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
+                                .andWhere('"socialLively"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
+                            "sub", '"sub"."pid" = "socialProfile"."id"')
+                          .where('"socialProfile"."username" = :username', {username: nodeIndo.node.username})
+                          .andWhere('"socialProfile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
+                          .getRawOne()
+                        ).pipe(
                           RxJS.tap( {
-                            next: (_) => this._logger.debug(`pipe(3-0): socialProfile and socialTracker not found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, username: ${nodeIndo.node.username}`),
+                            error: (error) => this._logger.error(`pipe(3-0): find socialProfile and socialTracker failed, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}`, error),
                           }),
-                          RxJS.mergeMap((_) => RxJS.EMPTY)
-                        ),
-                        RxJS.of(queryResult).pipe(
-                          RxJS.filter((queryResult) => !!queryResult && queryResult.trackerId && queryResult.eventId),
-                          RxJS.tap( {
-                            next: (queryResult) => this._logger.debug(`pipe(3-0): socialTracker already exists, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, socialTracker.id: ${queryResult.trackerId}, socialProfile.username: ${queryResult.profileUsername}`),
+                          RxJS.mergeMap((queryResult) =>
+                            RxJS.merge(
+                              RxJS.of(queryResult).pipe(
+                                RxJS.filter((queryResult) => !queryResult),
+                                RxJS.tap( {
+                                  next: (_) => this._logger.debug(`pipe(3-0): socialProfile and socialTracker not found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, username: ${nodeIndo.node.username}`),
+                                }),
+                                RxJS.mergeMap((_) => RxJS.EMPTY)
+                              ),
+                              RxJS.of(queryResult).pipe(
+                                RxJS.filter((queryResult) => !!queryResult && queryResult.trackerId && queryResult.eventId),
+                                RxJS.tap( {
+                                  next: (queryResult) => this._logger.debug(`pipe(3-0): socialTracker already exists, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, socialTracker.id: ${queryResult.trackerId}, socialProfile.username: ${queryResult.profileUsername}`),
+                                }),
+                                RxJS.mergeMap((_) => RxJS.EMPTY)
+                              ),
+                              RxJS.of(queryResult).pipe(
+                                RxJS.filter((queryResult) => !!queryResult && !queryResult.eventId && queryResult.profileId),
+                                RxJS.tap( {
+                                  next: (queryResult) => this._logger.debug(`pipe(3-0): socialProfile found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, socialProfile.username: ${queryResult.profileUsername}`),
+                                }),
+                              )
+                            )
+                          ),
+                          RxJS.map((queryResult) => {
+                            const socialProfile = new SocialProfileEntity();
+                            socialProfile.id = queryResult.profileId;
+                            socialProfile.username = queryResult.profileUsername;
+
+                            const socialTracker = new SocialTrackerEntity();
+                            socialTracker.actionType = SocialActionType.LIKE;
+                            socialTracker.socialEvent = data.socialEvent;
+                            socialTracker.socialProfile = socialProfile;
+
+                            const socialLikeAirdrop = new SocialAirdropEntity();
+                            socialLikeAirdrop.airdropRule = data.airdropLikeRule;
+                            socialLikeAirdrop.socialTracker = socialTracker;
+
+                            return { socialTracker, socialLikeAirdrop, ...data};
                           }),
-                          RxJS.mergeMap((_) => RxJS.EMPTY)
-                        ),
-                        RxJS.of(queryResult).pipe(
-                          RxJS.filter((queryResult) => !!queryResult && !queryResult.eventId && queryResult.profileId),
-                          RxJS.tap( {
-                            next: (queryResult) => this._logger.debug(`pipe(3-0): socialProfile found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, socialProfile.username: ${queryResult.profileUsername}`),
+                          RxJS.concatMap((pipeResult) =>
+                            RxJS.from(
+                              this._entityManager.connection.transaction(async (manager) => {
+                                await manager.createQueryBuilder()
+                                  .insert()
+                                  .into(SocialTrackerEntity)
+                                  .values([pipeResult.socialTracker])
+                                  .execute()
+
+                                await manager.createQueryBuilder()
+                                  .insert()
+                                  .into(SocialAirdropEntity)
+                                  .values([pipeResult.socialLikeAirdrop])
+                                  .execute();
+                              })
+                            ).pipe(RxJS.tap({
+                                next: (_) => this._logger.log(`pipe(3-0): save socialTracker success, trackerId: ${pipeResult.socialTracker.id}, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`),
+                                error: (error) => this._logger.error(`pipe(3-0): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`, error),
+                              }),
+                            )
+                          ),
+                          RxJS.tap({
+                            error: err => this._logger.error(`pipe(3-0): fetch and persist instagram Likes failed`, err)
                           }),
+                          RxJS.catchError(error => RxJS.throwError(() => new TrackerError('fetch and persist instagram Likes failed', error)))
                         )
                       )
-                    ),
-                    RxJS.map((queryResult) => {
-                      const socialProfile = new SocialProfileEntity();
-                      socialProfile.id = queryResult.profileId;
-                      socialProfile.username = queryResult.profileUsername;
-
-                      const socialTracker = new SocialTrackerEntity();
-                      socialTracker.actionType = SocialActionType.LIKE;
-                      socialTracker.socialEvent = data.socialEvent;
-                      socialTracker.socialProfile = socialProfile;
-
-                      const socialLikeAirdrop = new SocialAirdropEntity();
-                      socialLikeAirdrop.airdropRule = data.airdropLikeRule;
-                      socialLikeAirdrop.socialTracker = socialTracker;
-
-                      return { socialTracker, socialLikeAirdrop, ...data};
-                    }),
-                    RxJS.concatMap((pipeResult) =>
-                      RxJS.from(
-                        this._entityManager.connection.transaction(async (manager) => {
-                          await manager.createQueryBuilder()
-                            .insert()
-                            .into(SocialTrackerEntity)
-                            .values([pipeResult.socialTracker])
-                            .execute()
-
-                          await manager.createQueryBuilder()
-                            .insert()
-                            .into(SocialAirdropEntity)
-                            .values([pipeResult.socialLikeAirdrop])
-                            .execute();
-                        })
-                      ).pipe(RxJS.tap({
-                          next: (_) => this._logger.log(`pipe(3-0): save socialTracker success, trackerId: ${pipeResult.socialTracker.id}, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`),
-                          error: (error) => this._logger.error(`pipe(3-0): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`, error),
-                        }),
-                      )
-                    ),
-                    RxJS.tap({
-                      error: err => this._logger.error(`pipe(3-0): fetch and persist instagram Likes failed`, err)
-                    }),
-                    RxJS.catchError(error => RxJS.throwError(() => new TrackerError('fetch and persist instagram Likes failed', error)))
-                  )
+                    )
+                  ),
+                ),
+                RxJS.of(data).pipe(
+                  RxJS.filter(data => !data?.postLikes?.has_next_page?.data || !data?.postLikes?.has_next_page?.data?.length),
+                  RxJS.tap({
+                    next: _ => this._logger.log(`pipe(3-0): instagram post likes not found, postId: ${data.socialEvent.contentId}`)
+                  })
                 )
               )
             ),
@@ -489,159 +505,176 @@ export class InstagramPostTrackerJob {
               )
             ),
             RxJS.finalize(() => this._logger.debug(`pipe(3-0): finalize instagram client post likes, postId: ${objInfo.socialEvent.contentId}`)),
+          ),
+          // fetch instagram post comments
+          RxJS.defer(() =>
+            RxJS.from(this._fetchPostComments((<InstagramPostDto>objInfo.socialEvent.content.data).shortcode).pipe(
+              RxJS.map(postComments => ({postComments, ...objInfo}))
+            ))
+          ).pipe(
+            RxJS.tap({
+              next: (data) => this._logger.debug(`pipe(4-0): instagram httpClient post comments count: ${data?.postComments?.data?.comments?.length}`),
+            }),
+            RxJS.mergeMap(data =>
+              RxJS.merge(
+                RxJS.of(data).pipe(
+                  RxJS.filter(data => !!data?.postComments?.data?.comments?.length && data.postComments.data.comments.length > 0),
+                  RxJS.concatMap((data) =>
+                    RxJS.from(data.postComments.data.comments).pipe(
+                      RxJS.filter((comment: any) => comment.text.match(objInfo.filterRegexes.commentRegex)),
+                      RxJS.concatMap((comment:any) =>
+                        RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity, "socialProfile")
+                          .select('"socialProfile"."id" as "profileId", "socialProfile"."username" as "profileUsername"')
+                          .addSelect('"sub"."tid" as "trackerId"')
+                          .addSelect('"sub"."eid" as "eventId"')
+                          .addSelect('"users"."email"')
+                          .innerJoin("user", "users", '"users"."id" = "socialProfile"."userId"')
+                          .leftJoin(qb =>
+                              qb.select('"profile"."id" as "pid", "tracker"."id" as "tid", "event"."id" as "eid"')
+                                .from(SocialProfileEntity, "profile")
+                                .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
+                                .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
+                                .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "event"."airdropScheduleId"')
+                                .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
+                                .where('"event"."contentId" = :contentId', {contentId: data.socialEvent.contentId})
+                                .andWhere('"tracker"."actionType" = \'COMMENT\'')
+                                .andWhere('"profile"."username" = :username', {username: comment.user.username})
+                                .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
+                                .andWhere('"socialLively"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
+                            "sub", '"sub"."pid" = "socialProfile"."id"')
+                          .where('"socialProfile"."username" = :username', {username: comment.user.username})
+                          .andWhere('"socialProfile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
+                          .getRawOne()
+                        ).pipe(
+                          RxJS.tap( {
+                            error: (error) => this._logger.error(`pipe(4-0): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}`, error),
+                          }),
+                          RxJS.mergeMap((queryResult) =>
+                            RxJS.merge(
+                              RxJS.of(queryResult).pipe(
+                                RxJS.filter((queryResult) => !queryResult ),
+                                RxJS.tap( {
+                                  next: (_) => this._logger.log(`pipe(4-0): socialProfile and socialTracker not found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, username: ${data.postComments.user.username}`),
+                                }),
+                                RxJS.mergeMap((_) => RxJS.EMPTY)
+                              ),
+                              RxJS.of(queryResult).pipe(
+                                RxJS.filter((queryResult) => !!queryResult && queryResult.trackerId && queryResult.eventId),
+                                RxJS.tap( {
+                                  next: (queryResult) => this._logger.log(`pipe(4-0): socialTracker already exists, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, socialTracker.id: ${queryResult.trackerId}, socialProfile.username: ${queryResult.profileUsername}`),
+                                }),
+                                RxJS.mergeMap((_) => RxJS.EMPTY)
+                              ),
+                              RxJS.of(queryResult).pipe(
+                                RxJS.filter((queryResult) => !!queryResult && !queryResult.eventId && queryResult.profileId),
+                                RxJS.tap( {
+                                  next: (queryResult) => this._logger.log(`pipe(4-0): socialProfile found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, socialProfile.username: ${queryResult.profileUsername}`),
+                                }),
+                              )
+                            )
+                          ),
+                          RxJS.map((queryResult) => {
+                            const socialProfile = new SocialProfileEntity();
+                            socialProfile.id = queryResult.profileId;
+                            socialProfile.username = queryResult.profileUsername;
+                            const socialTracker = new SocialTrackerEntity();
+                            socialTracker.actionType = SocialActionType.COMMENT;
+                            socialTracker.socialEvent = data.socialEvent;
+                            socialTracker.socialProfile = socialProfile;
+
+                            const socialCommentAirdrop = new SocialAirdropEntity();
+                            socialCommentAirdrop.airdropRule = data.airdropCommentRule;
+                            socialCommentAirdrop.socialTracker = socialTracker;
+
+                            return { socialTracker, socialCommentAirdrop: socialCommentAirdrop, ...data};
+                          }),
+                          RxJS.concatMap((pipeResult) =>
+                            RxJS.from(
+                              this._entityManager.connection.transaction(async (manager) => {
+                                await manager.createQueryBuilder()
+                                  .insert()
+                                  .into(SocialTrackerEntity)
+                                  .values([pipeResult.socialTracker])
+                                  .execute()
+
+                                await manager.createQueryBuilder()
+                                  .insert()
+                                  .into(SocialAirdropEntity)
+                                  .values([pipeResult.socialCommentAirdrop])
+                                  .execute();
+                              })
+                            ).pipe(
+                              RxJS.tap({
+                                next: (_) => this._logger.log(`pipe(4-0): save socialTracker success, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode},  action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`),
+                                error: (error) => this._logger.error(`pipe(4-0): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`, error),
+                              }),
+                            )
+                          ),
+                          RxJS.tap({
+                            error: (error) => this._logger.error(`pipe(4-0): fetch and persist instagram post comments failed`, error),
+                          }),
+                          RxJS.catchError(error => RxJS.throwError(() => new TrackerError('fetch and persist instagram post comments failed', error)))
+                        )
+                      )
+                    )
+                  ),
+                ),
+                RxJS.of(data).pipe(
+                  RxJS.filter(data => !data?.postComments?.data?.comments?.length || !data?.postComments?.data?.comments?.length),
+                  RxJS.tap({
+                    next: _ => this._logger.log(`pipe(4-0): instagram post comments not found, postId: ${data.socialEvent.contentId}`)
+                  })
+                )
+              )
             ),
-          // // fetch instagram post comments
-          // RxJS.defer(() =>
-          //   RxJS.from(this._fetchPostComments((<InstagramPostDto>objInfo.socialEvent.content.data).shortcode).pipe(
-          //     RxJS.map(postComments => ({postComments, ...objInfo}))
-          //   ))
-          // ).pipe(
-          //   RxJS.tap({
-          //     next: (data) => this._logger.debug(`pipe(4-0): instagram httpClient post comments count: ${data.postComments.data.comments.length}`),
-          //   }),
-          //   RxJS.concatMap((data) =>
-          //     RxJS.from(data.postComments.comments).pipe(
-          //       RxJS.filter((comment: any) => comment.text.match(objInfo.filterRegexes.commentRegex)),
-          //       RxJS.concatMap((comment:any) =>
-          //         RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity, "socialProfile")
-          //           .select('"socialProfile"."id" as "profileId", "socialProfile"."username" as "profileUsername"')
-          //           .addSelect('"sub"."tid" as "trackerId"')
-          //           .addSelect('"sub"."eid" as "eventId"')
-          //           .addSelect('"users"."email"')
-          //           .innerJoin("user", "users", '"users"."id" = "socialProfile"."userId"')
-          //           .leftJoin(qb =>
-          //               qb.select('"profile"."id" as "pid", "tracker"."id" as "tid", "event"."id" as "eid"')
-          //                 .from(SocialProfileEntity, "profile")
-          //                 .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
-          //                 .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
-          //                 .where('"event"."contentId" = :contentId', {contentId: data.socialEvent.contentId})
-          //                 .andWhere('"tracker"."actionType" = \'COMMENT\'')
-          //                 .andWhere('"profile"."username" = :username', {username: comment.user.username})
-          //                 .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
-          //             "sub", '"sub"."pid" = "socialProfile"."id"')
-          //           .where('"socialProfile"."username" = :username', {username: comment.user.username})
-          //           .getRawOne()
-          //         ).pipe(
-          //           RxJS.tap( {
-          //             error: (error) => this._logger.error(`pipe(4-0): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}`, error),
-          //           }),
-          //           RxJS.mergeMap((queryResult) =>
-          //             RxJS.merge(
-          //               RxJS.of(queryResult).pipe(
-          //                 RxJS.filter((queryResult) => !queryResult ),
-          //                 RxJS.tap( {
-          //                   next: (_) => this._logger.log(`pipe(4-0): socialProfile and socialTracker not found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, username: ${data.postComments.user.username}`),
-          //                 }),
-          //                 RxJS.mergeMap((_) => RxJS.EMPTY)
-          //               ),
-          //               RxJS.of(queryResult).pipe(
-          //                 RxJS.filter((queryResult) => !!queryResult && queryResult.trackerId && queryResult.eventId),
-          //                 RxJS.tap( {
-          //                   next: (queryResult) => this._logger.log(`pipe(4-0): socialTracker already exists, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, socialTracker.id: ${queryResult.trackerId}, socialProfile.username: ${queryResult.profileUsername}`),
-          //                 }),
-          //                 RxJS.mergeMap((_) => RxJS.EMPTY)
-          //               ),
-          //               RxJS.of(queryResult).pipe(
-          //                 RxJS.filter((queryResult) => !!queryResult && !queryResult.eventId && queryResult.profileId),
-          //                 RxJS.tap( {
-          //                   next: (queryResult) => this._logger.log(`pipe(4-0): socialProfile found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, socialProfile.username: ${queryResult.profileUsername}`),
-          //                 }),
-          //               )
-          //             )
-          //           ),
-          //           RxJS.map((queryResult) => {
-          //             const socialProfile = new SocialProfileEntity();
-          //             socialProfile.id = queryResult.profileId;
-          //             socialProfile.username = queryResult.profileUsername;
-          //             const socialTracker = new SocialTrackerEntity();
-          //             socialTracker.actionType = SocialActionType.RETWEET;
-          //             socialTracker.socialEvent = data.socialEvent;
-          //             socialTracker.socialProfile = socialProfile;
-          //
-          //             const socialCommentAirdrop = new SocialAirdropEntity();
-          //             socialCommentAirdrop.airdropRule = data.airdropCommentRule;
-          //             socialCommentAirdrop.socialTracker = socialTracker;
-          //
-          //             return { socialTracker, socialCommentAirdrop: socialCommentAirdrop, ...data};
-          //           }),
-          //           RxJS.concatMap((pipeResult) =>
-          //             RxJS.from(
-          //               this._entityManager.connection.transaction(async (manager) => {
-          //                 await manager.createQueryBuilder()
-          //                   .insert()
-          //                   .into(SocialTrackerEntity)
-          //                   .values([pipeResult.socialTracker])
-          //                   .execute()
-          //
-          //                 await manager.createQueryBuilder()
-          //                   .insert()
-          //                   .into(SocialAirdropEntity)
-          //                   .values([pipeResult.socialCommentAirdrop])
-          //                   .execute();
-          //               })
-          //             ).pipe(
-          //               RxJS.tap({
-          //                 next: (_) => this._logger.log(`pipe(4-0): save socialTracker success, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode},  action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`),
-          //                 error: (error) => this._logger.error(`pipe(4-0): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`, error),
-          //               }),
-          //             )
-          //           ),
-          //           RxJS.tap({
-          //             error: (error) => this._logger.error(`pipe(4-0): fetch and persist instagram post comments failed`, error),
-          //           }),
-          //           RxJS.catchError(error => RxJS.throwError(() => new TrackerError('fetch and persist instagram post comments failed', error)))
-          //         )
-          //       )
-          //     )
-          //   ),
-          //   RxJS.retry({
-          //     count:3,
-          //     delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
-          //       RxJS.mergeMap(([error, retryCount]) =>
-          //         RxJS.merge(
-          //           RxJS.of([error, retryCount]).pipe(
-          //             RxJS.filter(([err,count]) => err instanceof AxiosError &&
-          //               (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
-          //               count <= 3
-          //             ),
-          //             RxJS.tap({
-          //               error: err => this._logger.warn(`pipe(4-0): httpClient get instagram post comments failed, message: ${err.message}, code: ${err.code}`)
-          //             }),
-          //             RxJS.delay(60000)
-          //           ),
-          //           RxJS.of([error, retryCount]).pipe(
-          //             RxJS.filter(([err,count]) => err instanceof AxiosError &&
-          //               (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
-          //               count > 3
-          //             ),
-          //             RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('fetch instagram post comments failed', err))),
-          //           ),
-          //           RxJS.of([error, retryCount]).pipe(
-          //              RxJS.filter(([err,_]) => err instanceof Error),
-          //              RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('fetch instagram post comments failed', err))),
-          //           ),
-          //         )
-          //       ),
-          //       RxJS.tap(([_, retryCount]) => this._logger.warn(`get lively instagram post likes failed, retry ${retryCount} . . . `))
-          //     )
-          //   }),
-          //   RxJS.tap({
-          //     error: (error) => this._logger.error(`pipe(4-0): fetch instagram posts comments failed, postId: ${objInfo.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}`, error)
-          //   }),
-          //   RxJS.catchError((error) =>
-          //     RxJS.merge(
-          //       RxJS.of(error).pipe(
-          //         RxJS.filter(err => err instanceof TrackerError || err instanceof AxiosError),
-          //         RxJS.mergeMap(err => RxJS.throwError(err))
-          //       ),
-          //       RxJS.of(error).pipe(
-          //         RxJS.filter(err => !(err instanceof TrackerError && err instanceof AxiosError)),
-          //         RxJS.mergeMap(err => RxJS.throwError(() => new TrackerError('instagram fetch post comments failed', err)))
-          //       )
-          //     )
-          //   ),
-          //   RxJS.finalize(() => this._logger.debug(`pipe(4-0): finalize instagram client post comments, postId: ${objInfo.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}`)),
-          // )
+            RxJS.retry({
+              count:3,
+              delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
+                RxJS.mergeMap(([error, retryCount]) =>
+                  RxJS.merge(
+                    RxJS.of([error, retryCount]).pipe(
+                      RxJS.filter(([err,count]) => err instanceof AxiosError &&
+                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                        count <= 3
+                      ),
+                      RxJS.tap({
+                        error: err => this._logger.warn(`pipe(4-0): httpClient get instagram post comments failed, message: ${err.message}, code: ${err.code}`)
+                      }),
+                      RxJS.delay(60000)
+                    ),
+                    RxJS.of([error, retryCount]).pipe(
+                      RxJS.filter(([err,count]) => err instanceof AxiosError &&
+                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                        count > 3
+                      ),
+                      RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('fetch instagram post comments failed', err))),
+                    ),
+                    RxJS.of([error, retryCount]).pipe(
+                       RxJS.filter(([err,_]) => err instanceof Error),
+                       RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('fetch instagram post comments failed', err))),
+                    ),
+                  )
+                ),
+                RxJS.tap(([_, retryCount]) => this._logger.warn(`get lively instagram post likes failed, retry ${retryCount} . . . `))
+              )
+            }),
+            RxJS.tap({
+              error: (error) => this._logger.error(`pipe(4-0): fetch instagram posts comments failed, postId: ${objInfo.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}`, error)
+            }),
+            RxJS.catchError((error) =>
+              RxJS.merge(
+                RxJS.of(error).pipe(
+                  RxJS.filter(err => err instanceof TrackerError || err instanceof AxiosError),
+                  RxJS.mergeMap(err => RxJS.throwError(err))
+                ),
+                RxJS.of(error).pipe(
+                  RxJS.filter(err => !(err instanceof TrackerError && err instanceof AxiosError)),
+                  RxJS.mergeMap(err => RxJS.throwError(() => new TrackerError('instagram fetch post comments failed', err)))
+                )
+              )
+            ),
+            RxJS.finalize(() => this._logger.debug(`pipe(4-0): finalize instagram client post comments, postId: ${objInfo.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}`)),
+          )
         )
       )
     ).subscribe({
@@ -688,7 +721,7 @@ export class InstagramPostTrackerJob {
               !axiosResponse?.data?.data?.end_cursor
             ),
             RxJS.tap({
-              next: response => this._logger.warn('_fetchLivelyPosts call api failed,' +
+              next: response => this._logger.debug('_fetchLivelyPosts call api complete,' +
                 `data.success: ${response?.data?.success}, hasNextPage: ${response?.data?.data?.has_next_page} `)
             }),
             RxJS.mergeMap(_ => RxJS.EMPTY)
@@ -732,7 +765,7 @@ export class InstagramPostTrackerJob {
                 !axiosResponse?.data?.data?.end_cursor
               ),
               RxJS.tap({
-                next: response => this._logger.warn('_fetchPostLikes call api failed,' +
+                next: response => this._logger.debug('_fetchPostLikes call api complete,' +
                   `data.success: ${response?.data?.success}, hasNextPage: ${response?.data?.data?.has_next_page} `)
               }),
               RxJS.mergeMap(_ => RxJS.EMPTY)
@@ -776,7 +809,7 @@ export class InstagramPostTrackerJob {
                 !axiosResponse?.data?.data?.end_cursor
               ),
               RxJS.tap({
-                next: response => this._logger.warn('_fetchPostComments call api failed,' +
+                next: response => this._logger.debug('_fetchPostComments call api complete,' +
                   `data.success: ${response?.data?.success}, headLoadComments: ${response?.data?.data?.has_more_headload_comments} `)
               }),
               RxJS.mergeMap(_ => RxJS.EMPTY)

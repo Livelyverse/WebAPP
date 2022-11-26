@@ -56,9 +56,9 @@ import { InstagramFollowerJob } from "./domain/jobs/instagram/instagramFollower.
     AirdropRuleService,
     AirdropService,
     AirdropScheduleService,
-    // TwitterFollowerJob,
-    // TweetTrackerJob,
-    // SocialAirdropJob,
+    TwitterFollowerJob,
+    TweetTrackerJob,
+    SocialAirdropJob,
     InstagramPostTrackerJob,
     InstagramFollowerJob
   ]

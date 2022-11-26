@@ -590,12 +590,16 @@ export class TweetTrackerJob {
                                     .from(SocialProfileEntity, "profile")
                                     .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
                                     .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
+                                    .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "event"."airdropScheduleId"')
+                                    .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
                                     .where('"event"."contentId" = :contentId', {contentId: data.socialEvent.contentId})
                                     .andWhere('"tracker"."actionType" = \'LIKE\'')
                                     .andWhere('"profile"."username" = :username', {username: tweetLiked.username})
-                                    .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
+                                    .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
+                                    .andWhere('"socialLively"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
                                   "sub", '"sub"."pid" = "socialProfile"."id"')
                                 .where('"socialProfile"."username" = :username', {username: tweetLiked.username})
+                                .andWhere('"socialProfile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
                                 .getRawOne()
                             ).pipe(
                               RxJS.tap( {
@@ -774,12 +778,16 @@ export class TweetTrackerJob {
                                     .from(SocialProfileEntity, "profile")
                                     .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
                                     .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
+                                    .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "event"."airdropScheduleId"')
+                                    .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
                                     .where('"event"."contentId" = :contentId', {contentId: data.socialEvent.contentId})
                                     .andWhere('"tracker"."actionType" = \'RETWEET\'')
                                     .andWhere('"profile"."username" = :username', {username: tweetRetweet.username})
-                                    .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
+                                    .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
+                                    .andWhere('"socialLively"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
                                 "sub", '"sub"."pid" = "socialProfile"."id"')
                               .where('"socialProfile"."username" = :username', {username: tweetRetweet.username})
+                              .andWhere('"socialProfile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
                               .getRawOne()
                             ).pipe(
                               RxJS.tap( {
