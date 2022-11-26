@@ -292,6 +292,8 @@ export class AirdropController {
     )
   }
 
+
+  // TODO refactor it
   @Get('/find/all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
@@ -414,7 +416,13 @@ export class AirdropController {
           RxJS.of(filter).pipe(
             RxJS.filter(filterVal => Object.hasOwn(SocialType, filterVal)),
             RxJS.mergeMap(filterVal => this._airdropService.findAll(
-              (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, filterVal as SocialType)),
+              (page - 1) * offset,
+              offset,
+              sortType ? sortType : SortType.ASC,
+              sortBy ? sortBy : AirdropSortBy.TIMESTAMP,
+              isSettlement,
+              filterBy,
+              filterVal as SocialType)),
             RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
               RxJS.merge(
                 RxJS.of(result).pipe(
@@ -454,7 +462,13 @@ export class AirdropController {
             RxJS.of(filter).pipe(
               RxJS.filter(filterVal => Object.hasOwn(SocialActionType, filterVal)),
               RxJS.mergeMap(filterVal => this._airdropService.findAll(
-                (page - 1) * offset, offset, sortType, sortBy, isSettlement, filterBy, filterVal as SocialActionType)),
+                (page - 1) * offset,
+                offset,
+                sortType ? sortType : SortType.ASC,
+                sortBy ? sortBy : AirdropSortBy.TIMESTAMP,
+                isSettlement,
+                filterBy,
+                filterVal as SocialActionType)),
               RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
                 RxJS.merge(
                   RxJS.of(result).pipe(
@@ -488,9 +502,15 @@ export class AirdropController {
         )
       ),
       RxJS.of(filterBy).pipe(
-        RxJS.filter(filterType => !!!filterType),
+        RxJS.filter(filterType => !filterType),
         RxJS.mergeMap(_ => this._airdropService.findAll(
-          (page - 1) * offset, offset, sortType, sortBy,  isSettlement,null, null)),
+          (page - 1) * offset,
+          offset,
+          sortType ? sortType : SortType.ASC,
+          sortBy ? sortBy : AirdropSortBy.TIMESTAMP,
+          isSettlement,
+          null,
+          null)),
         RxJS.mergeMap((result: FindAllType<SocialAirdropEntity>) =>
           RxJS.merge(
             RxJS.of(result).pipe(
@@ -539,6 +559,7 @@ export class AirdropController {
     )
   }
 
+  // TODO refactor it
   @Get('/find/balance/all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))

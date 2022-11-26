@@ -1,4 +1,5 @@
 import { TweetEventDto } from "./tweetEvent.dto";
+import { InstagramPostDto } from "./instagramPost.dto";
 
 export class ContentDto {
   public data?: any
@@ -6,7 +7,7 @@ export class ContentDto {
   public meta?: any
   public url?: string
 
-  public static from(dto: TweetEventDto): ContentDto {
+  public static from(dto: TweetEventDto | InstagramPostDto): ContentDto {
     const contentDto = new ContentDto();
     contentDto.data = dto;
     return contentDto;

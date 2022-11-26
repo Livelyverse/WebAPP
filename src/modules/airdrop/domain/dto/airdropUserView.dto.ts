@@ -33,8 +33,8 @@ export class AirdropUserViewDto {
       airdropDto.eventContentUrl = entity.contentUrl ? entity.contentUrl : null;
       airdropDto.socialProfileUrl = entity.socialProfileUrl;
       airdropDto.eventPublishedAt = entity.eventPublishedAt;
-      airdropDto.trackingStartedAt = entity.trackingStartedAt;
-      airdropDto.trackingEndAt = entity.trackingEndAt;
+      airdropDto.airdropStartAt = entity.airdropStartAt;
+      airdropDto.airdropEndAt = entity.airdropEndAt;
       airdropDto.eventStatus = entity.eventStatus;
       return airdropDto;
     }
@@ -94,10 +94,10 @@ export class AirdropUserViewDto {
   eventPublishedAt: Date;
 
   @ApiResponseProperty()
-  trackingStartedAt: Date;
+  airdropStartAt: Date;
 
   @ApiResponseProperty()
-  trackingEndAt: Date;
+  airdropEndAt: Date;
 
   @ApiResponseProperty()
   eventStatus: AirdropEventStatus;

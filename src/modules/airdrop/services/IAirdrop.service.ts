@@ -1,6 +1,7 @@
 import { BaseEntity } from "../../profile/domain/entity";
 import * as RxJS from "rxjs";
-import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
+import { FindManyOptions } from "typeorm/find-options/FindManyOptions";
+import { FindOneOptions } from "typeorm/find-options/FindOneOptions";
 
 export type FindAllType<T extends BaseEntity> = { data: Array<T>; total: number }
 
@@ -27,9 +28,9 @@ export interface IAirdropService<T extends BaseEntity> {
 
   findById(id: string): RxJS.Observable<T>;
 
-  find(option: FindOptionsWhere<T>): RxJS.Observable<T[]>;
+  find(option: FindManyOptions<T>): RxJS.Observable<T[]>;
 
-  findOne(option: FindOptionsWhere<T>): RxJS.Observable<T>;
+  findOne(option: FindOneOptions<T>): RxJS.Observable<T>;
 
   create(dto: object): RxJS.Observable<T>;
 

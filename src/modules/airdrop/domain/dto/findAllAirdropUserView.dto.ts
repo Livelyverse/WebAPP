@@ -1,13 +1,4 @@
 import { ApiResponseProperty } from "@nestjs/swagger";
-import { BaseEntity } from "../../../profile/domain/entity";
-import { SocialLivelyEntity } from "../entity/socialLively.entity";
-import { SocialLivelyViewDto } from "./socialLivelyView.dto";
-import { SocialAirdropEntity } from "../entity/socialAirdrop.entity";
-import { AirdropRuleViewDto } from "./airdropRuleView.dto";
-import { SocialAirdropRuleEntity } from "../entity/socialAirdropRule.entity";
-import { AirdropInfoViewDto } from "./airdropInfoView.dto";
-import { SocialFollowerEntity } from "../entity/socialFollower.entity";
-import { FollowerViewDto } from "./followerView.dto";
 import { SocialAirdropUserView } from "../../services/airdrop.service";
 import { AirdropUserViewDto } from "./airdropUserView.dto";
 

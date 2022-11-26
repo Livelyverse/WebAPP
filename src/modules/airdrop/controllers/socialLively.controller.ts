@@ -11,7 +11,7 @@ import {
   Post,
   Query,
   UseGuards,
-  UsePipes
+  UsePipes, ValidationPipe
 } from "@nestjs/common";
 import { SocialLivelyService, SocialLivelySortBy } from "../services/socialLively.service";
 import * as RxJS from "rxjs";
@@ -26,7 +26,6 @@ import { FindAllType, SortType } from "../services/IAirdrop.service";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SocialLivelyEntity } from "../domain/entity/socialLively.entity";
 import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
-import { ContextType, ValidationPipe } from "../domain/pipe/validationPipe";
 import { EnumPipe } from "../domain/pipe/enumPipe";
 
 
@@ -41,7 +40,6 @@ export class SocialLivelyController {
   @Post('create')
   @UsePipes(new ValidationPipe({
     transform: true,
-    validationContext: ContextType.CREATE,
     skipMissingProperties: true,
     validationError: { target: false }
   }))
@@ -90,7 +88,6 @@ export class SocialLivelyController {
   @Post('update')
   @UsePipes(new ValidationPipe({
     transform: true,
-    validationContext: ContextType.UPDATE,
     skipMissingProperties: true,
     validationError: { target: false }
   }))
@@ -300,7 +297,7 @@ export class SocialLivelyController {
   @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   socialLivelyFindBySocial(@Param('social', new EnumPipe(SocialType)) social): RxJS.Observable<SocialLivelyViewDto> {
-    return RxJS.from(this._socialLivelyService.findOne( { socialType: social } )).pipe(
+    return RxJS.from(this._socialLivelyService.findOne( { where: {socialType: social } } )).pipe(
       RxJS.map(entity => SocialLivelyViewDto.from(entity)),
       RxJS.tap({
         error: err => this._logger.error(`socialLivelyFindBySocial failed, id: ${social}`, err)

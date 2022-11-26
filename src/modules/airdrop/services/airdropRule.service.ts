@@ -7,6 +7,8 @@ import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
 import { AirdropRuleCreateDto } from "../domain/dto/airdropRuleCreate.dto";
 import { SocialAirdropRuleEntity } from "../domain/entity/socialAirdropRule.entity";
 import { AirdropRuleUpdateDto } from "../domain/dto/airdropRuleUpdate.dto";
+import { FindManyOptions } from "typeorm/find-options/FindManyOptions";
+import { FindOneOptions } from "typeorm/find-options/FindOneOptions";
 
 export enum AirdropRuleSortBy {
   TIMESTAMP = 'createdAt',
@@ -104,8 +106,8 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
     )
   }
   
-  find(option: FindOptionsWhere<SocialAirdropRuleEntity>): RxJS.Observable<SocialAirdropRuleEntity[]> {
-    return RxJS.from(this._entityManager.getRepository(SocialAirdropRuleEntity).findBy(option)).pipe(
+  find(option: FindManyOptions<SocialAirdropRuleEntity>): RxJS.Observable<SocialAirdropRuleEntity[]> {
+    return RxJS.from(this._entityManager.getRepository(SocialAirdropRuleEntity).find(option)).pipe(
       RxJS.tap({
         error: err => this._logger.error(`findOne SocialAirdropRule failed, option: ${JSON.stringify(option)}`, err)
       }),
@@ -135,8 +137,8 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
     )
   }
 
-  findOne(option: FindOptionsWhere<SocialAirdropRuleEntity>): RxJS.Observable<SocialAirdropRuleEntity> {
-    return RxJS.from(this._entityManager.getRepository(SocialAirdropRuleEntity).findOneBy(option)).pipe(
+  findOne(option: FindOneOptions<SocialAirdropRuleEntity>): RxJS.Observable<SocialAirdropRuleEntity> {
+    return RxJS.from(this._entityManager.getRepository(SocialAirdropRuleEntity).findOne(option)).pipe(
       RxJS.tap({
         error: err => this._logger.error(`findOne SocialAirdropRule failed, option: ${JSON.stringify(option)}`, err)
       }),

@@ -6,12 +6,11 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-  Post, UsePipes
+  Post, UsePipes, ValidationPipe
 } from "@nestjs/common";
 import { MailService } from '../../mail/mail.service';
 import { ContactDto } from "../domain/dto";
 import { SentMessageInfo } from 'nodemailer';
-import { ValidationPipe } from "../../airdrop/domain/pipe/validationPipe";
 
 @ApiTags('/api/profiles/contact')
 @Controller('/api/profiles/contact')

@@ -7,6 +7,8 @@ import { EntityManager } from "typeorm";
 import { SocialLivelyCreateDto } from "../domain/dto/socialLivelyCreate.dto";;
 import { SocialLivelyUpdateDto } from "../domain/dto/socialLivelyUpdate.dto";
 import { FindOptionsWhere } from "typeorm/find-options/FindOptionsWhere";
+import { FindManyOptions } from "typeorm/find-options/FindManyOptions";
+import { FindOneOptions } from "typeorm/find-options/FindOneOptions";
 
 export enum SocialLivelySortBy {
   TIMESTAMP = 'createdAt',
@@ -109,8 +111,8 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
     )
   }
 
-  find(option: FindOptionsWhere<SocialLivelyEntity>): RxJS.Observable<SocialLivelyEntity[]> {
-    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity).findBy(option)).pipe(
+  find(option: FindManyOptions<SocialLivelyEntity>): RxJS.Observable<SocialLivelyEntity[]> {
+    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity).find(option)).pipe(
       RxJS.tap({
         error: err => this._logger.error(`findOne SocialLively failed, option: ${JSON.stringify(option)}`, err)
       }),
@@ -140,8 +142,8 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
     )
   }
 
-  findOne(option: FindOptionsWhere<SocialLivelyEntity>): RxJS.Observable<SocialLivelyEntity> {
-    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity).findOneBy(option)).pipe(
+  findOne(option: FindOneOptions<SocialLivelyEntity>): RxJS.Observable<SocialLivelyEntity> {
+    return RxJS.from(this._entityManager.getRepository(SocialLivelyEntity).findOne(option)).pipe(
       RxJS.tap({
         error: err => this._logger.error(`findOne SocialLively failed, option: ${JSON.stringify(option)}`, err)
       }),

@@ -1,5 +1,4 @@
 import { ApiResponseProperty } from "@nestjs/swagger";
-import { FindAllBalanceType } from "../../services/airdrop.service";
 import { AirdropBalance, AirdropBalanceViewDto } from "./airdropBalanceView.dto";
 
 export class FindAllBalanceViewDto {

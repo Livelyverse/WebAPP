@@ -16,7 +16,7 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
-  UsePipes
+  UsePipes, ValidationPipe
 } from "@nestjs/common";
 import { UserService, UserSortBy } from "../services/user.service";
 import { UserCreateDto, UserUpdateDto, UserViewDto } from "../domain/dto";
@@ -30,7 +30,6 @@ import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SortType } from "../services/IService";
 import { EnumPipe } from "../domain/pipe/enumPipe";
-import { ValidationPipe } from "../domain/pipe/validationPipe";
 
 @ApiBearerAuth()
 @ApiTags('/api/profiles/users')

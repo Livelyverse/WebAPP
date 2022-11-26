@@ -11,7 +11,7 @@ import {
   Post,
   Query,
   UseGuards,
-  UsePipes
+  UsePipes, ValidationPipe
 } from "@nestjs/common";
 import * as RxJS from "rxjs";
 import { ApiBearerAuth, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
@@ -22,7 +22,6 @@ import { FindAllViewDto } from "../domain/dto/findAllView.dto";
 import { FindAllType, SortType } from "../services/IAirdrop.service";
 import { PaginationPipe } from "../domain/pipe/paginationPipe";
 import { SocialType } from "../../profile/domain/entity/socialProfile.entity";
-import { ContextType, ValidationPipe } from "../domain/pipe/validationPipe";
 import { AirdropRuleService, AirdropRuleSortBy } from "../services/airdropRule.service";
 import { AirdropRuleCreateDto } from "../domain/dto/airdropRuleCreate.dto";
 import { AirdropRuleViewDto } from "../domain/dto/airdropRuleView.dto";
@@ -41,7 +40,6 @@ export class AirdropRuleController {
   @Post('create')
   @UsePipes(new ValidationPipe({
     transform: true,
-    validationContext: ContextType.CREATE,
     skipMissingProperties: true,
     validationError: { target: false }
   }))
@@ -90,7 +88,6 @@ export class AirdropRuleController {
   @Post('update')
   @UsePipes(new ValidationPipe({
     transform: true,
-    validationContext: ContextType.UPDATE,
     skipMissingProperties: true,
     validationError: { target: false }
   }))
@@ -294,7 +291,7 @@ export class AirdropRuleController {
   @ApiResponse({ status: 500, description: 'Internal Server Error.' })
   airdropRulesFindBySocialType(@Param('social', new EnumPipe(SocialType)) social: SocialType):
     RxJS.Observable<AirdropRuleViewDto[]> {
-    return RxJS.from(this._airdropRuleService.find( { socialType: social } )).pipe(
+    return RxJS.from(this._airdropRuleService.find( { where: { socialType: social } } )).pipe(
       RxJS.map(entities => entities.map(entity =>
         AirdropRuleViewDto.from(entity)).reduce((acc, value) => [...acc, value], [])),
       RxJS.tap({
