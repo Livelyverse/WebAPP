@@ -15,7 +15,7 @@ import { UserEntity } from '../domain/entity';
 import { UserGroupService } from './userGroup.service';
 import * as argon2 from 'argon2';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
-import { extname, join } from 'path';
+import * as path from 'path';
 import * as fs from 'fs';
 import {
   AuthMailEntity,
@@ -30,11 +30,22 @@ export enum UserSortBy {
   USERNAME = 'username'
 }
 
+type AuthAccessToken = {
+  accessTokenId: string,
+  accessToken: string,
+  authTokenEntity: AuthTokenEntity
+}
+
+type AuthRefreshToken = {
+  refreshToken: string,
+  authTokenEntity: AuthTokenEntity
+}
 
 @Injectable()
 export class UserService implements IService<UserEntity> {
   private readonly _logger = new Logger(UserService.name);
   private readonly _uploadPath;
+  private _accessTokenTTL;
 
   constructor(
     @InjectRepository(AuthTokenEntity)
@@ -53,6 +64,8 @@ export class UserService implements IService<UserEntity> {
       '/' +
       this._configService.get<string>('http.upload.path') +
       '/';
+
+    this._accessTokenTTL = this._configService.get<number>('app.accessTokenTTL');
   }
 
   async create(userDto: UserCreateDto): Promise<UserEntity> {
@@ -472,19 +485,44 @@ export class UserService implements IService<UserEntity> {
 
   async update(userDto: UserUpdateDto, entity: UserEntity): Promise<UserEntity> {
 
-    try {
-      entity.walletAddress = ethers.utils.getAddress(userDto.walletAddress);
-    } catch (err) {
-      throw new HttpException({
-        statusCode: '400',
-        message: 'invalid wallet address',
-        error: 'Bad Request'
-      }, HttpStatus.BAD_REQUEST)
+    if(userDto?.walletAddress) {
+      try {
+        entity.walletAddress = ethers.utils.getAddress(userDto.walletAddress);
+      } catch (err) {
+        throw new HttpException({
+          statusCode: '400',
+          message: 'invalid wallet address',
+          error: 'Bad Request'
+        }, HttpStatus.BAD_REQUEST)
+      }
     }
 
     try {
-      entity.fullName = userDto.fullName;
-      return await this._userRepository.save(entity);
+      entity.fullName = userDto?.fullName ? userDto.fullName : null;
+      await this._userRepository.save(entity);
+      await this._cacheManager.set(`USER.EMAIL:${entity.email}`, entity, {ttl: 0});
+      let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${entity.id}`);
+      if (authAccessToken) {
+        authAccessToken.authTokenEntity.user = entity;
+        await this._cacheManager.set(
+          `AUTH_ACCESS_TOKEN.USER_ID:${entity.id}`,
+          {
+            accessTokenId: authAccessToken.accessTokenId,
+            accessToken: authAccessToken.accessToken,
+            authTokenEntity: authAccessToken.authTokenEntity
+          },
+          { ttl: this._accessTokenTTL / 1000 }
+        );
+      }
+      let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${entity.id}`);
+      if (authRefreshToken) {
+        authRefreshToken.authTokenEntity.user = entity;
+        const refreshTokenExpiredAt = new Date(authRefreshToken.authTokenEntity.refreshTokenExpiredAt);
+        await this._cacheManager.set(`AUTH_REFRESH_TOKEN.USER_ID:${entity.id}`,
+          { refreshToken: authRefreshToken.refreshToken, authTokenEntity: authRefreshToken.authTokenEntity },
+          { ttl: Math.round((refreshTokenExpiredAt.getTime() - Date.now()) / 1000) });
+      }
+      return entity;
     } catch (err) {
       this._logger.error(`userRepository.save of update failed, mail: ${entity.email}, dto: ${JSON.stringify(userDto)}`, err);
       if (err?.code === PostgresErrorCode.UniqueViolation) {
@@ -502,9 +540,9 @@ export class UserService implements IService<UserEntity> {
     }
   }
 
-  async updateEntity(user: UserEntity): Promise<UserEntity> {
+  async updateEntity(user: UserEntity): Promise<void> {
     try {
-      return await this._userRepository.save(user);
+      await this._userRepository.save(user);
     } catch (err) {
       this._logger.error(`userRepository.save failed, mail: ${user.email}`, err);
       throw new HttpException({
@@ -517,32 +555,33 @@ export class UserService implements IService<UserEntity> {
 
   async uploadImage(request: any, file: Express.Multer.File): Promise<URL> {
     const user = request.user as UserEntity;
-    const fileExtName = extname(file.originalname);
+    const fileExtName = path.extname(file.originalname);
     const filename = `profilePhoto_${user.id}_${Date.now()}${fileExtName}`;
+    const newFilePath = path.join(this._uploadPath,filename);
     const tmpArray = request.url.split('/');
     const absoluteUrl =
       'https://' +
       this._configService.get<string>('http.domain') +
       tmpArray.splice(0, tmpArray.length - 1).join('/') +
-      '/get/' +
+      '/image/' +
       filename;
 
     if (user.imageFilename) {
-      const oldImageFile = this._uploadPath + user.imageFilename;
+      const oldImageFile = path.join(this._uploadPath, user.imageFilename);
       if (fs.existsSync(oldImageFile)) {
         try {
           fs.rmSync(oldImageFile);
         } catch (error) {
-          this._logger.error(`could not remove file ${oldImageFile}`, error);
+          this._logger.error(`remove file ${oldImageFile} failed`, error);
         }
       }
     }
 
     try {
-      fs.writeFileSync(this._uploadPath + filename, file.buffer);
+      fs.writeFileSync(newFilePath, file.buffer);
     } catch (error) {
       this._logger.error(
-        `could not write file ${this._uploadPath + filename}`,
+        `write file ${newFilePath} failed`,
         error,
       );
       throw new HttpException({
@@ -557,6 +596,28 @@ export class UserService implements IService<UserEntity> {
       user.imageMimeType = file.mimetype;
       user.imageFilename = filename;
       await this._userRepository.save(user);
+      await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, {ttl: 0});
+      let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
+      if (authAccessToken) {
+        authAccessToken.authTokenEntity.user = user;
+        await this._cacheManager.set(
+          `AUTH_ACCESS_TOKEN.USER_ID:${user.id}`,
+          {
+            accessTokenId: authAccessToken.accessTokenId,
+            accessToken: authAccessToken.accessToken,
+            authTokenEntity: authAccessToken.authTokenEntity
+          },
+          { ttl: this._accessTokenTTL / 1000 }
+        );
+      }
+      let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+      if (authRefreshToken) {
+        authRefreshToken.authTokenEntity.user = user;
+        const refreshTokenExpiredAt = new Date(authRefreshToken.authTokenEntity.refreshTokenExpiredAt);
+        await this._cacheManager.set(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`,
+          { refreshToken: authRefreshToken.refreshToken, authTokenEntity: authRefreshToken.authTokenEntity },
+          { ttl: Math.round((refreshTokenExpiredAt.getTime() - Date.now()) / 1000) });
+      }
     } catch (error) {
       this._logger.error(
         `userRepository.save of uploadImage failed, email: ${JSON.stringify(
@@ -574,17 +635,21 @@ export class UserService implements IService<UserEntity> {
     return new URL(absoluteUrl);
   }
 
-  public getImage(image: string): string {
-    const imageFile = this._uploadPath + image;
-    if (fs.existsSync(imageFile)) {
-      return imageFile;
-    } else {
-      this._logger.error(`could not found file ${imageFile}`);
+  public async getImage(image: string): Promise<{path: string, size: number}> {
+
+    const imageFile = path.join(this._uploadPath, image);
+    try {
+        await fs.promises.access(imageFile)
+        const stat = await fs.promises.stat(imageFile);
+        return { path: imageFile, size: stat.size }
+    } catch (err) {
+      this._logger.error(`get file ${imageFile} failed`, err);
+      this._logger.debug(`file ${imageFile} not found`);
       throw new HttpException({
-        statusCode: '500',
-        message: 'Something Went Wrong',
-        error: 'Internal Server Error'
-      }, HttpStatus.INTERNAL_SERVER_ERROR)
+        statusCode: '404',
+        message: `Image file ${image} Not Found`,
+        error: 'NotFound'
+      }, HttpStatus.NOT_FOUND)
     }
   }
 }
