@@ -6,7 +6,6 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { TwitterApi } from "twitter-api-v2";
 import TwitterApiv2ReadOnly from "twitter-api-v2/dist/v2/client.v2.read";
 import * as RxJS from "rxjs";
-import { finalize } from "rxjs";
 import { SocialProfileEntity, SocialType } from "../../../../profile/domain/entity/socialProfile.entity";
 import { SocialLivelyEntity } from "../../entity/socialLively.entity";
 import { UserV2 } from "twitter-api-v2/dist/types/v2/user.v2.types";
@@ -38,10 +37,10 @@ export class TwitterFollowerJob {
 
     this._isRunning = false;
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
-    this.fetchTwitterFollowers();
+    // this.fetchTwitterFollowers();
   }
 
-  @Cron(CronExpression.EVERY_6_HOURS)
+  @Cron(CronExpression.EVERY_DAY_AT_1AM)
   fetchTwitterFollowers() {
 
     if(!this._isRunning) {
@@ -105,10 +104,13 @@ export class TwitterFollowerJob {
         )
       ),
       RxJS.concatMap(([socialLively, socialEvent, airdropRule ]: [SocialLivelyEntity, SocialEventEntity, SocialAirdropRuleEntity]) =>
-        RxJS.from(this._twitterClient.followers(socialLively.userId, {
+        RxJS.defer(() =>
+          RxJS.from(this._twitterClient.followers(socialLively.userId, {
             max_results: 256,
             asPaginator: true,
-            "user.fields": ["id", "name", "username", "url", "location", "entities"]})).pipe(
+            "user.fields": ["id", "name", "username", "url", "location", "entities"]
+          }))
+        ).pipe(
           RxJS.expand((paginator) => !paginator.done ? RxJS.from(paginator.next()) : RxJS.EMPTY, 1),
           RxJS.concatMap((paginator) =>
             RxJS.merge(
@@ -129,7 +131,6 @@ export class TwitterFollowerJob {
           ),
           RxJS.tap({
             next: (paginator) => this._logger.log(`tweeter client paginator users count: ${paginator.meta.result_count}`),
-            error: (error) => this._logger.error(`tweeter client paginator users failed`, error)
           }),
           RxJS.concatMap((paginator) =>
             RxJS.from(paginator.users).pipe(
@@ -153,6 +154,9 @@ export class TwitterFollowerJob {
                 ),
               )
           }),
+          RxJS.tap({
+            error: (error) => this._logger.error(`tweeter client fetch followers failed`, error)
+          }),
           RxJS.catchError((error) =>
             RxJS.merge(
               RxJS.of(error).pipe(
@@ -169,7 +173,7 @@ export class TwitterFollowerJob {
               )
             )
           ),
-          finalize(() => this._logger.debug(`finalize twitter client follower . . .`)),
+          RxJS.finalize(() => this._logger.debug(`finalize twitter client follower . . .`)),
           this.retryWithDelay(30000, 3),
         )
       ),
