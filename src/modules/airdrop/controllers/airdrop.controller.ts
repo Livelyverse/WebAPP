@@ -164,34 +164,34 @@ export class AirdropController {
                     )
                   )
                 ),
-                RxJS.tap({
-                  error: err => this._logger.error(`airdropFindByUserId failed, user.id: ${req.user.id}`, err)
-                }),
-                RxJS.catchError(error =>
-                  RxJS.merge(
-                    RxJS.of(error).pipe(
-                      RxJS.filter(err => err instanceof HttpException),
-                      RxJS.mergeMap(err => RxJS.throwError(err)),
-                    ),
-                    RxJS.of(error).pipe(
-                      RxJS.filter(err => !(err instanceof HttpException)),
-                      RxJS.mergeMap(err =>
-                        RxJS.throwError(() => new HttpException(
-                          {
-                            statusCode: '500',
-                            message: 'Something Went Wrong',
-                            error: 'Internal Server Error'
-                          }, HttpStatus.INTERNAL_SERVER_ERROR)
-                        )
-                      )
-                    )
-                  )
-                ),
               )
             )
           )
         )
-      )
+      ),
+      RxJS.tap({
+        error: err => this._logger.error(`airdropFindByUserId failed, user.id: ${req.user.id}`, err)
+      }),
+      RxJS.catchError(error =>
+        RxJS.merge(
+          RxJS.of(error).pipe(
+            RxJS.filter(err => err instanceof HttpException),
+            RxJS.mergeMap(err => RxJS.throwError(err)),
+          ),
+          RxJS.of(error).pipe(
+            RxJS.filter(err => !(err instanceof HttpException)),
+            RxJS.mergeMap(err =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '500',
+                  message: 'Something Went Wrong',
+                  error: 'Internal Server Error'
+                }, HttpStatus.INTERNAL_SERVER_ERROR)
+              )
+            )
+          )
+        )
+      ),
     )
   }
 
@@ -261,34 +261,34 @@ export class AirdropController {
                     )
                   )
                 ),
-                RxJS.tap({
-                  error: err => this._logger.error(`airdropFindBalanceByUserId failed, user.id: ${req.user.id}`, err)
-                }),
-                RxJS.catchError(error =>
-                  RxJS.merge(
-                    RxJS.of(error).pipe(
-                      RxJS.filter(err => err instanceof HttpException),
-                      RxJS.mergeMap(err => RxJS.throwError(err)),
-                    ),
-                    RxJS.of(error).pipe(
-                      RxJS.filter(err => !(err instanceof HttpException)),
-                      RxJS.mergeMap(err =>
-                        RxJS.throwError(() => new HttpException(
-                          {
-                            statusCode: '500',
-                            message: 'Something Went Wrong',
-                            error: 'Internal Server Error'
-                          }, HttpStatus.INTERNAL_SERVER_ERROR)
-                        )
-                      )
-                    )
-                  )
-                ),
               )
             )
           )
         )
-      )
+      ),
+      RxJS.tap({
+        error: err => this._logger.error(`airdropFindBalanceByUserId failed, user.id: ${req.user.id}`, err)
+      }),
+      RxJS.catchError(error =>
+        RxJS.merge(
+          RxJS.of(error).pipe(
+            RxJS.filter(err => err instanceof HttpException),
+            RxJS.mergeMap(err => RxJS.throwError(err)),
+          ),
+          RxJS.of(error).pipe(
+            RxJS.filter(err => !(err instanceof HttpException)),
+            RxJS.mergeMap(err =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '500',
+                  message: 'Something Went Wrong',
+                  error: 'Internal Server Error'
+                }, HttpStatus.INTERNAL_SERVER_ERROR)
+              )
+            )
+          )
+        )
+      ),
     )
   }
 

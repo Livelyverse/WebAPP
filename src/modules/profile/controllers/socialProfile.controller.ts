@@ -56,9 +56,9 @@ export class SocialProfileController {
   socialProfileCreate(@Req() req, @Body() socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileViewDto> {
     return RxJS.from(this._socialProfileService.create(req.user, socialProfileDto)).pipe(
       RxJS.map(entity => SocialProfileViewDto.from(entity)),
-      RxJS.tap({
-        error: err => this._logger.error(`socialProfileCreate failed, dto: ${JSON.stringify(socialProfileDto)}`, err)
-      }),
+      // RxJS.tap({
+      //   error: err => this._logger.error(`socialProfileCreate failed, dto: ${JSON.stringify(socialProfileDto)}`, err)
+      // }),
       RxJS.catchError(error =>
         RxJS.merge(
           RxJS.of(error).pipe(

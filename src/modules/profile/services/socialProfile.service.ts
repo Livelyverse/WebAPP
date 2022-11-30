@@ -193,121 +193,173 @@ export class SocialProfileService {
   }
 
   create(user: UserEntity, socialProfileDto: SocialProfileCreateDto): RxJS.Observable<SocialProfileEntity> {
-    return RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
-        .findOne({
-          relations: ['user'],
-          // join: {
-          //   alias: "socialProfile",
-          //   leftJoinAndSelect: {
-          //     user: "socialProfile.userId"
-          //   }
-          // },
-          loadEagerRelations: true,
-          where: {
-            // user: { id:  user.id },
-            socialType: socialProfileDto.socialType,
-            username: socialProfileDto.username
-          }
-        })
-      ).pipe(
-        RxJS.mergeMap(result =>
-          RxJS.merge(
-            RxJS.of(result).pipe(
-              RxJS.filter(socialFindResult => socialFindResult?.user?.id == user.id),
-              RxJS.tap({
-                next: socialFindResult => this._logger.debug(`request new SocialProfile already exist, request: ${JSON.stringify(socialProfileDto)}, id: ${socialFindResult.id}`),
-              }),
-              RxJS.mergeMap(_ =>
-                RxJS.throwError(() =>
-                  new HttpException({
-                    statusCode: '400',
-                    message: 'SocialProfile Already Exist',
-                    error: 'Bad Request'
-                  }, HttpStatus.BAD_REQUEST)
-                )
-              )
-            ),
-            RxJS.of(result).pipe(
-              RxJS.filter(socialFindResult => !socialFindResult?.user),
-              RxJS.tap({
-                next: socialFindResult => this._logger.debug(
-                  "socialProfile already exist, but doesn't bind to requested user," +
-                  `request: ${JSON.stringify(socialProfileDto)}, id: ${socialFindResult.id}, userId: ${user.id}`
-                ),
-              }),
-              RxJS.map(socialProfile => {socialProfile.user = user; return socialProfile;}),
-              RxJS.mergeMap(entity =>
-                RxJS.from(this._entityManager.getRepository(SocialProfileEntity).save(entity)).pipe(
-                  RxJS.tap({
-                    next: result => this._logger.debug(`bind SocialProfile success, id: ${result.id}, username: ${result.username}, socialType: ${result.socialType}`),
-                    error: err => this._logger.error(`bind SocialProfile failed, username ${entity.username}, socialType: ${entity.socialType}`, err)
-                  }),
-                  RxJS.catchError(_ => RxJS.throwError(() =>
-                    new HttpException({
-                      statusCode: '500',
-                      message: 'Something Went Wrong',
-                      error: 'Internal Server Error'
-                    }, HttpStatus.INTERNAL_SERVER_ERROR))
-                  )
-                )
-              )
-            ),
-            RxJS.of(result).pipe(
-              RxJS.filter(socialFindResult => !socialFindResult),
-              RxJS.map(_ => socialProfileDto),
-              RxJS.map(socialProfileDto => {
-                const entity = new SocialProfileEntity();
-                entity.user = user;
-                entity.socialType = socialProfileDto.socialType;
-                entity.username = socialProfileDto.username;
-                entity.socialName = socialProfileDto?.socialName;
-                entity.profileUrl = socialProfileDto?.profileUrl;
-                entity.website = socialProfileDto?.website;
-                entity.location = socialProfileDto?.location;
-                return entity
-              }),
-              RxJS.mergeMap(entity =>
-                RxJS.from(this._entityManager.getRepository(SocialProfileEntity).save(entity)).pipe(
-                  RxJS.tap({
-                    next: result => this._logger.debug(`create SocialProfile success, id: ${result.id}, username: ${result.username}, socialType: ${result.socialType}`),
-                    error: err => this._logger.error(`create SocialProfile failed, username ${entity.username}, socialType: ${entity.socialType}`, err)
-                  }),
-                  RxJS.catchError(_ => RxJS.throwError(() =>
-                    new HttpException({
-                      statusCode: '500',
-                      message: 'Something Went Wrong',
-                      error: 'Internal Server Error'
-                    }, HttpStatus.INTERNAL_SERVER_ERROR))
-                  )
-                )
-              )
-            )
-          )
-        ),
+    return RxJS.of(socialProfileDto).pipe(
+      RxJS.mergeMap(socialProfileDto =>
+        RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
+          .findOne({
+            relations: {
+              user: true,
+            },
+            loadEagerRelations: true,
+            where: {
+              user: { id: user.id },
+              socialType: socialProfileDto.socialType,
+              username: socialProfileDto.username
+            }
+          })
+        ).pipe(
         RxJS.tap({
-          error: err => this._logger.error(`create SocialProfile failed, username ${socialProfileDto.username}, socialType: ${socialProfileDto.socialType}`, err)
+          error: err => this._logger.error(`findOne SocialProfile failed, user.email: ${user.email}, social username ${socialProfileDto.username}, Id: ${socialProfileDto.socialType}`, err)
         }),
-        RxJS.catchError(error =>
-          RxJS.merge(
-            RxJS.of(error).pipe(
-              RxJS.filter(err => err instanceof HttpException),
-              RxJS.mergeMap(err => RxJS.throwError(err)),
-            ),
-            RxJS.of(error).pipe(
-              RxJS.filter(err => !(err instanceof HttpException)),
-              RxJS.mergeMap(err =>
-                RxJS.throwError(() => new HttpException(
-                  {
-                    statusCode: '500',
-                    message: 'Something Went Wrong',
-                    error: 'Internal Server Error'
-                  }, HttpStatus.INTERNAL_SERVER_ERROR)
-                )
+      )),
+      RxJS.concatMap(socialFind =>
+        RxJS.merge(
+          RxJS.of(socialFind).pipe(
+            RxJS.filter(socialFindResult => !!socialFindResult),
+            RxJS.tap({
+              next: socialFindResult => this._logger.debug(`request new SocialProfile already exist, request: ${JSON.stringify(socialProfileDto)}, id: ${socialFindResult.id}`),
+            }),
+            RxJS.mergeMap(_ =>
+              RxJS.throwError(() =>
+                new HttpException({
+                  statusCode: '400',
+                  message: 'SocialProfile Already Exist',
+                  error: 'Bad Request'
+                }, HttpStatus.BAD_REQUEST)
+              )
+            )
+          ),
+          RxJS.of(socialFind).pipe(
+            RxJS.filter(socialFindResult => !socialFindResult),
+            RxJS.switchMap(_ =>
+              RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
+                .findOne({
+                  relations: {
+                    user: true,
+                  },
+                  join: {
+                    alias: "socialProfile",
+                    leftJoinAndSelect: {
+                      user: "socialProfile.user"
+                    }
+                  },
+                  loadEagerRelations: true,
+                  where: {
+                    socialType: socialProfileDto.socialType,
+                    username: socialProfileDto.username
+                  }
+                })
+              ).pipe(
+                RxJS.tap({
+                  // next: result => this._logger.log(`find social profile success, socialUsername ${socialProfileDto.username}, socialType: ${socialProfileDto.socialType}, found Id: ${result?.id}`),
+                  error: err => this._logger.error(`find social profile failed, socialUsername ${socialProfileDto.username}, socialType: ${socialProfileDto.socialType}`, err)
+                }),
+                RxJS.mergeMap(result =>
+                  RxJS.merge(
+                    RxJS.of(result).pipe(
+                      RxJS.filter(socialFindResult => !!socialFindResult && !!socialFindResult?.user),
+                      RxJS.tap({
+                        next: socialFindResult => this._logger.debug(
+                          "socialProfile already exist, and bind to another user," +
+                          `request: ${JSON.stringify(socialProfileDto)}, id: ${socialFindResult.id}, userId: ${user.id}`
+                        ),
+                      }),
+                      RxJS.mergeMap(_ =>
+                        RxJS.throwError(() =>
+                          new HttpException({
+                            statusCode: '400',
+                            message: 'SocialProfile Already Exists',
+                            error: 'Bad Request'
+                          }, HttpStatus.BAD_REQUEST)
+                        )
+                      )
+                    ),
+                    RxJS.of(result).pipe(
+                      RxJS.filter(socialFindResult => !!socialFindResult && !socialFindResult?.user),
+                      RxJS.tap({
+                        next: socialFindResult => this._logger.debug(
+                          "socialProfile already exist, but doesn't bind to requested user," +
+                          `request: ${JSON.stringify(socialProfileDto)}, id: ${socialFindResult.id}, userId: ${user.id}`
+                        ),
+                      }),
+                      RxJS.map(socialProfile => {socialProfile.user = user; return socialProfile;}),
+                      RxJS.mergeMap(entity =>
+                        RxJS.from(this._entityManager.getRepository(SocialProfileEntity).save(entity)).pipe(
+                          RxJS.tap({
+                            next: result => this._logger.debug(`bind SocialProfile success, id: ${result.id}, username: ${result.username}, socialType: ${result.socialType}`),
+                            error: err => this._logger.error(`bind SocialProfile failed, username ${entity.username}, socialType: ${entity.socialType}`, err)
+                          }),
+                          RxJS.catchError(_ => RxJS.throwError(() =>
+                            new HttpException({
+                              statusCode: '500',
+                              message: 'Something Went Wrong',
+                              error: 'Internal Server Error'
+                            }, HttpStatus.INTERNAL_SERVER_ERROR))
+                          )
+                        )
+                      )
+                    ),
+                    RxJS.of(result).pipe(
+                      RxJS.filter(socialFindResult => !socialFindResult),
+                      RxJS.map(_ => socialProfileDto),
+                      RxJS.map(socialProfileDto => {
+                        const entity = new SocialProfileEntity();
+                        entity.user = user;
+                        entity.socialType = socialProfileDto.socialType;
+                        entity.username = socialProfileDto.username;
+                        entity.socialName = socialProfileDto?.socialName;
+                        entity.profileUrl = socialProfileDto?.profileUrl;
+                        entity.website = socialProfileDto?.website;
+                        entity.location = socialProfileDto?.location;
+                        return entity
+                      }),
+                      RxJS.mergeMap(entity =>
+                        RxJS.from(this._entityManager.getRepository(SocialProfileEntity).save(entity)).pipe(
+                          RxJS.tap({
+                            next: result => this._logger.debug(`create SocialProfile success, id: ${result.id}, username: ${result.username}, socialType: ${result.socialType}`),
+                            error: err => this._logger.error(`create SocialProfile failed, username ${entity.username}, socialType: ${entity.socialType}`, err)
+                          }),
+                          RxJS.catchError(_ => RxJS.throwError(() =>
+                            new HttpException({
+                              statusCode: '500',
+                              message: 'Something Went Wrong',
+                              error: 'Internal Server Error'
+                            }, HttpStatus.INTERNAL_SERVER_ERROR))
+                          )
+                        )
+                      )
+                    )
+                  )
+                ),
               )
             )
           )
-        ),
-      )
+        )
+      ),
+      RxJS.tap({
+        error: err => this._logger.error(`create social profile failed, socialUsername ${socialProfileDto.username}, socialType: ${socialProfileDto.socialType}`, err)
+      }),
+      RxJS.catchError(error =>
+        RxJS.merge(
+          RxJS.of(error).pipe(
+            RxJS.filter(err => err instanceof HttpException),
+            RxJS.mergeMap(err => RxJS.throwError(err)),
+          ),
+          RxJS.of(error).pipe(
+            RxJS.filter(err => !(err instanceof HttpException)),
+            RxJS.mergeMap(err =>
+              RxJS.throwError(() => new HttpException(
+                {
+                  statusCode: '500',
+                  message: 'Something Went Wrong',
+                  error: 'Internal Server Error'
+                }, HttpStatus.INTERNAL_SERVER_ERROR)
+              )
+            )
+          )
+        )
+      ),
+    )
   }
 
   update(dto: SocialProfileUpdateDto, user: UserEntity): RxJS.Observable<SocialProfileEntity> {
@@ -365,11 +417,11 @@ export class SocialProfileService {
           ),
         )),
       RxJS.map(([socialProfileDto, socialProfileEntity]) => {
-        socialProfileEntity.website = socialProfileDto.website ? socialProfileDto.website : socialProfileEntity?.website;
-        socialProfileEntity.username = socialProfileDto.username ? socialProfileDto.username : socialProfileEntity?.username;
-        socialProfileEntity.socialName = socialProfileDto.socialName ? socialProfileDto.socialName : socialProfileEntity?.socialName;
-        socialProfileEntity.profileUrl = socialProfileDto.profileUrl ? socialProfileDto.profileUrl : socialProfileDto?.profileUrl;
-        socialProfileEntity.location = socialProfileDto.location ? socialProfileDto.location : socialProfileDto?.location;
+        socialProfileEntity.website = socialProfileDto?.website ? socialProfileDto.website : socialProfileEntity?.website;
+        socialProfileEntity.username = socialProfileDto?.username ? socialProfileDto.username : socialProfileEntity?.username;
+        socialProfileEntity.socialName = socialProfileDto?.socialName ? socialProfileDto.socialName : socialProfileEntity?.socialName;
+        socialProfileEntity.profileUrl = socialProfileDto?.profileUrl ? socialProfileDto.profileUrl : socialProfileDto?.profileUrl;
+        socialProfileEntity.location = socialProfileDto?.location ? socialProfileDto.location : socialProfileDto?.location;
         return socialProfileEntity
       }),
       RxJS.mergeMap((entity:SocialProfileEntity) =>
