@@ -45,7 +45,8 @@ type AuthRefreshToken = {
 export class UserService implements IService<UserEntity> {
   private readonly _logger = new Logger(UserService.name);
   private readonly _uploadPath;
-  private _accessTokenTTL;
+  private readonly _accessTokenTTL;
+  private readonly _refreshTokenTTL;
 
   constructor(
     @InjectRepository(AuthTokenEntity)
@@ -59,13 +60,9 @@ export class UserService implements IService<UserEntity> {
     private readonly _userGroupService: UserGroupService,
     private readonly _configService: ConfigService,
   ) {
-    this._uploadPath =
-      process.cwd() +
-      '/' +
-      this._configService.get<string>('http.upload.path') +
-      '/';
-
+    this._uploadPath = path.join(process.cwd(), this._configService.get<string>('http.upload.path'));
     this._accessTokenTTL = this._configService.get<number>('app.accessTokenTTL');
+    this._refreshTokenTTL = this._configService.get<number>('app.refreshTokenTTL');
   }
 
   async create(userDto: UserCreateDto): Promise<UserEntity> {
@@ -249,11 +246,20 @@ export class UserService implements IService<UserEntity> {
       }
     }
 
-    await this._cacheManager.del(`USER.EMAIL:${user.email}`);
-    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
-    await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
-    await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${user.id}`);
-    await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID::${user.id}`);
+    try {
+      await this._cacheManager.del(`USER.EMAIL:${user.email}`);
+      await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
+      await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+      await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${user.id}`);
+      await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID::${user.id}`);
+    } catch (err) {
+      this._logger.error(`removeByEmail cache actions failed, USER.EMAIL:${user.email}, AUTH_ACCESS_TOKEN.USER_ID:${user.id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
     try {
       await this._userRepository.remove(user);
     } catch (err) {
@@ -340,11 +346,21 @@ export class UserService implements IService<UserEntity> {
       }
     }
 
-    await this._cacheManager.del(`USER.EMAIL:${user.email}`);
-    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
-    await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
-    await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${user.id}`);
-    await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID::${user.id}`);
+    try {
+      await this._cacheManager.del(`USER.EMAIL:${user.email}`);
+      await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
+      await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+      await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${user.id}`);
+      await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID::${user.id}`);
+    } catch (err) {
+      this._logger.error(`removeById cache actions failed, USER.EMAIL:${user.email}, AUTH_ACCESS_TOKEN.USER_ID:${user.id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     try {
       await this._userRepository.remove(user);
     } catch (err) {
@@ -500,7 +516,7 @@ export class UserService implements IService<UserEntity> {
     try {
       entity.fullName = userDto?.fullName ? userDto.fullName : null;
       await this._userRepository.save(entity);
-      await this._cacheManager.set(`USER.EMAIL:${entity.email}`, entity, {ttl: 0});
+      await this._cacheManager.set(`USER.EMAIL:${entity.email}`, entity, {ttl: this._refreshTokenTTL / 1000});
       let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${entity.id}`);
       if (authAccessToken) {
         authAccessToken.authTokenEntity.user = entity;
@@ -524,7 +540,7 @@ export class UserService implements IService<UserEntity> {
       }
       return entity;
     } catch (err) {
-      this._logger.error(`userRepository.save of update failed, mail: ${entity.email}, dto: ${JSON.stringify(userDto)}`, err);
+      this._logger.error(`user update failed, mail: ${entity.email}, dto: ${JSON.stringify(userDto)}`, err);
       if (err?.code === PostgresErrorCode.UniqueViolation) {
         throw new HttpException({
           statusCode: '400',
@@ -596,7 +612,7 @@ export class UserService implements IService<UserEntity> {
       user.imageMimeType = file.mimetype;
       user.imageFilename = filename;
       await this._userRepository.save(user);
-      await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, {ttl: 0});
+      await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, {ttl: this._refreshTokenTTL / 1000});
       let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
       if (authAccessToken) {
         authAccessToken.authTokenEntity.user = user;
@@ -619,12 +635,7 @@ export class UserService implements IService<UserEntity> {
           { ttl: Math.round((refreshTokenExpiredAt.getTime() - Date.now()) / 1000) });
       }
     } catch (error) {
-      this._logger.error(
-        `userRepository.save of uploadImage failed, email: ${JSON.stringify(
-          user.email,
-        )}`,
-        error,
-      );
+      this._logger.error(`uploadImage failed, email: ${user.email}`, error);
       throw new HttpException({
         statusCode: '500',
         message: 'Something Went Wrong',
