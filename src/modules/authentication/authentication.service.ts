@@ -138,13 +138,32 @@ export class AuthenticationService {
 
     user.password = hashPassword;
     await this._userService.updateEntity(user);
-    await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, {ttl: 0});
-    await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
-    await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+    try {
+      await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, {ttl: this._refreshTokenTTL / 1000});
+      await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
+      await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+    } catch (err) {
+      this._logger.error(`changeUserPassword cache actions failed, AUTH_ACCESS_TOKEN.USER_ID:${user.id}, USER.EMAIL:${user.email}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   public async userAuthentication(dto: LoginDto, res: Response): Promise<void> {
-    let user = await this._cacheManager.get<UserEntity>(`USER.EMAIL:${dto.email}`);
+    let user
+    try {
+      user = await this._cacheManager.get<UserEntity>(`USER.EMAIL:${dto.email}`);
+    } catch (err) {
+      this._logger.error(`userAuthentication cache get failed, USER.EMAIL:${dto.email}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
     if(!user) {
       user = await this._userService.findByEmail(dto.email);
       if (!user) {
@@ -158,7 +177,17 @@ export class AuthenticationService {
           });
         return;
       }
-      await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, {ttl: 0});
+
+      try {
+        await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, {ttl: this._refreshTokenTTL / 1000});
+      } catch (err) {
+        this._logger.error(`userAuthentication cache set failed, USER.EMAIL:${dto.email}`, err);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
     }
 
     if (!user.isActive) {
@@ -237,7 +266,17 @@ export class AuthenticationService {
       userDto.email,
       Number(authMailEntity.verificationId),
     );
-    await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, {ttl: this._mailTokenTTL / 1000});
+    try {
+      await this._cacheManager.set(`USER.EMAIL:${dto.email}`, user, {ttl: this._mailTokenTTL / 1000});
+    } catch (err) {
+      this._logger.error(`userSignUp cache set failed, USER.EMAIL:${dto.email}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     return await this.generateAuthMailToken(authMailEntity);
   }
 
@@ -253,7 +292,18 @@ export class AuthenticationService {
       }, HttpStatus.UNAUTHORIZED);
     }
 
-    let authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}`);
+    let authMailToken;
+    try {
+      authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}`);
+    } catch (err) {
+      this._logger.error(`authMailCodeConfirmation cache get failed, AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if (!authMailToken) {
       this._logger.warn(
         `authMailToken not found, mailToken: ${JSON.stringify(mailToken)}`,
@@ -316,9 +366,18 @@ export class AuthenticationService {
       }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    await this._cacheManager.set(`USER.EMAIL:${authMailToken.authMailEntity.user.email}`, authMailToken.authMailEntity.user, {ttl: 0});
-    await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailToken.authMailEntity.user.id}`);
-    await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}`);
+    try {
+      await this._cacheManager.set(`USER.EMAIL:${authMailToken.authMailEntity.user.email}`, authMailToken.authMailEntity.user, {ttl: this._refreshTokenTTL / 1000});
+      await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailToken.authMailEntity.user.id}`);
+      await this._cacheManager.del(`AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}`);
+    } catch (err) {
+      this._logger.error(`authMailCodeConfirmation cache actions failed, AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}, USER.EMAIL:${authMailToken.authMailEntity.user.email}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
     return authMailToken.authMailEntity;
   }
 
@@ -336,7 +395,18 @@ export class AuthenticationService {
 
     let authMailEntity;
     const mailToken = await this.authTokenValidation(token, false);
-    let authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}`);
+    let authMailToken
+    try {
+      authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}`);
+    } catch (err) {
+      this._logger.error(`resendMailVerification cache get failed, key: AUTH_MAIL_USER_VERIFICATION.ID:${mailToken.jti}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if (!authMailToken) {
       this._logger.warn(
         `authMailToken not found, authMail id: ${mailToken.jti}`,
@@ -379,9 +449,18 @@ export class AuthenticationService {
     }
 
     authMailEntity.expiredAt = new Date(authMailEntity.expiredAt);
-    await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailEntity.id}`,
-      { mailToken, authMailEntity, latestMailResendTimestamp: Date.now() },
-      { ttl: Math.round((authMailEntity.expiredAt.getTime() - Date.now()) / 1000) });
+    try {
+      await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailEntity.id}`,
+        { mailToken, authMailEntity, latestMailResendTimestamp: Date.now() },
+        { ttl: Math.round((authMailEntity.expiredAt.getTime() - Date.now()) / 1000) });
+    } catch (err) {
+      this._logger.error(`resendMailVerification cache set failed, AUTH_MAIL_USER_VERIFICATION.ID:${authMailEntity.id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
     this._mailService.sendCodeConfirmation(
       user.email,
@@ -391,7 +470,18 @@ export class AuthenticationService {
 
   public async sendForgetPasswordMail(req: Request, email: string): Promise<any> {
     let authMailEntity;
-    let userEntity = await this._cacheManager.get<UserEntity>(`USER.EMAIL:${email}`);
+    let userEntity;
+    try {
+      userEntity = await this._cacheManager.get<UserEntity>(`USER.EMAIL:${email}`);
+    } catch (err) {
+      this._logger.error(`sendForgetPasswordMail cache get failed, USER.EMAIL:${email}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if (!userEntity) {
       try {
         userEntity = await this._userService.findByEmail(email);
@@ -428,7 +518,17 @@ export class AuthenticationService {
       }, HttpStatus.BAD_REQUEST);
     }
 
-    let authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userEntity.id}`)
+    let authMailToken
+    try {
+      authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userEntity.id}`)
+    } catch (err) {
+      this._logger.error(`sendForgetPasswordMail cache get failed, AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userEntity.id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
     if(!authMailToken) {
       try {
         authMailEntity = await this._entityManager.getRepository(AuthMailEntity).findOne({
@@ -465,15 +565,34 @@ export class AuthenticationService {
     authMailEntity = await this.createAuthMailEntity(userEntity, AuthMailType.FORGOTTEN_PASSWORD)
     const absoluteUrl = `${req.protocol}://${req.get('host')}/forget-password/change-password?`
       + `user-id=${userEntity.id}&reset-id=${authMailEntity.verificationId}`;
-      // this._configService.get<string>('http.domain') +
-    await this._cacheManager.set(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`,
-      { mailToken: null, authMailEntity, latestMailResendTimestamp: null },
-      { ttl: this._mailTokenTTL / 1000 });
+
+    try {
+      await this._cacheManager.set(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`,
+        { mailToken: null, authMailEntity, latestMailResendTimestamp: null },
+        { ttl: this._mailTokenTTL / 1000 });
+    } catch (err) {
+      this._logger.error(`sendForgetPasswordMail cache set failed, AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     this._mailService.sendForgetPassword(
       userEntity.email,
       absoluteUrl,
     );
-    await this._cacheManager.set(`USER.EMAIL:${email}`, userEntity, {ttl: this._mailTokenTTL / 1000});
+    try {
+      await this._cacheManager.set(`USER.EMAIL:${email}`, userEntity, {ttl: this._mailTokenTTL / 1000});
+    } catch (err) {
+      this._logger.error(`sendForgetPasswordMail cache set failed, USER.EMAIL:${email}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   public async postUserResetPasswordHandler(
@@ -481,7 +600,18 @@ export class AuthenticationService {
     resetId: string,
     resetPasswordDto: PostResetPasswordDto,
   ): Promise<any> {
-    let authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
+    let authMailToken
+    try {
+      authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
+    } catch (err) {
+      this._logger.error(`postUserResetPasswordHandler cache get failed, AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if (!authMailToken) {
       this._logger.debug(
         `reset password failed, auth mail entity not found, userId: ${userId}, resetId: ${resetId}`,
@@ -510,15 +640,35 @@ export class AuthenticationService {
 
     authMailToken.authMailEntity.user.password = hashPassword;
     await this._userService.updateEntity(authMailToken.authMailEntity.user);
-    await this._cacheManager.set(`USER.EMAIL:${authMailToken.authMailEntity.user.email}`, authMailToken.authMailEntity.user, {ttl: 0});
-    await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
+
+    try {
+      await this._cacheManager.set(`USER.EMAIL:${authMailToken.authMailEntity.user.email}`, authMailToken.authMailEntity.user, {ttl: this._refreshTokenTTL / 1000});
+      await this._cacheManager.del(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
+    } catch (err) {
+      this._logger.error(`postUserResetPasswordHandler cache actions failed, AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId} USER.EMAIL:${authMailToken.authMailEntity.user.email}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   public async getUserResetPasswordReq(
     userId: string,
     resetId: string,
   ): Promise<GetResetPasswordDto> {
-    let authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
+    let authMailToken
+    try {
+      authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`);
+    } catch (err) {
+      this._logger.error(`getUserResetPasswordReq cache get failed, AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${userId}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
     if (!authMailToken) {
       this._logger.debug(
         `reset password failed, auth mail entity not found, userId: ${userId}, resetId: ${resetId}`,
@@ -539,9 +689,30 @@ export class AuthenticationService {
 
   public async revokeAuthToken(userId: string): Promise<AuthTokenEntity> {
     let authTokenEntity: AuthTokenEntity;
-    let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${userId}`);
+    let authRefreshToken;
+    try {
+      authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${userId}`);
+    } catch (err) {
+      this._logger.error(`revokeAuthToken cache get failed, AUTH_REFRESH_TOKEN.USER_ID:${userId}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
     if(!authRefreshToken) {
-      let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${userId}`);
+      let authAccessToken
+      try {
+        authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${userId}`);
+      } catch (err) {
+        this._logger.error(`revokeAuthToken cache get failed, AUTH_ACCESS_TOKEN.USER_ID:${userId}`, err);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
       if (!authAccessToken) {
         try {
           authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
@@ -591,8 +762,13 @@ export class AuthenticationService {
       }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    try {
+      await this._cacheManager.del(`USER.EMAIL:${authTokenEntity.user.email}`);
       await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${userId}`);
       await this._cacheManager.del(`AUTH_REFRESH_TOKEN.USER_ID:${userId}`);
+    } catch (err) {
+      this._logger.error(`revokeAuthToken cache actions failed, USER.EMAIL:${authTokenEntity.user.email}, AUTH_ACCESS_TOKEN.USER_ID:${userId}`, err);
+    }
     return authTokenEntity;
   }
 
@@ -608,7 +784,18 @@ export class AuthenticationService {
       }, HttpStatus.UNAUTHORIZED);
     }
 
-    let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${payload.sub}`);
+    let authAccessToken
+    try {
+      authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${payload.sub}`);
+    } catch (err) {
+      this._logger.error(`accessTokenValidation cache get failed, AUTH_ACCESS_TOKEN.USER_ID:${payload.sub}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if(!authAccessToken) {
       return new HttpException({
         statusCode: '401',
@@ -677,7 +864,18 @@ export class AuthenticationService {
       }, HttpStatus.UNAUTHORIZED);
     }
 
-    let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${payload.sub}`);
+    let authRefreshToken;
+    try {
+      authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${payload.sub}`);
+    } catch (err) {
+      this._logger.error(`resolveRefreshToken cache get failed, AUTH_REFRESH_TOKEN.USER_ID:${payload.sub}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if (!authRefreshToken) {
       this._logger.log(
         `authTokenEntity not found, payload: ${JSON.stringify(payload)}`,
@@ -732,9 +930,28 @@ export class AuthenticationService {
     let mailToken;
     let authMailToken;
     if (authMailEntity.mailType === AuthMailType.USER_VERIFICATION) {
-      authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailEntity.user.id}`);
+      try {
+        authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailEntity.user.id}`);
+      } catch (err) {
+        this._logger.error(`generateAuthMailToken cache get failed, AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailEntity.user.id}`, err);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
     } else if(authMailEntity.mailType === AuthMailType.FORGOTTEN_PASSWORD) {
-      authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`);
+      try {
+        authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`);
+      } catch (err) {
+        this._logger.error(`generateAuthMailToken cache get failed, AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`, err);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
     }
 
     if(!authMailToken) {
@@ -769,16 +986,34 @@ export class AuthenticationService {
       }
 
       if (authMailEntity.mailType === AuthMailType.USER_VERIFICATION) {
-        await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailEntity.id}`,
-          { mailToken, authMailEntity, latestMailResendTimestamp: null },
-          { ttl: this._mailTokenTTL / 1000 });
-        await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailEntity.user.id}`,
-          { mailToken, authMailEntity, latestMailResendTimestamp: null },
-          { ttl: this._mailTokenTTL / 1000 });
+        try {
+          await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.ID:${authMailEntity.id}`,
+            { mailToken, authMailEntity, latestMailResendTimestamp: null },
+            { ttl: this._mailTokenTTL / 1000 });
+          await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailEntity.user.id}`,
+            { mailToken, authMailEntity, latestMailResendTimestamp: null },
+            { ttl: this._mailTokenTTL / 1000 });
+        } catch (err) {
+          this._logger.error(`generateAuthMailToken cache set failed, AUTH_MAIL_USER_VERIFICATION.USER_ID:${authMailEntity.user.id}, AUTH_MAIL_USER_VERIFICATION.ID:${authMailEntity.id}`, err);
+          throw new HttpException({
+            statusCode: '500',
+            message: 'Something Went Wrong',
+            error: 'Internal Server Error'
+          }, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
       } else if (authMailEntity.mailType === AuthMailType.FORGOTTEN_PASSWORD) {
-        await this._cacheManager.set(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`,
-          { mailToken, authMailEntity, latestMailResendTimestamp: null },
-          { ttl: this._mailTokenTTL / 1000 });
+        try {
+          await this._cacheManager.set(`AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`,
+            { mailToken, authMailEntity, latestMailResendTimestamp: null },
+            { ttl: this._mailTokenTTL / 1000 });
+        } catch (err) {
+          this._logger.error(`generateAuthMailToken cache set failed, AUTH_MAIL_FORGOTTEN_PASSWORD.USER_ID:${authMailEntity.user.id}`, err);
+          throw new HttpException({
+            statusCode: '500',
+            message: 'Something Went Wrong',
+            error: 'Internal Server Error'
+          }, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
       }
       return mailToken;
     } else {
@@ -787,7 +1022,18 @@ export class AuthenticationService {
   }
 
   public async generateAccessToken(authTokenEntity: AuthTokenEntity): Promise<string> {
-    let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${authTokenEntity.user.id}`);
+    let authAccessToken
+    try {
+      authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${authTokenEntity.user.id}`);
+    } catch (err) {
+      this._logger.error(`generateAccessToken cache get failed, AUTH_ACCESS_TOKEN.USER_ID:${authTokenEntity.user.id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if(!authAccessToken) {
       const accessTokenId = crypto.randomUUID({
         disableEntropyCache: true,
@@ -820,11 +1066,21 @@ export class AuthenticationService {
         }, HttpStatus.INTERNAL_SERVER_ERROR);
       }
 
-      await this._cacheManager.set(
-        `AUTH_ACCESS_TOKEN.USER_ID:${authTokenEntity.user.id}`,
-        { accessTokenId, accessToken, authTokenEntity },
-        { ttl: this._accessTokenTTL / 1000 }
-      );
+      try {
+        await this._cacheManager.set(
+          `AUTH_ACCESS_TOKEN.USER_ID:${authTokenEntity.user.id}`,
+          { accessTokenId, accessToken, authTokenEntity },
+          { ttl: this._accessTokenTTL / 1000 }
+        );
+      } catch (err) {
+        this._logger.error(`generateAccessToken cache set failed, AUTH_ACCESS_TOKEN.USER_ID:${authTokenEntity.user.id}`, err);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
       return accessToken;
     } else {
       return authAccessToken.accessToken;
@@ -833,7 +1089,18 @@ export class AuthenticationService {
 
   public async generateRefreshToken(authTokenEntity: AuthTokenEntity): Promise<string> {
     let refreshToken;
-    let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${authTokenEntity.user.id}`);
+    let authRefreshToken;
+    try {
+      authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${authTokenEntity.user.id}`);
+    } catch (err) {
+      this._logger.error(`generateRefreshToken cache get failed, AUTH_REFRESH_TOKEN.USER_ID:${authTokenEntity.user.id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if(!authRefreshToken) {
       let refreshTokenExpiredAt;
       if (typeof authTokenEntity.refreshTokenExpiredAt === 'string') {
@@ -869,9 +1136,19 @@ export class AuthenticationService {
           error: 'Internal Server Error'
         }, HttpStatus.INTERNAL_SERVER_ERROR);
       }
-      await this._cacheManager.set(`AUTH_REFRESH_TOKEN.USER_ID:${authTokenEntity.user.id}`,
-        { refreshToken, authTokenEntity },
-        { ttl: this._refreshTokenTTL / 1000 });
+      try {
+        await this._cacheManager.set(`AUTH_REFRESH_TOKEN.USER_ID:${authTokenEntity.user.id}`,
+          { refreshToken, authTokenEntity },
+          { ttl: this._refreshTokenTTL / 1000 });
+      } catch (err) {
+        this._logger.error(`generateRefreshToken cache set failed, AUTH_REFRESH_TOKEN.USER_ID:${authTokenEntity.user.id}`, err);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
       return refreshToken;
     } else {
       return authRefreshToken.refreshToken;
@@ -880,7 +1157,18 @@ export class AuthenticationService {
 
   public async getAuthTokenEntity(user: UserEntity): Promise<AuthTokenEntity> {
     let authTokenEntity: AuthTokenEntity;
-    let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+    let authRefreshToken
+    try {
+      authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${user.id}`);
+    } catch (err) {
+      this._logger.error(`getAuthTokenEntity cache get failed, AUTH_REFRESH_TOKEN.USER_ID:${user.id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if(!authRefreshToken) {
       try {
         authTokenEntity = await this._entityManager.getRepository(AuthTokenEntity).findOne({
@@ -977,7 +1265,18 @@ export class AuthenticationService {
 
   public async getAuthMailEntity(userEntity: UserEntity): Promise<AuthMailEntity> {
     let authMailEntity;
-    let authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`);
+    let authMailToken;
+    try {
+      authMailToken = await this._cacheManager.get<AuthMailToken>(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`);
+    } catch (err) {
+      this._logger.error(`getAuthMailEntity cache get failed, AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`, err);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if(!authMailToken) {
       try {
         authMailEntity = await this._entityManager.getRepository(AuthMailEntity).findOne({
@@ -1011,9 +1310,18 @@ export class AuthenticationService {
         }, HttpStatus.INTERNAL_SERVER_ERROR);
       }
       if(authMailEntity) {
-        await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`,
-          { mailToken: authMailToken.mailToken, authMailEntity },
-          { ttl: Math.round((authMailEntity.expiredAt.getTime() - Date.now()) / 1000) });
+        try {
+          await this._cacheManager.set(`AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`,
+            { mailToken: authMailToken.mailToken, authMailEntity },
+            { ttl: Math.round((authMailEntity.expiredAt.getTime() - Date.now()) / 1000) });
+        } catch (err) {
+          this._logger.error(`getAuthMailEntity cache set failed, AUTH_MAIL_USER_VERIFICATION.USER_ID:${userEntity.id}`, err);
+          throw new HttpException({
+            statusCode: '500',
+            message: 'Something Went Wrong',
+            error: 'Internal Server Error'
+          }, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
       }
       return authMailEntity;
     } else {

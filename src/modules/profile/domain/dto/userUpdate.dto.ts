@@ -11,7 +11,7 @@ export class UserUpdateDto {
   public walletAddress: string;
 
   @IsOptional()
-  @Length(8, 128, { message: 'full length between 4 and 128 characters' })
+  @Length(4, 128, { message: 'full length between 4 and 128 characters' })
   @IsString({ message: 'fullName must be string' })
   @ApiPropertyOptional()
   public fullName: string;
