@@ -1,0 +1,54 @@
+version: "3"
+services:
+  postgres:
+    container_name: production_postgres
+    image: postgres:latest
+    restart: always
+    ports:
+      - "54322:5432"
+    volumes:
+      - /srv/docker-volumes-data/pgdata:/var/lib/postgresql/data/pgdata:Z
+    environment:
+      POSTGRES_DB: livelydb
+      POSTGRES_PASSWORD: "secret"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+      MAX_CONNECTIONS: 10
+      PGDATA: /var/lib/postgresql/data/pgdata
+    networks:
+      - backend_production
+
+  redis:
+    container_name: production_redis
+    image: redis:alpine
+    restart: always
+    ports:
+      - "63799:6379"
+    volumes:
+      ## keep redis data on localhost so we don't lose them ##
+      - /srv/docker-volumes-data/redis-production:/data:Z
+    command: redis-server --requirepass secret
+    environment:
+      - REDIS_REPLICATION_MODE=master
+    networks:
+      - backend_production
+
+  application:
+    container_name: offchain_production
+    restart: always
+    ports:
+      - "3101:3100"
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    volumes:
+      - "/srv/config/off-chain:/usr/src/app/dist/resources"
+    networks:
+      - backend_production
+    environment:
+      WEB_APP_ENV_MODE: PROD
+    depends_on:
+      - postgres
+      - redis
+networks:
+  backend_production:
+    driver: bridge
