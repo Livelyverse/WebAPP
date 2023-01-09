@@ -2,17 +2,15 @@
 # BUILD FOR LOCAL DEVELOPMENT
 ###################
 
-FROM node:18 As development
-RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm
+FROM node:18-alpine As development
 
 WORKDIR /usr/src/app
 
-COPY --chown=node:node pnpm-lock.yaml ./
+COPY --chown=node:node package*.json ./
 
-RUN pnpm fetch --prod
+RUN npm ci
 
 COPY --chown=node:node . .
-RUN pnpm install
 
 USER node
 
@@ -20,22 +18,21 @@ USER node
 # BUILD FOR PRODUCTION
 ###################
 
-FROM node:18 As build
-RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm
+FROM node:18-alpine As build
 
 WORKDIR /usr/src/app
 
-COPY --chown=node:node pnpm-lock.yaml ./
+COPY --chown=node:node package*.json ./
 
 COPY --chown=node:node --from=development /usr/src/app/node_modules ./node_modules
 
 COPY --chown=node:node . .
 
-RUN pnpm build
+RUN npm run build
 
 ENV NODE_ENV production
 
-RUN pnpm install --prod
+RUN npm ci --only=production && npm cache clean --force
 
 USER node
 
