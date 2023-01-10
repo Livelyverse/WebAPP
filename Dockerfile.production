@@ -8,7 +8,7 @@ WORKDIR /usr/src/app
 COPY --chown=node:node package.json ./
 COPY --chown=node:node yarn.lock ./
 
-RUN yarn
+RUN yarn install --frozen-lock
 
 COPY --chown=node:node . .
 
