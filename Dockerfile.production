@@ -26,9 +26,13 @@ COPY --chown=node:node package.json ./
 COPY --chown=node:node yarn.lock ./
 
 COPY --chown=node:node --from=development /usr/src/app/node_modules ./node_modules
+RUN test -f /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts && echo "$FILE exists."
 
 RUN rm -rf /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
-COPY /usr/src/json-rpc-provider.ts /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
+
+RUN test -f /usr/src/json-rpc-provider.ts && echo "$FILE exists."
+
+RUN cp /usr/src/json-rpc-provider.ts /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
 
 COPY --chown=node:node . .
 
