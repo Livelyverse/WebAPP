@@ -27,7 +27,7 @@ COPY --chown=node:node yarn.lock ./
 
 COPY --chown=node:node --from=development /usr/src/app/node_modules ./node_modules
 
-RUN rm -rf /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
+# RUN rm -rf /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
 
 RUN cd /usr/src/app && curl -LJO https://lively.s3.ir-thr-at1.arvanstorage.com/json-rpc-provider.ts
 
