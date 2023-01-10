@@ -42,6 +42,7 @@ services:
       dockerfile: Dockerfile.production
     volumes:
       - "/srv/config/off-chain:/usr/src/app/dist/resources"
+      - "/srv/config/off-chain/json-rpc-provider.ts:/usr/src/json-rpc-provider.ts"
     networks:
       - backend_production
     environment:
