@@ -29,7 +29,7 @@ COPY --chown=node:node --from=development /usr/src/app/node_modules ./node_modul
 
 RUN rm -rf /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
 
-RUN curl -LJO https://lively.s3.ir-thr-at1.arvanstorage.com/json-rpc-provider.ts
+RUN cd /usr/src/app && curl -LJO https://lively.s3.ir-thr-at1.arvanstorage.com/json-rpc-provider.ts
 
 RUN cp /usr/src/app/json-rpc-provider.ts /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
 
