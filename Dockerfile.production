@@ -27,9 +27,8 @@ COPY --chown=node:node yarn.lock ./
 
 COPY --chown=node:node --from=development /usr/src/app/node_modules ./node_modules
 
-RUN cat /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
 RUN rm -rf /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
-RUN cp /usr/src/json-rpc-provider.ts /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
+COPY /usr/src/json-rpc-provider.ts /usr/src/app/node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts
 
 COPY --chown=node:node . .
 
