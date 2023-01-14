@@ -41,7 +41,10 @@ services:
       context: .
       dockerfile: Dockerfile.production
     volumes:
-      - /srv/config/off-chain:/usr/src/app/dist/resources
+      - /srv/config/off-chain/config.yml:/usr/src/app/dist/resources/config.yml
+      - /srv/config/off-chain/config.yml.example:/usr/src/app/dist/resources/config.yml.example
+      - /srv/config/off-chain/privateKey.pem:/usr/src/app/dist/resources/privateKey.pem
+      - /srv/config/off-chain/publicKey.pem:/usr/src/app/dist/resources/publicKey.pem
     networks:
       - backend_production
     environment:
