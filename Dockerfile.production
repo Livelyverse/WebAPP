@@ -3,16 +3,11 @@
 # BUILD FOR PRODUCTION
 ###################
 FROM node:alpine As build
-RUN mkdir -p /usr/src/app/node_modules
-RUN mkdir -p /usr/src/app/dist
 
 WORKDIR /usr/src/app
 
-COPY node_modules /usr/src/app/node_modules
-COPY dist /usr/src/app/dist
-
-RUN chmod +x /usr/src/app/dist
-RUN chmod +x /usr/src/app/node_modules
+COPY node_modules ./node_modules
+COPY dist ./dist
 
 USER node
 
@@ -23,5 +18,5 @@ FROM node:alpine As production
 
 COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
 COPY --chown=node:node --from=build /usr/src/app/dist ./dist
-EXPOSE 3100
+
 CMD [ "node", "dist/main.js" ]
