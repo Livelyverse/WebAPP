@@ -2,8 +2,7 @@
 ###################
 # BUILD FOR PRODUCTION
 ###################
-FROM node:v18.11 As build
-
+FROM node:alpine As build
 RUN mkdir -p /usr/src/app/node_modules
 RUN mkdir -p /usr/src/app/dist
 
@@ -18,7 +17,7 @@ USER node
 ###################
 # PRODUCTION
 ###################
-FROM node:v18.11 As production
+FROM node:alpine As production
 
 COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
 COPY --chown=node:node --from=build /usr/src/app/dist ./dist
