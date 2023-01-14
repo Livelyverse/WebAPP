@@ -4,10 +4,13 @@
 ###################
 FROM node:latest As build
 
+RUN mkdir -p /usr/src/app/node_modules
+RUN mkdir -p /usr/src/app/dist
+
 WORKDIR /usr/src/app
 
-#COPY /var/www/WebAPP/node_modules /usr/src/app/node_modules
-#COPY /var/www/WebAPP/dist /usr/src/app/dist
+ADD /var/www/WebAPP/node_modules /usr/src/app/node_modules
+ADD /var/www/WebAPP/dist /usr/src/app/dist
 
 USER node
 
@@ -17,7 +20,7 @@ USER node
 ###################
 FROM node:latest As production
 
-# COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
-# COPY --chown=node:node --from=build /usr/src/app/dist ./dist
+COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
+COPY --chown=node:node --from=build /usr/src/app/dist ./dist
 
 CMD [ "node", "/usr/src/app/dist/main.js" ]
