@@ -58,4 +58,3 @@ services:
       - redis
 networks:
   backend_production:
-    driver: bridge
