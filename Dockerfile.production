@@ -6,7 +6,7 @@ FROM node:alpine As build
 RUN mkdir -p /usr/src/app/node_modules
 RUN mkdir -p /usr/src/app/dist
 
-WORKDIR /usr/src/app
+# WORKDIR /usr/src/app
 
 COPY /var/www/WebAPP/node_modules/ /usr/src/app/node_modules
 COPY /var/www/WebAPP/dist/ /usr/src/app/dist
