@@ -37,7 +37,7 @@ services:
     container_name: offchain_production
     restart: always
     ports:
-      - "3101:3100"
+      - "3100"
     build:
       context: .
       dockerfile: Dockerfile.production
