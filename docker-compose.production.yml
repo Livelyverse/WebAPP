@@ -41,6 +41,8 @@ services:
       context: .
       dockerfile: Dockerfile.production
     volumes:
+      - /var/www/WebAPP/node_modules:/usr/src/app/node_modules
+      - /var/www/WebAPP/dist:/usr/src/app/dist
       - /srv/config/off-chain/config.yml:/usr/src/app/dist/resources/config.yml
       - /srv/config/off-chain/config.yml.example:/usr/src/app/dist/resources/config.yml.example
       - /srv/config/off-chain/privateKey.pem:/usr/src/app/dist/resources/privateKey.pem
