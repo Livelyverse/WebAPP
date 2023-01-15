@@ -32,6 +32,8 @@ services:
     restart: always
     ports:
       - "3101:3100"
+    expose:
+      - 465
     build:
       context: .
       dockerfile: Dockerfile.production
