@@ -2,10 +2,10 @@ version: "3"
 services:
   postgres:
     container_name: production_postgres
-    image: postgres:latest
+    image: postgres:14.2
     restart: always
     ports:
-      - "54322:5432"
+      - "5432:5432"
     volumes:
       - /srv/docker-volumes-data/pgdata:/var/lib/postgresql/data/pgdata:Z
     environment:
@@ -23,7 +23,7 @@ services:
     image: redis
     restart: always
     ports:
-      - "63799:6379"
+      - "6379:6379"
     networks:
       - backend_production
 
@@ -32,8 +32,6 @@ services:
     restart: always
     ports:
       - "3101:3100"
-    expose:
-      - 465
     build:
       context: .
       dockerfile: Dockerfile.production
