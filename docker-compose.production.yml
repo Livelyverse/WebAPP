@@ -1,0 +1,50 @@
+version: "3"
+services:
+  postgres:
+    container_name: production_postgres
+    image: postgres:latest
+    restart: always
+    ports:
+      - "54322:5432"
+    volumes:
+      - /srv/docker-volumes-data/pgdata:/var/lib/postgresql/data/pgdata:Z
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+      MAX_CONNECTIONS: 10
+      PGDATA: /var/lib/postgresql/data/pgdata
+    networks:
+      - backend_production
+
+  redis:
+    container_name: production_redis
+    image: redis
+    restart: always
+    ports:
+      - "63799:6379"
+    networks:
+      - backend_production
+
+  application:
+    container_name: offchain_production
+    restart: always
+    ports:
+      - "3101:3100"
+    expose:
+      - 465
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    networks:
+      - backend_production
+    env_file:
+      - .env
+    environment:
+      WEB_APP_ENV_MODE: PROD
+    depends_on:
+      - postgres
+      - redis
+networks:
+  backend_production:
