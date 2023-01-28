@@ -11,7 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { UserCreateDto, UserUpdateDto } from '../domain/dto';
 import { validate } from 'class-validator';
 import { FindAllType, IService, SortType } from "./IService";
-import { UserEntity } from '../domain/entity';
+import { SocialProfileEntity, UserEntity } from '../domain/entity';
 import { UserGroupService } from './userGroup.service';
 import * as argon2 from 'argon2';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
@@ -24,6 +24,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Cache } from "cache-manager";
 import { ethers } from "ethers";
+import { SocialProfileService } from "./socialProfile.service";
 
 export enum UserSortBy {
   TIMESTAMP = 'createdAt',
@@ -49,6 +50,8 @@ export class UserService implements IService<UserEntity> {
   private readonly _refreshTokenTTL;
 
   constructor(
+    @InjectRepository(SocialProfileEntity)
+    private readonly _socialProfileRepository: Repository<SocialProfileEntity>,
     @InjectRepository(AuthTokenEntity)
     private readonly _tokenRepository: Repository<AuthTokenEntity>,
     @InjectRepository(AuthMailEntity)
@@ -59,6 +62,7 @@ export class UserService implements IService<UserEntity> {
     private readonly _cacheManager: Cache,
     private readonly _userGroupService: UserGroupService,
     private readonly _configService: ConfigService,
+    private readonly _socialProfileService: SocialProfileService,
   ) {
     this._uploadPath = path.join(process.cwd(), this._configService.get<string>('http.upload.path'));
     this._accessTokenTTL = this._configService.get<number>('app.accessTokenTTL');
@@ -246,6 +250,26 @@ export class UserService implements IService<UserEntity> {
       }
     }
 
+    const profiles = await this._socialProfileRepository.find({
+      relations: ['user'],
+      where: {
+        user: { id: user.id },
+      },
+    });
+
+    if (profiles && profiles.length > 0) {
+      for (let i = 0; i < profiles.length; i++) {
+        try {
+          await this._socialProfileRepository.remove(profiles[i]);
+        } catch (error) {
+          this._logger.error(
+            `socialRepository.remove failed: socialProfile id ${profiles[i].id}`,
+            error,
+          );
+        }
+      }
+    }
+
     try {
       await this._cacheManager.del(`USER.EMAIL:${user.email}`);
       await this._cacheManager.del(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
@@ -340,6 +364,26 @@ export class UserService implements IService<UserEntity> {
         } catch (error) {
           this._logger.error(
             `tokenRepository.remove failed: authToken id ${authTokens[i].id}`,
+            error,
+          );
+        }
+      }
+    }
+    
+    const profiles = await this._socialProfileRepository.find({
+      relations: ['user'],
+      where: {
+        user: { id: user.id },
+      },
+    });
+
+    if (profiles && profiles.length > 0) {
+      for (let i = 0; i < profiles.length; i++) {
+        try {
+          await this._socialProfileRepository.remove(profiles[i]);
+        } catch (error) {
+          this._logger.error(
+            `socialRepository.remove failed: socialProfile id ${profiles[i].id}`,
             error,
           );
         }
