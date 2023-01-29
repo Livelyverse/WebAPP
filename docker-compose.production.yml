@@ -15,13 +15,12 @@ services:
 
   redis:
     container_name: production_redis
-    image: redis:alpine
+    image: redis:6
     restart: unless-stopped
     ports:
       - "6379:6379"
-    command: redis-server --requirepass secret
     environment:
-      - REDIS_REPLICATION_MODE=master
+      - ALLOW_EMPTY_PASSWORD=yes
     networks:
       - backend_production
 
