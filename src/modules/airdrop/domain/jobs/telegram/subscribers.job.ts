@@ -1,40 +1,81 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Timeout } from '@nestjs/schedule';
-import { Telegram, Telegraf, Scenes, session } from 'telegraf';
+import { Telegram, Telegraf, Scenes, session, Context } from 'telegraf';
 import { InlineKeyboardButton } from 'typegram';
+import { ConfigService } from '@nestjs/config';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager, MoreThan } from 'typeorm';
+import { SocialProfileEntity, SocialType } from '../../../../profile/domain/entity/socialProfile.entity'
+import { SocialEventEntity } from '../../entity/socialEvent.entity';
+import { SocialAirdropScheduleEntity } from '../../entity/socialAirdropSchedule.entity';
+import { SocialTrackerEntity } from '../../entity/socialTracker.entity';
 
 @Injectable()
 export class TelegramSubscriberJob {
-  // use @BotFather to get your token, it must be the admin of channel
-  private token = '5416659848:AAFMYvWTiX4IBUDrA6Tp4xHKxCGf0eZA2pc';
-  // creating bot with generated token
-  private bot = new Telegraf(this.token);
+  private readonly _logger = new Logger(TelegramSubscriberJob.name);
+  private readonly _token;
+  private readonly _channelName: string;
+  private readonly _bot;
+  private readonly _telegram: Telegram;
+  private readonly _owner;
+  private readonly _admins;
+  private readonly _numTrackerInterval;
 
-  // initializing telegram sdk with the generated token
-  private telegram = new Telegram(this.token);
 
-  // admin id that have administrator access to the channel
-  private adminId = 896767754;
+  constructor(
+    @InjectEntityManager()
+    private readonly _entityManager: EntityManager,
+    private readonly _configService: ConfigService,
+  ){
+    this._token = this._configService.get<string>("airdrop.telegram.token");
+    if (!this._token) {
+      throw new Error("airdrop.telegram.token config is empty");
+    }
 
-  private admins = [896767754];
+    this._channelName = this._configService.get<string>("airdrop.telegram.channelName");
+    if (!this._channelName) {
+      throw new Error("airdrop.telegram.channelName config is empty");
+    }
 
-  private channelName = '@livelychanneltest';
+    this._owner = this._configService.get<string>("airdrop.telegram.owner");
+    if (!this._owner) {
+      throw new Error("airdrop.telegram.owner config is empty");
+    }
+
+    this._admins = this._configService.get<number[]>("airdrop.telegram.admins");
+    if (!this._admins) {
+      throw new Error("airdrop.telegram.admins config is empty");
+    }
+
+    this._numTrackerInterval = this._configService.get<number>('airdrop.telegram.tracker.interval');
+    if (!this._numTrackerInterval) {
+      throw new Error("airdrop.telegram.tracker.interval config is empty");
+    }
+
+    // creating bot with the token
+    this._bot = new Telegraf(this._token)
+    // initializing telegram sdk with the the token
+    this._telegram = new Telegram(this._token)
+    this.findNewSubscribers();
+  }
 
   // this function should register all the middleware and actions to react to the users activity
   @Timeout(1000)
   async findNewSubscribers() {
+    this._logger.debug("findNewSubscribers started!!!")
     try {
       // create stage from all scenes
       const stage = new Scenes.Stage<Scenes.SceneContext>([this.createAirdropScene()]);
 
       // session middleware will create a session for each user
-      this.bot.use(session());
+      this._bot.use(session());
 
       // register stage middleware
-      this.bot.use(stage.middleware());
+      this._bot.use(stage.middleware());
 
       // on call bot for first time
-      this.bot.start(async (ctx) => {
+      this._bot.start(async (ctx) => {
+        // this._logger.debug('Started By', JSON.stringify(ctx));
         await ctx.sendMessage('welcome', {
           reply_markup: {
             keyboard: [[{ text: 'new airdrop 🤑' }, { text: 'new post 🤓' }]],
@@ -44,13 +85,13 @@ export class TelegramSubscriberJob {
       });
 
       // creating new airdrop post
-      this.bot.hears('new airdrop 🤑', (ctx) => {
-        if (this.admins.includes(ctx.update.message.from.id)) return;
+      this._bot.hears('new airdrop 🤑', (ctx) => {
+        if (!this._admins.includes(ctx.update.message.from.id)) return;
         (ctx as any).scene.enter('createAirdrop', { user_id: ctx.update.message.from.id });
       });
 
       // listening to the airdrop post click
-      this.registerOnAirdropPostClicked();
+      this.registerOnAirdropPostClicked()
 
       // this.bot.hears('new post 🤓', (ctx) => ctx.reply('post clicked'));
 
@@ -60,7 +101,7 @@ export class TelegramSubscriberJob {
 
       // this.registerAction('next');
 
-      await this.bot.launch();
+      await this._bot.launch();
     } catch (error) {
       console.log('error on telegram: ', error);
     }
@@ -70,11 +111,11 @@ export class TelegramSubscriberJob {
    * remove join and leave notification on super group
    */
   registerRemoveJoinAndLeftMessages() {
-    this.bot.on(['left_chat_member', 'new_chat_members'], async (ctx) => {
+    this._bot.on(['left_chat_member', 'new_chat_members'], async (ctx) => {
       try {
         await ctx.telegram.deleteMessage(ctx.update.message.chat.id, ctx.update.message.message_id);
         await ctx.telegram.sendMessage(
-          this.adminId,
+          this._owner,
           `chat member ${
             (ctx.update.message as any).new_chat_member
               ? (ctx.update.message as any).new_chat_member.username
@@ -91,14 +132,14 @@ export class TelegramSubscriberJob {
    * listens to join new members in super group
    */
   registerListenerForNewMember() {
-    this.bot.on('new_chat_members', (ctx) => {
+    this._bot.on('new_chat_members', (ctx) => {
       console.log('ctx.chatJoinRequest.from:', ctx.update.message);
     });
   }
 
   postWithButton(btnText: string, btnCallbackData: string, postText: string) {
-    this.telegram.callApi('sendMessage', {
-      chat_id: this.channelName,
+    this._telegram.callApi('sendMessage', {
+      chat_id: this._channelName,
       reply_markup: {
         inline_keyboard: [[{ text: btnText, callback_data: btnCallbackData }]],
       },
@@ -108,7 +149,7 @@ export class TelegramSubscriberJob {
   }
 
   registerAction(callback: string) {
-    this.bot.action(callback, async (ctx) => {
+    this._bot.action(callback, async (ctx) => {
       console.log('action next clicked');
       try {
         const user = ctx.update.callback_query.from;
@@ -122,23 +163,23 @@ export class TelegramSubscriberJob {
 
   // send a simple message to channel
   async sendMessageToChannel(msg: string) {
-    await this.telegram.sendMessage(this.channelName, msg);
+    await this._telegram.sendMessage(this._channelName, msg);
   }
 
   createAirdropScene() {
     return new Scenes.WizardScene<any>(
       'createAirdrop',
       async (ctx) => {
-        await ctx.reply('enter post title: ');
+        await ctx.reply("Type the event's tile: ");
         return ctx.wizard.next();
       },
       async (ctx) => {
         ctx.scene.state.title = ctx.update.message.text;
-        await ctx.reply('provide an image or send none: ');
+        await ctx.reply('provide an image or send "none": ');
         await ctx.wizard.next();
       },
       async (ctx) => {
-        ctx.scene.state.image = ctx.update.message.photo[1];
+        ctx.scene.state.image = ctx.update.message.photo ? ctx.update.message.photo[1] : ctx.update.message.text;
         await ctx.reply('provide an action button text: ');
         await ctx.wizard.next();
       },
@@ -147,7 +188,42 @@ export class TelegramSubscriberJob {
         const state = ctx.scene.state;
         console.log('data is: ', state);
 
-        await this.createAirdropPost(state.image.file_id, state.title, state.button);
+        const schedule = await this._entityManager.getRepository(SocialAirdropScheduleEntity)
+        .findOne({
+          relations: {
+            socialLively: true
+          },
+          loadEagerRelations: true,
+          where: {
+            socialLively: {
+              socialType: SocialType.TELEGRAM,
+              isActive: true,
+            },
+            airdropEndAt: MoreThan(new Date())
+          }
+        })
+
+        if (!schedule) {
+          ctx.reply("We are not in any schedule right now!");
+          return ctx.scene.leave();
+        }
+
+        const post = await this.createAirdropPost(state.image.file_id ? state.image.file_id : state.image, state.title, state.button);
+        if (!post) {
+          ctx.reply("Faild to post the event!")
+          return ctx.scene.leave();
+        }
+        const event = await this._entityManager.getRepository(SocialEventEntity).create({
+          contentId: post.message_id,
+          content: ctx.scene.state.image,
+          airdropSchedule: schedule,
+        })
+        if (!event) {
+          ctx.reply("Can't create this event into the database!")
+          await ctx.telegram.deleteMessage(this._channelName, post.message_id);
+          return ctx.scene.leave();
+        }
+        ctx.reply(`The event posted successfuly: t.me/${this._channelName.slice(1)}/${post.message_id}`)
         return ctx.scene.leave();
       },
     );
@@ -155,14 +231,22 @@ export class TelegramSubscriberJob {
 
   // creating air drop post with image, caption and button
   async createAirdropPost(source: string, caption: string, btnText: string) {
+    let result
     try {
-      await this.telegram.sendPhoto(this.channelName, source, {
+      source === "none" ? 
+      await this._telegram.sendMessage(this._channelName, caption, {
+        reply_markup: {
+          inline_keyboard: [[{ text: btnText, callback_data: 'airdrop_clicked' }]],
+        },
+      })
+      :
+      await this._telegram.sendPhoto(this._channelName, source, {
         caption,
         reply_markup: {
           inline_keyboard: [[{ text: btnText, callback_data: 'airdrop_clicked' }]],
         },
-      });
-      return true;
+      })
+      return result;
     } catch (error) {
       console.log('error on create air drop post: ', error);
       return false;
@@ -171,22 +255,80 @@ export class TelegramSubscriberJob {
 
   /**
    * react to the airdrop post clicked
-   * you can retrieve the user data from ctx.update.callback_query.from
+   * you can retrieve the user data from ctx.callbackQuery.from
    * every time user clicked the button it will trigger this action
    */
-  registerOnAirdropPostClicked() {
-    this.bot.action('airdrop_clicked', (ctx) => {
-      // this.memberIsInChannel(ctx.update.callback_query.from.id);
-      console.log('air drop licked by', ctx.update.callback_query.from.id, ctx.update.callback_query.from.username);
-    });
-  }
 
+  registerOnAirdropPostClicked() {
+    this._bot.action('airdrop_clicked', async(ctx: Context) => 
+    {
+    const memberStatus = await this.memberInChannelStatus(ctx.callbackQuery.from.id);
+    if (memberStatus === "left" || memberStatus === "not") {
+      ctx.answerCbQuery("Faild: You should join the channel first!")
+      return
+    }
+    const sender = {id: ctx.callbackQuery.from.id, username: ctx.callbackQuery.from.username, status: memberStatus}
+    const event = await this._entityManager.getRepository(SocialEventEntity)
+    .findOne({
+      relations: {
+        airdropSchedule: true
+      },
+      loadEagerRelations: true,
+     where: {
+      contentId: `${ctx.callbackQuery.message.message_id}`
+     }
+    })
+    if (!event) {
+      ctx.answerCbQuery("Faild: Can't find the event!!");
+      return;
+    }
+    if (event.airdropSchedule.airdropEndAt <= new Date()) {
+      ctx.answerCbQuery("Faild: The schedule of this event had been expired!")
+      return;
+    }
+    this._logger.debug('air drop clicked by', sender.id, sender.username);
+    const socialProfile = await this._entityManager
+    .createQueryBuilder(SocialProfileEntity, "socialProfile")
+    .where('"socialProfile"."socialType" = :socialType', {socialType: SocialType.TELEGRAM})
+    .andWhere('"socialProfile"."username" = :username', {username: sender.username})
+    .orWhere('"socialProfile"."socialId" = :socialId', {socialId: sender.id})
+    .getOne()
+    if (!socialProfile) {
+      ctx.answerCbQuery("Failed: You should register at our platform first!")
+      return;
+    }
+    let socialTracker = await this._entityManager.getMongoRepository(SocialTrackerEntity)
+    .findOne({
+      relations: {
+        socialEvent: true,
+        socialProfile: true,
+      },
+      loadEagerRelations: true,
+     where: {
+      socialEvent: event,
+      socialProfile: socialProfile,
+     }
+    })
+    if (socialTracker) {
+      ctx.answerCbQuery("Success: You'r action submited before!")
+      return;
+    }
+    socialTracker = await this._entityManager.getRepository(SocialTrackerEntity).create({
+      socialEvent: event,
+      socialProfile: socialProfile
+    })
+    if (!socialTracker) {
+      ctx.answerCbQuery("Failed: We can't sumbit your action in our database!")
+      return;
+    }
+  })
+  }
   /**
    * create invite link, its just usable for one time
    */
   async createInviteLink(channel?: string): Promise<string> {
-    const result = await this.telegram.callApi('createChatInviteLink', {
-      chat_id: channel ?? this.channelName,
+    const result = await this._telegram.callApi('createChatInviteLink', {
+      chat_id: channel ?? this._channelName,
     });
     return result.invite_link;
   }
@@ -195,9 +337,9 @@ export class TelegramSubscriberJob {
    * @param id, check if member is in channel by his user id
    * also username is supported, just pass the user name as id
    */
-  async memberIsInChannel(id: number): Promise<'member' | 'left' | 'not' | 'creator'> {
+  async memberInChannelStatus(id: number): Promise<'member' | 'left' | 'not' | 'creator'> {
     try {
-      const result = await this.telegram.getChatMember(this.channelName, id);
+      const result = await this._telegram.getChatMember(this._channelName, id);
       if (result.status === 'left') return 'left';
       else if (result.status === 'member') return 'member';
       else if (result.status === 'creator') return 'creator';
@@ -215,7 +357,7 @@ export class TelegramSubscriberJob {
     //   ],
     // ],
 
-    this.bot.start((ctx) => {
+    this._bot.start((ctx) => {
       ctx.sendPhoto(imageUrl, {
         caption: caption,
         reply_markup: {
@@ -227,7 +369,7 @@ export class TelegramSubscriberJob {
   }
 
   sendMessageWithButton() {
-    this.bot.command('like', (ctx) => {
+    this._bot.command('like', (ctx) => {
       ctx.reply('Hi there!', {
         reply_markup: {
           inline_keyboard: [
