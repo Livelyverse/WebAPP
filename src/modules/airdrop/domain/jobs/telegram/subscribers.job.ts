@@ -7,6 +7,7 @@ import { InjectEntityManager } from '@nestjs/typeorm';
 import { EntityManager, MoreThan } from 'typeorm';
 import { SocialProfileEntity, SocialType } from '../../../../profile/domain/entity/socialProfile.entity'
 import { SocialEventEntity } from '../../entity/socialEvent.entity';
+import { SocialActionType } from '../../entity/enums';
 import { SocialAirdropScheduleEntity } from '../../entity/socialAirdropSchedule.entity';
 import { SocialTrackerEntity } from '../../entity/socialTracker.entity';
 
@@ -213,7 +214,8 @@ export class TelegramSubscriberJob {
           ctx.reply("Faild to post the event!")
           return ctx.scene.leave();
         }
-        const event = await this._entityManager.getRepository(SocialEventEntity).create({
+        const event = await this._entityManager.getRepository(SocialEventEntity).save({
+          publishedAt: new Date(),
           contentId: post.message_id,
           content: ctx.scene.state.image,
           airdropSchedule: schedule,
@@ -223,6 +225,7 @@ export class TelegramSubscriberJob {
           await ctx.telegram.deleteMessage(this._channelName, post.message_id);
           return ctx.scene.leave();
         }
+        this._logger.debug("Created event is:", JSON.stringify(event))
         ctx.reply(`The event posted successfuly: t.me/${this._channelName.slice(1)}/${post.message_id}`)
         return ctx.scene.leave();
       },
@@ -234,13 +237,13 @@ export class TelegramSubscriberJob {
     let result
     try {
       source === "none" ? 
-      await this._telegram.sendMessage(this._channelName, caption, {
+      result = await this._telegram.sendMessage(this._channelName, caption, {
         reply_markup: {
           inline_keyboard: [[{ text: btnText, callback_data: 'airdrop_clicked' }]],
         },
       })
       :
-      await this._telegram.sendPhoto(this._channelName, source, {
+      result = await this._telegram.sendPhoto(this._channelName, source, {
         caption,
         reply_markup: {
           inline_keyboard: [[{ text: btnText, callback_data: 'airdrop_clicked' }]],
@@ -288,16 +291,17 @@ export class TelegramSubscriberJob {
     }
     this._logger.debug('air drop clicked by', sender.id, sender.username);
     const socialProfile = await this._entityManager
-    .createQueryBuilder(SocialProfileEntity, "socialProfile")
-    .where('"socialProfile"."socialType" = :socialType', {socialType: SocialType.TELEGRAM})
-    .andWhere('"socialProfile"."username" = :username', {username: sender.username})
-    .orWhere('"socialProfile"."socialId" = :socialId', {socialId: sender.id})
-    .getOne()
+    .getRepository(SocialProfileEntity).findOne({
+      where: {
+        socialType: SocialType.TELEGRAM,
+        socialId: `${sender.id}`,
+      }
+    })
     if (!socialProfile) {
       ctx.answerCbQuery("Failed: You should register at our platform first!")
       return;
     }
-    let socialTracker = await this._entityManager.getMongoRepository(SocialTrackerEntity)
+    let socialTracker = await this._entityManager.getRepository(SocialTrackerEntity)
     .findOne({
       relations: {
         socialEvent: true,
@@ -305,15 +309,20 @@ export class TelegramSubscriberJob {
       },
       loadEagerRelations: true,
      where: {
-      socialEvent: event,
-      socialProfile: socialProfile,
+      socialEvent: {
+        id: event.id
+      },
+      socialProfile: {
+        id: socialProfile.id
+      },
      }
     })
     if (socialTracker) {
       ctx.answerCbQuery("Success: You'r action submited before!")
       return;
     }
-    socialTracker = await this._entityManager.getRepository(SocialTrackerEntity).create({
+    socialTracker = await this._entityManager.getRepository(SocialTrackerEntity).save({
+      actionType: SocialActionType.REACTION,
       socialEvent: event,
       socialProfile: socialProfile
     })
@@ -321,6 +330,7 @@ export class TelegramSubscriberJob {
       ctx.answerCbQuery("Failed: We can't sumbit your action in our database!")
       return;
     }
+    ctx.answerCbQuery("Success: You'r action submited successfuly!")
   })
   }
   /**
