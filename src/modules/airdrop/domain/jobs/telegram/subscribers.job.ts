@@ -10,6 +10,8 @@ import { SocialEventEntity } from '../../entity/socialEvent.entity';
 import { SocialActionType } from '../../entity/enums';
 import { SocialAirdropScheduleEntity } from '../../entity/socialAirdropSchedule.entity';
 import { SocialTrackerEntity } from '../../entity/socialTracker.entity';
+import { SocialAirdropEntity } from '../../entity/socialAirdrop.entity';
+import { SocialAirdropRuleEntity } from '../../entity/socialAirdropRule.entity';
 
 @Injectable()
 export class TelegramSubscriberJob {
@@ -79,28 +81,20 @@ export class TelegramSubscriberJob {
         // this._logger.debug('Started By', JSON.stringify(ctx));
         await ctx.sendMessage('welcome', {
           reply_markup: {
-            keyboard: [[{ text: 'new airdrop 🤑' }, { text: 'new post 🤓' }]],
+            keyboard: [[{ text: 'new airdrop event post 🤑' }]],
             resize_keyboard: true,
           },
         });
       });
 
       // creating new airdrop post
-      this._bot.hears('new airdrop 🤑', (ctx) => {
+      this._bot.hears('new airdrop event post 🤑', (ctx) => {
         if (!this._admins.includes(ctx.update.message.from.id)) return;
         (ctx as any).scene.enter('createAirdrop', { user_id: ctx.update.message.from.id });
       });
 
       // listening to the airdrop post click
       this.registerOnAirdropPostClicked()
-
-      // this.bot.hears('new post 🤓', (ctx) => ctx.reply('post clicked'));
-
-      this.registerListenerForNewMember();
-
-      // await this.createInviteLink();
-
-      // this.registerAction('next');
 
       await this._bot.launch();
     } catch (error) {
@@ -136,35 +130,6 @@ export class TelegramSubscriberJob {
     this._bot.on('new_chat_members', (ctx) => {
       console.log('ctx.chatJoinRequest.from:', ctx.update.message);
     });
-  }
-
-  postWithButton(btnText: string, btnCallbackData: string, postText: string) {
-    this._telegram.callApi('sendMessage', {
-      chat_id: this._channelName,
-      reply_markup: {
-        inline_keyboard: [[{ text: btnText, callback_data: btnCallbackData }]],
-      },
-      text: postText,
-      allow_sending_without_reply: true,
-    });
-  }
-
-  registerAction(callback: string) {
-    this._bot.action(callback, async (ctx) => {
-      console.log('action next clicked');
-      try {
-        const user = ctx.update.callback_query.from;
-        console.log('ctx is: ', user);
-        const result = await ctx.answerCbQuery();
-        ctx.reply(`next clicked by @${user.username} with user id ${user.id}: ${user.first_name} ${user.last_name}`);
-        console.log('result is: ', result);
-      } catch (error) {}
-    });
-  }
-
-  // send a simple message to channel
-  async sendMessageToChannel(msg: string) {
-    await this._telegram.sendMessage(this._channelName, msg);
   }
 
   createAirdropScene() {
@@ -330,17 +295,35 @@ export class TelegramSubscriberJob {
       ctx.answerCbQuery("Failed: We can't sumbit your action in our database!")
       return;
     }
+    const reactionRule = await this._entityManager.getRepository(SocialAirdropRuleEntity).findOne({
+      where: {
+        socialType: SocialType.TELEGRAM,
+        actionType: SocialActionType.REACTION,
+      }
+    })
+    if (!reactionRule) {
+      ctx.answerCbQuery("Failed: Sorry we can't find the reaction rule from the database, Please report this to the admin")
+      return
+    }
+    const airdrop = await this._entityManager.getRepository(SocialAirdropEntity).save({
+      airdropRule: reactionRule,
+      socialTracker: socialTracker,
+    })
+    if (!airdrop) {
+      ctx.answerCbQuery("Failed: Sorry we can't insert the airdrop into the database, Please report this to the admin")
+      await this._entityManager.getRepository(SocialTrackerEntity).remove(socialTracker)
+      return
+    }
+    socialTracker.airdrop = airdrop
+    const finalSocialTracker = await this._entityManager.getRepository(SocialTrackerEntity).save(socialTracker)
+    if (!finalSocialTracker) {
+      ctx.answerCbQuery("Failed: Sorry we can't the socialTracker from database, Please report this to the admin")
+      await this._entityManager.getRepository(SocialAirdropEntity).remove(airdrop)
+      await this._entityManager.getRepository(SocialTrackerEntity).remove(socialTracker)
+      return
+    }
     ctx.answerCbQuery("Success: You'r action submited successfuly!")
   })
-  }
-  /**
-   * create invite link, its just usable for one time
-   */
-  async createInviteLink(channel?: string): Promise<string> {
-    const result = await this._telegram.callApi('createChatInviteLink', {
-      chat_id: channel ?? this._channelName,
-    });
-    return result.invite_link;
   }
 
   /**
@@ -357,47 +340,5 @@ export class TelegramSubscriberJob {
     } catch (error) {
       return 'not';
     }
-  }
-
-  sendMessageWithButtonAndPhoto(imageUrl: string, buttons: InlineKeyboardButton[][], caption: string) {
-    // inline_keyboard: [
-    //   [
-    //     { text: '👍', callback_data: 'qwe' },
-    //     { text: '👎', callback_data: 'asd' },
-    //   ],
-    // ],
-
-    this._bot.start((ctx) => {
-      ctx.sendPhoto(imageUrl, {
-        caption: caption,
-        reply_markup: {
-          inline_keyboard: buttons,
-          resize_keyboard: true,
-        },
-      });
-    });
-  }
-
-  sendMessageWithButton() {
-    this._bot.command('like', (ctx) => {
-      ctx.reply('Hi there!', {
-        reply_markup: {
-          inline_keyboard: [
-            /* Inline buttons. 2 side-by-side */
-            // [
-            //   { text: 'Button 1', callback_data: 'btn-1' },
-            //   { text: 'Button 2', callback_data: 'btn-2' },
-            // ],
-            /* One button */
-            // it needs a registered action to respond to this callback_data
-            [{ text: '👍', callback_data: 'next' }],
-            // [Markup.callbackButton('Test', 'test')],
-            // [m.callbackButton('Test 2', 'test2')],
-            /* Also, we can have URL buttons. */
-            // [{ text: 'Open in browser', url: 'telegraf.js.org' }],
-          ],
-        },
-      });
-    });
   }
 }
