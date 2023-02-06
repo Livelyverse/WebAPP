@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Timeout } from '@nestjs/schedule';
 import { Telegram, Telegraf, Scenes, session, Context } from 'telegraf';
-import { InlineKeyboardButton } from 'typegram';
 import { ConfigService } from '@nestjs/config';
 import { InjectEntityManager } from '@nestjs/typeorm';
-import { EntityManager, MoreThan } from 'typeorm';
+import { EntityManager, EntityNotFoundError, MoreThan } from 'typeorm';
 import { SocialProfileEntity, SocialType } from '../../../../profile/domain/entity/socialProfile.entity'
 import { SocialEventEntity } from '../../entity/socialEvent.entity';
 import { SocialActionType } from '../../entity/enums';
@@ -12,7 +11,12 @@ import { SocialAirdropScheduleEntity } from '../../entity/socialAirdropSchedule.
 import { SocialTrackerEntity } from '../../entity/socialTracker.entity';
 import { SocialAirdropEntity } from '../../entity/socialAirdrop.entity';
 import { SocialAirdropRuleEntity } from '../../entity/socialAirdropRule.entity';
+import { ContentDto } from '../../dto/content.dto';
+import { AirdropScheduleService } from '../../../services/airdropSchedule.service';
 
+class SendTelegramMessage {
+  message_id: number
+}
 @Injectable()
 export class TelegramSubscriberJob {
   private readonly _logger = new Logger(TelegramSubscriberJob.name);
@@ -29,7 +33,8 @@ export class TelegramSubscriberJob {
     @InjectEntityManager()
     private readonly _entityManager: EntityManager,
     private readonly _configService: ConfigService,
-  ){
+    private readonly _scheduleService: AirdropScheduleService,
+  ) {
     this._token = this._configService.get<string>("airdrop.telegram.token");
     if (!this._token) {
       throw new Error("airdrop.telegram.token config is empty");
@@ -59,16 +64,16 @@ export class TelegramSubscriberJob {
     this._bot = new Telegraf(this._token)
     // initializing telegram sdk with the the token
     this._telegram = new Telegram(this._token)
-    this.findNewSubscribers();
+    this._findNewSubscribers();
   }
 
   // this function should register all the middleware and actions to react to the users activity
   @Timeout(1000)
-  async findNewSubscribers() {
+  private async _findNewSubscribers() {
     this._logger.debug("findNewSubscribers started!!!")
     try {
       // create stage from all scenes
-      const stage = new Scenes.Stage<Scenes.SceneContext>([this.createAirdropScene()]);
+      const stage = new Scenes.Stage<Scenes.SceneContext>([this._createAirdropScene()]);
 
       // session middleware will create a session for each user
       this._bot.use(session());
@@ -79,12 +84,16 @@ export class TelegramSubscriberJob {
       // on call bot for first time
       this._bot.start(async (ctx) => {
         // this._logger.debug('Started By', JSON.stringify(ctx));
-        await ctx.sendMessage('welcome', {
-          reply_markup: {
-            keyboard: [[{ text: 'new airdrop event post 🤑' }]],
-            resize_keyboard: true,
-          },
-        });
+        try {
+          await ctx.sendMessage('welcome', {
+            reply_markup: {
+              keyboard: [[{ text: 'new airdrop event post 🤑' }]],
+              resize_keyboard: true,
+            },
+          });
+        } catch (error) {
+          this._logger.error("Can't send welcome message: ", error)
+        }
       });
 
       // creating new airdrop post
@@ -94,131 +103,141 @@ export class TelegramSubscriberJob {
       });
 
       // listening to the airdrop post click
-      this.registerOnAirdropPostClicked()
+      this._registerOnAirdropPostClicked()
 
       await this._bot.launch();
     } catch (error) {
-      console.log('error on telegram: ', error);
+      this._logger.error('error on telegram: ', error);
     }
   }
 
   /**
    * remove join and leave notification on super group
    */
-  registerRemoveJoinAndLeftMessages() {
-    this._bot.on(['left_chat_member', 'new_chat_members'], async (ctx) => {
+  private _registerRemoveJoinAndLeftMessages() {
+    this._bot.on(['left_chat_member', 'new_chat_members'], (ctx) => {
       try {
-        await ctx.telegram.deleteMessage(ctx.update.message.chat.id, ctx.update.message.message_id);
-        await ctx.telegram.sendMessage(
+        ctx.telegram.deleteMessage(ctx.update.message.chat.id, ctx.update.message.message_id);
+        ctx.telegram.sendMessage(
           this._owner,
-          `chat member ${
-            (ctx.update.message as any).new_chat_member
-              ? (ctx.update.message as any).new_chat_member.username
-              : (ctx.update.message as any).left_chat_member.username
+          `chat member ${(ctx.update.message as any).new_chat_member
+            ? (ctx.update.message as any).new_chat_member.username
+            : (ctx.update.message as any).left_chat_member.username
           } : ${(ctx.update.message as any).new_chat_member ? 'joined' : 'left'}`,
         );
       } catch (error) {
-        console.log('error on remove log: ', error);
+        this._logger.debug('error on remove log: ', error);
       }
     });
   }
 
   /**
-   * listens to join new members in super group
+   * listens to join new members on super group
    */
-  registerListenerForNewMember() {
-    this._bot.on('new_chat_members', (ctx) => {
-      console.log('ctx.chatJoinRequest.from:', ctx.update.message);
+  private _registerListenerForNewMember() {
+    this._bot.on('new_chat_members', (ctx: Context) => {
+      const member = { id: ctx.from.id, username: ctx.from.username }
+      this._logger.debug('New memeber:', member.id, member.username);
     });
   }
 
-  createAirdropScene() {
+  private _createAirdropScene() {
     return new Scenes.WizardScene<any>(
       'createAirdrop',
-      async (ctx) => {
-        await ctx.reply("Type the event's tile: ");
+      (ctx) => {
+        ctx.reply("Type the event's title: ");
         return ctx.wizard.next();
       },
-      async (ctx) => {
+      (ctx) => {
         ctx.scene.state.title = ctx.update.message.text;
-        await ctx.reply('provide an image or send "none": ');
-        await ctx.wizard.next();
+        ctx.reply('provide an image or send "none": ');
+        ctx.wizard.next();
       },
-      async (ctx) => {
+      (ctx) => {
         ctx.scene.state.image = ctx.update.message.photo ? ctx.update.message.photo[1] : ctx.update.message.text;
-        await ctx.reply('provide an action button text: ');
-        await ctx.wizard.next();
+        ctx.reply('provide an action button text: ');
+        ctx.wizard.next();
       },
-      async (ctx) => {
+      (ctx) => {
         ctx.scene.state.button = ctx.update.message.text;
         const state = ctx.scene.state;
-        console.log('data is: ', state);
-
-        const schedule = await this._entityManager.getRepository(SocialAirdropScheduleEntity)
-        .findOne({
-          relations: {
-            socialLively: true
-          },
-          loadEagerRelations: true,
-          where: {
-            socialLively: {
-              socialType: SocialType.TELEGRAM,
-              isActive: true,
+        this._entityManager.getRepository(SocialAirdropScheduleEntity)
+          .findOne({
+            relations: {
+              socialLively: true
             },
-            airdropEndAt: MoreThan(new Date())
-          }
-        })
+            loadEagerRelations: true,
+            where: {
+              socialLively: {
+                socialType: SocialType.TELEGRAM,
+                isActive: true,
+              },
+              airdropEndAt: MoreThan(new Date())
+            }
+          }).then(schedule => {
+            if (!schedule) {
+              ctx.reply("We are not in any schedule right now!");
+              return ctx.scene.leave();
+            }
 
-        if (!schedule) {
-          ctx.reply("We are not in any schedule right now!");
-          return ctx.scene.leave();
-        }
+            this._createAirdropPost(state.image.file_id ? state.image.file_id : state.image, state.title, state.button)
+              .then(post => {
+                if (!post) {
+                  ctx.reply("Failed to post the event!")
+                  return ctx.scene.leave();
+                }
+                this._logger.debug("Post is:", JSON.stringify(post))
+                const content = ContentDto.fromMedia(ctx.scene.state.image)
 
-        const post = await this.createAirdropPost(state.image.file_id ? state.image.file_id : state.image, state.title, state.button);
-        if (!post) {
-          ctx.reply("Faild to post the event!")
-          return ctx.scene.leave();
-        }
-        const event = await this._entityManager.getRepository(SocialEventEntity).save({
-          publishedAt: new Date(),
-          contentId: post.message_id,
-          content: ctx.scene.state.image,
-          airdropSchedule: schedule,
-        })
-        if (!event) {
-          ctx.reply("Can't create this event into the database!")
-          await ctx.telegram.deleteMessage(this._channelName, post.message_id);
-          return ctx.scene.leave();
-        }
-        this._logger.debug("Created event is:", JSON.stringify(event))
-        ctx.reply(`The event posted successfuly: t.me/${this._channelName.slice(1)}/${post.message_id}`)
-        return ctx.scene.leave();
+                this._entityManager.getRepository(SocialEventEntity).insert({
+                  publishedAt: new Date(),
+                  contentId: `${post.message_id}`,
+                  content: content,
+                  airdropSchedule: schedule,
+                }).then(event => {
+                  if (!event) {
+                    ctx.reply("Can't create this event into the database!")
+                    ctx.telegram.deleteMessage(this._channelName, post.message_id);
+                    return ctx.scene.leave();
+                  }
+                  ctx.reply(`The event posted successfully: t.me/${this._channelName.slice(1)}/${post.message_id}`)
+                }).catch(e => {
+                  this._logger.error("We can't insert new event from telegram:", e)
+                  ctx.reply(`We can't create this event into the database!: ${JSON.stringify(e)}`)
+                  ctx.telegram.deleteMessage(this._channelName, post.message_id);
+                  return ctx.scene.leave();
+                })
+              }).catch(e => {
+                this._logger.error("Failed to post the event:", e)
+                ctx.reply(`Failed to post the event: ${JSON.stringify(e)}`)
+                return ctx.scene.leave();
+              })
+          }).catch(e => {
+            this._logger.error("We can't schedule from telegram:", e)
+            ctx.reply(`We can't schedule from telegram: ${JSON.stringify(e)}`)
+            return ctx.scene.leave();
+          })
       },
     );
   }
 
   // creating air drop post with image, caption and button
-  async createAirdropPost(source: string, caption: string, btnText: string) {
-    let result
-    try {
-      source === "none" ? 
-      result = await this._telegram.sendMessage(this._channelName, caption, {
+  private _createAirdropPost(source: string, caption: string, btnText: string) {
+    let result: Promise<SendTelegramMessage>
+    source === "none" ?
+      result = this._telegram.sendMessage(this._channelName, caption, {
         reply_markup: {
           inline_keyboard: [[{ text: btnText, callback_data: 'airdrop_clicked' }]],
         },
       })
       :
-      result = await this._telegram.sendPhoto(this._channelName, source, {
+      result = this._telegram.sendPhoto(this._channelName, source, {
         caption,
         reply_markup: {
           inline_keyboard: [[{ text: btnText, callback_data: 'airdrop_clicked' }]],
         },
       })
-      return result;
-    } catch (error) {
-      console.log('error on create air drop post: ', error);
-      return false;
-    }
+    return result
   }
 
   /**
@@ -227,118 +246,129 @@ export class TelegramSubscriberJob {
    * every time user clicked the button it will trigger this action
    */
 
-  registerOnAirdropPostClicked() {
-    this._bot.action('airdrop_clicked', async(ctx: Context) => 
-    {
-    const memberStatus = await this.memberInChannelStatus(ctx.callbackQuery.from.id);
-    if (memberStatus === "left" || memberStatus === "not") {
-      ctx.answerCbQuery("Faild: You should join the channel first!")
-      return
-    }
-    const sender = {id: ctx.callbackQuery.from.id, username: ctx.callbackQuery.from.username, status: memberStatus}
-    const event = await this._entityManager.getRepository(SocialEventEntity)
-    .findOne({
-      relations: {
-        airdropSchedule: true
-      },
-      loadEagerRelations: true,
-     where: {
-      contentId: `${ctx.callbackQuery.message.message_id}`
-     }
-    })
-    if (!event) {
-      ctx.answerCbQuery("Faild: Can't find the event!!");
-      return;
-    }
-    if (event.airdropSchedule.airdropEndAt <= new Date()) {
-      ctx.answerCbQuery("Faild: The schedule of this event had been expired!")
-      return;
-    }
-    this._logger.debug('air drop clicked by', sender.id, sender.username);
-    const socialProfile = await this._entityManager
-    .getRepository(SocialProfileEntity).findOne({
-      where: {
-        socialType: SocialType.TELEGRAM,
-        socialId: `${sender.id}`,
+  private _registerOnAirdropPostClicked() {
+    this._bot.action('airdrop_clicked', (ctx: Context) => {
+      const memberStatus = this._memberInChannelStatus(ctx.callbackQuery.from.id);
+      if (memberStatus === "left" || memberStatus === "not") {
+        // try catch
+        ctx.answerCbQuery("Failed: You should join the channel first!")
+        return
       }
+      const sender = { id: ctx.callbackQuery.from.id, username: ctx.callbackQuery.from.username, status: memberStatus }
+      this._entityManager
+        .getRepository(SocialProfileEntity).findOneOrFail({
+          where: {
+            socialType: SocialType.TELEGRAM,
+            socialId: `${sender.id}`,
+          }
+        }).then(socialProfile => {
+          this._entityManager.getRepository(SocialEventEntity)
+            .findOneOrFail({
+              relations: {
+                airdropSchedule: true
+              },
+              loadEagerRelations: true,
+              where: {
+                contentId: `${ctx.callbackQuery.message.message_id}`
+              }
+            }).then(event => {
+              if (event.airdropSchedule.airdropEndAt <= new Date()) {
+                ctx.answerCbQuery("Failed: The schedule of this event had been expired!")
+                return;
+              }
+              this._logger.debug('air drop clicked by', sender.id, sender.username);
+              this._entityManager.getRepository(SocialTrackerEntity)
+                .findOne({
+                  relations: {
+                    socialEvent: true,
+                    socialProfile: true,
+                  },
+                  loadEagerRelations: true,
+                  where: {
+                    socialEvent: {
+                      id: event.id
+                    },
+                    socialProfile: {
+                      id: socialProfile.id
+                    },
+                  }
+                }).then(socialTracker => {
+                  if (socialTracker) {
+                    ctx.answerCbQuery("Success: You'r action submited before!")
+                    return;
+                  }
+                  this._entityManager.getRepository(SocialAirdropRuleEntity).findOneOrFail({
+                    where: {
+                      socialType: SocialType.TELEGRAM,
+                      actionType: SocialActionType.LIKE,
+                    }
+                  }).then(likeRule => {
+                    this._entityManager.getRepository(SocialTrackerEntity).save({
+                      actionType: SocialActionType.LIKE,
+                      socialEvent: event,
+                      socialProfile: socialProfile
+                    }).then(socialTracker => {
+                      if (!socialTracker) {
+                        ctx.answerCbQuery("Failed: We can't sumbit your action in our database!")
+                        return;
+                      }
+                      this._entityManager.getRepository(SocialAirdropEntity).insert({
+                        airdropRule: likeRule,
+                        socialTracker: socialTracker,
+                      }).then(airdrop => {
+                        ctx.answerCbQuery("Success: You'r action submited successfuly!")
+                        return
+                      }).catch(e => {
+                        ctx.answerCbQuery("Failed: Sorry we can't sumbit your airdrop in our database, Please report to the Admin!")
+                        this._logger.error("can't submit social tracker into the database: ", e)
+                        return;
+                      })
+                    }).catch(e => {
+                      ctx.answerCbQuery("Failed: We can't sumbit your action in our database, Please report to the Admin!")
+                      this._logger.error("can't submit social tracker into the database: ", e)
+                      return;
+                    })
+                  }).catch(e => {
+                    ctx.answerCbQuery("Failed: Sorry we can't find the reaction rule from the database, Please report this to the admin")
+                    this._logger.error("can't get like rule from the database: ", e)
+                    return
+                    // likeRule find
+                  })
+                }).catch(e => {
+                  ctx.answerCbQuery("Failed: getting social tracker failed!");
+                  this._logger.error("can't get socail tracker from the database: ", e)
+                  return;
+                })
+            }).catch(e => {
+              ctx.answerCbQuery("Failed: Can't find the event!");
+              this._logger.error("can't get event from the database: ", e)
+              return;
+            })
+        }).catch(e => {
+          if (e instanceof EntityNotFoundError) {
+            ctx.answerCbQuery("Failed: You should register at our platform first!")
+          } else {
+            ctx.answerCbQuery("Failed: We can't get your social profile, Please report this to the Admin!")
+            this._logger.error("can't get social profile from the database: ", e)
+          }
+          return;
+        })
     })
-    if (!socialProfile) {
-      ctx.answerCbQuery("Failed: You should register at our platform first!")
-      return;
-    }
-    let socialTracker = await this._entityManager.getRepository(SocialTrackerEntity)
-    .findOne({
-      relations: {
-        socialEvent: true,
-        socialProfile: true,
-      },
-      loadEagerRelations: true,
-     where: {
-      socialEvent: {
-        id: event.id
-      },
-      socialProfile: {
-        id: socialProfile.id
-      },
-     }
-    })
-    if (socialTracker) {
-      ctx.answerCbQuery("Success: You'r action submited before!")
-      return;
-    }
-    socialTracker = await this._entityManager.getRepository(SocialTrackerEntity).save({
-      actionType: SocialActionType.REACTION,
-      socialEvent: event,
-      socialProfile: socialProfile
-    })
-    if (!socialTracker) {
-      ctx.answerCbQuery("Failed: We can't sumbit your action in our database!")
-      return;
-    }
-    const reactionRule = await this._entityManager.getRepository(SocialAirdropRuleEntity).findOne({
-      where: {
-        socialType: SocialType.TELEGRAM,
-        actionType: SocialActionType.REACTION,
-      }
-    })
-    if (!reactionRule) {
-      ctx.answerCbQuery("Failed: Sorry we can't find the reaction rule from the database, Please report this to the admin")
-      return
-    }
-    const airdrop = await this._entityManager.getRepository(SocialAirdropEntity).save({
-      airdropRule: reactionRule,
-      socialTracker: socialTracker,
-    })
-    if (!airdrop) {
-      ctx.answerCbQuery("Failed: Sorry we can't insert the airdrop into the database, Please report this to the admin")
-      await this._entityManager.getRepository(SocialTrackerEntity).remove(socialTracker)
-      return
-    }
-    socialTracker.airdrop = airdrop
-    const finalSocialTracker = await this._entityManager.getRepository(SocialTrackerEntity).save(socialTracker)
-    if (!finalSocialTracker) {
-      ctx.answerCbQuery("Failed: Sorry we can't the socialTracker from database, Please report this to the admin")
-      await this._entityManager.getRepository(SocialAirdropEntity).remove(airdrop)
-      await this._entityManager.getRepository(SocialTrackerEntity).remove(socialTracker)
-      return
-    }
-    ctx.answerCbQuery("Success: You'r action submited successfuly!")
-  })
   }
 
   /**
    * @param id, check if member is in channel by his user id
    * also username is supported, just pass the user name as id
    */
-  async memberInChannelStatus(id: number): Promise<'member' | 'left' | 'not' | 'creator'> {
-    try {
-      const result = await this._telegram.getChatMember(this._channelName, id);
-      if (result.status === 'left') return 'left';
-      else if (result.status === 'member') return 'member';
-      else if (result.status === 'creator') return 'creator';
-      else return 'not';
-    } catch (error) {
-      return 'not';
-    }
+  private _memberInChannelStatus(id: number): 'member' | 'left' | 'not' | 'creator' {
+    let result: 'member' | 'left' | 'not' | 'creator'
+    this._telegram.getChatMember(this._channelName, id)
+      .then((member) => {
+        if (member.status === 'left') result = 'left';
+        else if (member.status === 'member') result = 'member';
+        else if (member.status === 'creator') result = 'creator';
+        else result = 'not';
+      }).catch(() => result = 'not')
+    return result
   }
 }
