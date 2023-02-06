@@ -12,4 +12,10 @@ export class ContentDto {
     contentDto.data = dto;
     return contentDto;
   }
+
+  public static fromMedia(media: string): ContentDto {
+    const contentDto = new ContentDto();
+    contentDto.media = media;
+    return contentDto;
+  }
 }
