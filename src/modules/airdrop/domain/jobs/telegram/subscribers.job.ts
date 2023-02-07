@@ -58,16 +58,16 @@ export class TelegramSubscriberJob {
     this._bot = new Telegraf(this._token)
     // initializing telegram sdk with the the token
     this._telegram = new Telegram(this._token)
-    this.findNewSubscribers();
+    this._initializeBot();
   }
 
   // this function should register all the middleware and actions to react to the users activity
   @Timeout(1000)
-  async findNewSubscribers() {
+  private async _initializeBot() {
     this._logger.debug("findNewSubscribers started!!!")
     try {
       // create stage from all scenes
-      const stage = new Scenes.Stage<Scenes.SceneContext>([this.createAirdropScene()]);
+      const stage = new Scenes.Stage<Scenes.SceneContext>([this._createAirdropScene()]);
 
       // session middleware will create a session for each user
       this._bot.use(session());
@@ -93,7 +93,7 @@ export class TelegramSubscriberJob {
       });
 
       // listening to the airdrop post click
-      this.registerOnAirdropPostClicked()
+      this._registerOnAirdropPostClicked()
 
       await this._bot.launch();
     } catch (error) {
@@ -104,7 +104,7 @@ export class TelegramSubscriberJob {
   /**
    * remove join and leave notification on super group
    */
-  registerRemoveJoinAndLeftMessages() {
+  private _registerRemoveJoinAndLeftMessages() {
     this._bot.on(['left_chat_member', 'new_chat_members'], async (ctx) => {
       try {
         await ctx.telegram.deleteMessage(ctx.update.message.chat.id, ctx.update.message.message_id);
@@ -125,13 +125,13 @@ export class TelegramSubscriberJob {
   /**
    * listens to join new members in super group
    */
-  registerListenerForNewMember() {
+  private _registerListenerForNewMember() {
     this._bot.on('new_chat_members', (ctx) => {
       console.log('ctx.chatJoinRequest.from:', ctx.update.message);
     });
   }
 
-  createAirdropScene() {
+  private _createAirdropScene() {
     return new Scenes.WizardScene<any>(
       'createAirdrop',
       async (ctx) => {
@@ -173,7 +173,7 @@ export class TelegramSubscriberJob {
           return ctx.scene.leave();
         }
 
-        const post = await this.createAirdropPost(state.image.file_id ? state.image.file_id : state.image, state.title, state.button);
+        const post = await this._createAirdropPost(state.image.file_id ? state.image.file_id : state.image, state.title, state.button);
         if (!post) {
           ctx.reply("Failed to post the event!")
           return ctx.scene.leave();
@@ -197,7 +197,7 @@ export class TelegramSubscriberJob {
   }
 
   // creating air drop post with image, caption and button
-  async createAirdropPost(source: string, caption: string, btnText: string) {
+  private async _createAirdropPost(source: string, caption: string, btnText: string) {
     let result
     try {
       source === "none" ? 
@@ -226,10 +226,10 @@ export class TelegramSubscriberJob {
    * every time user clicked the button it will trigger this action
    */
 
-  registerOnAirdropPostClicked() {
+  private _registerOnAirdropPostClicked() {
     this._bot.action('airdrop_clicked', async(ctx: Context) => 
     {
-    const memberStatus = await this.memberInChannelStatus(ctx.callbackQuery.from.id);
+    const memberStatus = await this._memberInChannelStatus(ctx.callbackQuery.from.id);
     if (memberStatus === "left" || memberStatus === "not") {
       ctx.answerCbQuery("Failed: You should join the channel first!")
       return
@@ -329,7 +329,7 @@ export class TelegramSubscriberJob {
    * @param id, check if member is in channel by his user id
    * also username is supported, just pass the user name as id
    */
-  async memberInChannelStatus(id: number): Promise<'member' | 'left' | 'not' | 'creator'> {
+  private async _memberInChannelStatus(id: number): Promise<'member' | 'left' | 'not' | 'creator'> {
     try {
       const result = await this._telegram.getChatMember(this._channelName, id);
       if (result.status === 'left') return 'left';
