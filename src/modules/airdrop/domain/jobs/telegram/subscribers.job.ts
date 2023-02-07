@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Timeout } from '@nestjs/schedule';
 import { Telegram, Telegraf, Scenes, session, Context } from 'telegraf';
-import { InlineKeyboardButton } from 'typegram';
 import { ConfigService } from '@nestjs/config';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { EntityManager, MoreThan } from 'typeorm';
@@ -176,7 +175,7 @@ export class TelegramSubscriberJob {
 
         const post = await this.createAirdropPost(state.image.file_id ? state.image.file_id : state.image, state.title, state.button);
         if (!post) {
-          ctx.reply("Faild to post the event!")
+          ctx.reply("Failed to post the event!")
           return ctx.scene.leave();
         }
         const event = await this._entityManager.getRepository(SocialEventEntity).save({
@@ -191,7 +190,7 @@ export class TelegramSubscriberJob {
           return ctx.scene.leave();
         }
         this._logger.debug("Created event is:", JSON.stringify(event))
-        ctx.reply(`The event posted successfuly: t.me/${this._channelName.slice(1)}/${post.message_id}`)
+        ctx.reply(`The event posted successfully: t.me/${this._channelName.slice(1)}/${post.message_id}`)
         return ctx.scene.leave();
       },
     );
@@ -232,7 +231,7 @@ export class TelegramSubscriberJob {
     {
     const memberStatus = await this.memberInChannelStatus(ctx.callbackQuery.from.id);
     if (memberStatus === "left" || memberStatus === "not") {
-      ctx.answerCbQuery("Faild: You should join the channel first!")
+      ctx.answerCbQuery("Failed: You should join the channel first!")
       return
     }
     const sender = {id: ctx.callbackQuery.from.id, username: ctx.callbackQuery.from.username, status: memberStatus}
@@ -247,11 +246,11 @@ export class TelegramSubscriberJob {
      }
     })
     if (!event) {
-      ctx.answerCbQuery("Faild: Can't find the event!!");
+      ctx.answerCbQuery("Failed: Can't find the event!!");
       return;
     }
     if (event.airdropSchedule.airdropEndAt <= new Date()) {
-      ctx.answerCbQuery("Faild: The schedule of this event had been expired!")
+      ctx.answerCbQuery("Failed: The schedule of this event had been expired!")
       return;
     }
     this._logger.debug('air drop clicked by', sender.id, sender.username);
@@ -283,7 +282,7 @@ export class TelegramSubscriberJob {
      }
     })
     if (socialTracker) {
-      ctx.answerCbQuery("Success: You'r action submited before!")
+      ctx.answerCbQuery("Success: You'r action submitted before!")
       return;
     }
     socialTracker = await this._entityManager.getRepository(SocialTrackerEntity).save({
@@ -292,7 +291,7 @@ export class TelegramSubscriberJob {
       socialProfile: socialProfile
     })
     if (!socialTracker) {
-      ctx.answerCbQuery("Failed: We can't sumbit your action in our database!")
+      ctx.answerCbQuery("Failed: We can't submit your action in our database!")
       return;
     }
     const reactionRule = await this._entityManager.getRepository(SocialAirdropRuleEntity).findOne({
@@ -322,7 +321,7 @@ export class TelegramSubscriberJob {
       await this._entityManager.getRepository(SocialTrackerEntity).remove(socialTracker)
       return
     }
-    ctx.answerCbQuery("Success: You'r action submited successfuly!")
+    ctx.answerCbQuery("Success: You'r action submitted successfully!")
   })
   }
 
