@@ -11,6 +11,7 @@ import { SocialAirdropScheduleEntity } from '../../entity/socialAirdropSchedule.
 import { SocialTrackerEntity } from '../../entity/socialTracker.entity';
 import { SocialAirdropEntity } from '../../entity/socialAirdrop.entity';
 import { SocialAirdropRuleEntity } from '../../entity/socialAirdropRule.entity';
+import { ContentDto } from '../../dto/content.dto';
 
 class SendTelegramMessage {
   message_id: number
@@ -197,10 +198,11 @@ export class TelegramSubscriberJob {
           }
 
           try {
+            const content = ContentDto.fromMedia(ctx.scene.state.image)
             await this._entityManager.getRepository(SocialEventEntity).insert({
               publishedAt: new Date(),
               contentId: `${post.message_id}`,
-              content: ctx.scene.state.image,
+              content: content,
               airdropSchedule: schedule,
             })
           } catch (error) {
