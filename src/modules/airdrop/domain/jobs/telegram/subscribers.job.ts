@@ -384,32 +384,44 @@ export class TelegramSubscriberJob {
         }
 
         try {
-          socialTracker = await this._entityManager.getRepository(SocialTrackerEntity).save({
-            actionType: SocialActionType.LIKE,
-            socialEvent: event,
-            socialProfile: socialProfile
-          })
-        } catch (error) {
-          this._logger.error("We can't insert new telegram social tracker: ", error)
-          try {
-            await ctx.answerCbQuery("Failed: We can't submit your action in our database!")
-          } catch (error) {
-            this._logger.error("We can't send the reply of failure of submitting telegram social tracker status: ", error)
-          }
-          return
-        }
+          await this._entityManager.transaction(async (manager) => {
+            try {
+              socialTracker = await manager.getRepository(SocialTrackerEntity).save({
+                actionType: SocialActionType.LIKE,
+                socialEvent: event,
+                socialProfile: socialProfile
+              })
+            } catch (error) {
+              this._logger.error("We can't insert new telegram social tracker: ", error)
+              try {
+                await ctx.answerCbQuery("Failed: We can't submit your action in our database!")
+              } catch (error) {
+                this._logger.error("We can't send the reply of failure of submitting telegram social tracker status: ", error)
+              }
+              return
+            }
 
-        try {
-          const airdrop = await this._entityManager.getRepository(SocialAirdropEntity).save({
-            airdropRule: likeRule,
-            socialTracker: socialTracker,
+            try {
+              await manager.getRepository(SocialAirdropEntity).save({
+                airdropRule: likeRule,
+                socialTracker: socialTracker,
+              })
+            } catch (error) {
+              this._logger.error("We can't insert new telegram airdrop: ", error)
+              try {
+                await ctx.answerCbQuery("Failed: Sorry we can't insert the airdrop into the database")
+              } catch (error) {
+                this._logger.error("We can't send the reply of failure of submitting telegram airdrop: ", error)
+              }
+              return
+            }
           })
         } catch (error) {
-          this._logger.error("We can't insert new telegram airdrop: ", error)
+          this._logger.error("Saving telegram social tracker with transaction failed: ", error)
           try {
-            await ctx.answerCbQuery("Failed: Sorry we can't insert the airdrop into the database")
+            await ctx.answerCbQuery("Failed: Sorry we can't insert the social tracker into the database")
           } catch (error) {
-            this._logger.error("We can't send the reply of failure of submitting telegram airdrop: ", error)
+            this._logger.error("We can't send the reply of failure of submitting telegram social tracker with transaction: ", error)
           }
           return
         }
