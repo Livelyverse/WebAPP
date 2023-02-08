@@ -6,6 +6,7 @@ export enum SocialActionType {
   // HASHTAG_FOLLOW = "HASHTAG_FOLLOW",
   COMMENT = "COMMENT",
   VIEW = "VIEW",
+  REACTION =  "REACTION",
   SAVE = "SAVE"
 }
 
