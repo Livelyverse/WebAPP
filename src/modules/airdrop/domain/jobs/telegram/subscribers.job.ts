@@ -122,33 +122,18 @@ export class TelegramSubscriberJob {
     return new Scenes.WizardScene<any>(
       'createAirdrop',
       async (ctx) => {
-        try {
-          await ctx.reply("Type the event's tile: ");
-          return ctx.wizard.next();
-        } catch (error) {
-          this._logger.error("We can't send reply of entering event post in telegram: ", error)
-          return ctx.scene.leave();
-        }
+        if (! await this._sendReply(ctx, "TEXT", "failure of entering event post in telegram", "Type the event's tile: ")) return ctx.scene.leave();
+        return ctx.wizard.next();
       },
       async (ctx) => {
-        try {
-          ctx.scene.state.title = ctx.update.message.text;
-          await ctx.reply('provide an image or send "none": ');
-          await ctx.wizard.next();
-        } catch (error) {
-          this._logger.error("We can't send reply of sending image of event post in telegram: ", error)
-          return ctx.scene.leave();
-        }
+        ctx.scene.state.title = ctx.update.message.text;
+        if (! await this._sendReply(ctx, "TEXT", "failure of getting image of event post in telegram", "Provide an image or send 'none': ")) return ctx.scene.leave();
+        return ctx.wizard.next();
       },
       async (ctx) => {
-        try {
-          ctx.scene.state.image = ctx.update.message.photo ? ctx.update.message.photo[1] : ctx.update.message.text;
-          await ctx.reply('provide an action button text: ');
-          await ctx.wizard.next();
-        } catch (error) {
-          this._logger.error("We can't send reply of getting button of event post in telegram: ", error)
-          return ctx.scene.leave();
-        }
+        ctx.scene.state.image = ctx.update.message.photo ? ctx.update.message.photo[1] : ctx.update.message.text;
+        if (! await this._sendReply(ctx, "TEXT", "failure of getting button of event post in telegram: ", "Provide an action button text: ")) return ctx.scene.leave();
+        return ctx.wizard.next();
       },
       async (ctx) => {
         try {
@@ -171,15 +156,11 @@ export class TelegramSubscriberJob {
                 }
               })
           } catch (error) {
-            try {
-              if (error instanceof EntityNotFoundError) {
-                await ctx.reply("We are not in any active schedule right now. Make a schedule first.")
-              } else {
-                this._logger.error("We can't get schedule from the database: ", error)
-                await ctx.reply(`We can't send reply of entering event post in telegram: ${error}`);
-              }
-            } catch (error) {
-              this._logger.error("We can't send reply of failure of getting schedule in telegram: ", error)
+            if (error instanceof EntityNotFoundError) {
+              if (! await this._sendReply(ctx, "TEXT", "failure of getting schedule in telegram", "We are not in any active schedule right now. Make a schedule first.")) return ctx.scene.leave();
+            } else {
+              this._logger.error("We can't get schedule from the database: ", error)
+              if (! await this._sendReply(ctx, "TEXT", "failure of getting schedule in telegram", `We can't send reply of entering event post in telegram: ${error}`)) return ctx.scene.leave();
             }
             return ctx.scene.leave();
           }
@@ -189,11 +170,7 @@ export class TelegramSubscriberJob {
             post = await this._createAirdropPost(state.image.file_id ? state.image.file_id : state.image, state.title, state.button);
           } catch (error) {
             this._logger.error("We can't create an event post in telegram: ", error)
-            try {
-              await ctx.reply(`We can't send create an event post in telegram channel: ${error}`);
-            } catch (error) {
-              this._logger.error("We can't send reply of failure of creating an event post in telegram channel: ", error)
-            }
+            if (! await this._sendReply(ctx, "TEXT", "failure of creating an event post in telegram channel", `We can't send created an event post in telegram channel: ${error}`)) return ctx.scene.leave();
             return ctx.scene.leave();
           }
 
@@ -207,20 +184,11 @@ export class TelegramSubscriberJob {
             })
           } catch (error) {
             this._logger.error("We can't insert an event in database: ", error)
-            try {
-              await ctx.reply(`We can't insert an event in database: ${error}`);
-            } catch (error) {
-              this._logger.error("We can't send reply of failure of inserting an event in database: ", error)
-            }
+            if (! await this._sendReply(ctx, "TEXT", "failure of inserting an event in database", `We can't insert an event in database: ${error}`)) return ctx.scene.leave();
             return ctx.scene.leave();
           }
 
-          try {
-            await ctx.reply(`The event posted successfully: t.me/${this._channelName.slice(1)}/${post.message_id}`)
-          } catch (error) {
-            this._logger.error("We can't send reply of result of created post: ", error)
-          }
-
+          if (! await this._sendReply(ctx, "TEXT", "result of created post", `The event posted successfully: t.me/${this._channelName.slice(1)}/${post.message_id}`)) return ctx.scene.leave();
         } catch (error) {
           this._logger.error("Unexpected error in telegram job scene: ", error)
         }
@@ -270,11 +238,7 @@ export class TelegramSubscriberJob {
           return
         }
         if (memberStatus === "left" || memberStatus === "not") {
-          try {
-            await ctx.answerCbQuery("Failed: You should join the channel first!")
-          } catch (error) {
-            this._logger.error("We can't send the reply of failure of member status in telegram: ", error)
-          }
+          if (! await this._sendReply(ctx, "QUERY", "failure of member status in telegram", "Failed: You should join the channel first!")) return;
           return
         }
         const sender = { id: ctx.callbackQuery.from.id, username: ctx.callbackQuery.from.username, status: memberStatus }
@@ -293,19 +257,11 @@ export class TelegramSubscriberJob {
             })
         } catch (error) {
           this._logger.error("We can't get the event from the database:", error)
-          try {
-            await ctx.answerCbQuery("Failed: Can't find the event!!");
-          } catch (error) {
-            this._logger.error("We can't send the reply of failure of getting the event", error)
-          }
+          if (! await this._sendReply(ctx, "QUERY", "failure of getting the event", "Failed: Can't find the event!")) return;
           return
         }
         if (event.airdropSchedule.airdropEndAt <= new Date()) {
-          try {
-            await ctx.answerCbQuery("Failed: The schedule of this event had been expired!")
-          } catch (error) {
-            this._logger.error("We can't send the reply of expired schedule", error)
-          }
+          if (! await this._sendReply(ctx, "QUERY", "the reply of expired schedule", "Failed: The schedule of this event had been expired!")) return;
           return;
         }
         this._logger.debug('air drop clicked by', sender.id, sender.username);
@@ -320,15 +276,11 @@ export class TelegramSubscriberJob {
               }
             })
         } catch (error) {
-          try {
-            if (error instanceof EntityNotFoundError) {
-              await ctx.answerCbQuery("Failed: You should register at our platform first!")
-            } else {
-              this._logger.error("We can't get the social profile from the database:", error)
-              await ctx.answerCbQuery("Failed: Sorry we can't get the social profile from the database")
-            }
-          } catch (error) {
-            this._logger.error("We can't send the reply of failure of getting social profile", error)
+          if (error instanceof EntityNotFoundError) {
+            if (! await this._sendReply(ctx, "QUERY", "failure of getting social profile", "Failed: You should register at our platform first!")) return;
+          } else {
+            this._logger.error("We can't get the social profile from the database:", error)
+            if (! await this._sendReply(ctx, "QUERY", "failure of getting social profile", "Failed: Sorry we can't get the social profile from the database")) return;
           }
           return;
         }
@@ -354,16 +306,12 @@ export class TelegramSubscriberJob {
         } catch (error) {
           if (error! instanceof EntityNotFoundError) {
             this._logger.error("We can't get telegram social tracker status: ", error)
-            try {
-              await ctx.answerCbQuery("Failed: Sorry we have some problems of getting social tracker status")
-            } catch (error) {
-              this._logger.error("We can't send the reply of failure of getting telegram social tracker status: ", error)
-            }
+            if (! await this._sendReply(ctx, "QUERY", "failure of getting telegram social tracker status", "Failed: Sorry we have some problems of getting social tracker status")) return;
             return;
           }
         }
         if (socialTracker) {
-          ctx.answerCbQuery("Success: You'r action submitted before!")
+          if (! await this._sendReply(ctx, "QUERY", "social tracker was submitted before", "Success: You'r action submitted before!")) return;
           return;
         }
 
@@ -377,11 +325,7 @@ export class TelegramSubscriberJob {
           })
         } catch (error) {
           this._logger.error("We can't get telegram like rule: ", error)
-          try {
-            await ctx.answerCbQuery("Failed: Sorry we have some problems of getting telegram like rule")
-          } catch (error) {
-            this._logger.error("We can't send the reply of failure of getting telegram like rule: ", error)
-          }
+          if (! await this._sendReply(ctx, "QUERY", "failure of getting telegram like rule", "Failed: Sorry we have some problems of getting telegram like rule")) return;
           return;
         }
 
@@ -395,11 +339,7 @@ export class TelegramSubscriberJob {
               })
             } catch (error) {
               this._logger.error("We can't insert new telegram social tracker: ", error)
-              try {
-                await ctx.answerCbQuery("Failed: We can't submit your action in our database!")
-              } catch (error) {
-                this._logger.error("We can't send the reply of failure of submitting telegram social tracker status: ", error)
-              }
+              if (! await this._sendReply(ctx, "QUERY", "failure of submitting telegram social tracker status", "Failed: We can't submit your action in our database!")) return;
               return
             }
 
@@ -410,30 +350,17 @@ export class TelegramSubscriberJob {
               })
             } catch (error) {
               this._logger.error("We can't insert new telegram airdrop: ", error)
-              try {
-                await ctx.answerCbQuery("Failed: Sorry we can't insert the airdrop into the database")
-              } catch (error) {
-                this._logger.error("We can't send the reply of failure of submitting telegram airdrop: ", error)
-              }
+              if (! await this._sendReply(ctx, "QUERY", "failure of submitting telegram airdrop", "Failed: Sorry we can't insert the airdrop into the database")) return;
               return
             }
           })
         } catch (error) {
           this._logger.error("Saving telegram social tracker with transaction failed: ", error)
-          try {
-            await ctx.answerCbQuery("Failed: Sorry we can't insert the social tracker into the database")
-          } catch (error) {
-            this._logger.error("We can't send the reply of failure of submitting telegram social tracker with transaction: ", error)
-          }
+          if (! await this._sendReply(ctx, "QUERY", "failure of submitting telegram social tracker with transaction", "Failed: Sorry we can't insert the social tracker into the database")) return;
           return
         }
 
-        try {
-          await ctx.answerCbQuery("Success: You'r action submitted successfully!")
-        } catch (error) {
-          this._logger.error("We can't send the reply of submitted action: ", error)
-          return
-        }
+        if (! await this._sendReply(ctx, "QUERY", "reply of submitted action", "Success: You'r action submitted successfully!")) return;
         return
       } catch (error) {
         this._logger.error("Unexpected error on telegram action clicked: ", error)
@@ -457,5 +384,28 @@ export class TelegramSubscriberJob {
       this._logger.error("We can't get chatMember status from the telegram: ", error)
       return error;
     }
+  }
+  private async _sendReply(ctx: Context, replyType: "TEXT" | "QUERY", subject: string, answer: string): Promise<boolean> {
+    try {
+      if (replyType === "TEXT") {
+        try {
+          await ctx.reply(answer);
+        } catch (error) {
+          this._logger.error(`We can't send reply of ${subject}: `, error)
+          return false
+        }
+      } else {
+        try {
+          await ctx.answerCbQuery(answer)
+        } catch (error) {
+          this._logger.error(`We can't send the reply of ${subject}: `, error)
+          return false
+        }
+      }
+    } catch (error) {
+      this._logger.error("Unexpected error of sending telegram reply: ", error)
+      return false
+    }
+    return true
   }
 }
