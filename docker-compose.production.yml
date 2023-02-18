@@ -5,7 +5,7 @@ services:
     image: postgres:14.2
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "5432"
     volumes:
       - /srv/docker-volumes-data/pgdata:/var/lib/postgresql/data/pgdata:Z
     env_file:
@@ -18,7 +18,7 @@ services:
     image: redis:6
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6379"
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     networks:
