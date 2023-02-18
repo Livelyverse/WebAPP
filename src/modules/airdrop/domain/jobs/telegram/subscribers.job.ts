@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Timeout } from '@nestjs/schedule';
-import { Telegram, Telegraf, Scenes, session, Context } from 'telegraf';
+import { Telegram, Telegraf, Scenes, session, Context, NarrowedContext } from 'telegraf';
 import { ConfigService } from '@nestjs/config';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { EntityManager, EntityNotFoundError, MoreThan } from 'typeorm';
@@ -22,12 +21,11 @@ export class TelegramSubscriberJob {
   private readonly _logger = new Logger(TelegramSubscriberJob.name);
   private readonly _token;
   private readonly _channelName: string;
-  private readonly _bot;
+  private readonly _bot: Telegraf;
   private readonly _telegram: Telegram;
   private readonly _owner;
   private readonly _admins;
   private readonly _numTrackerInterval;
-
 
   constructor(
     @InjectEntityManager()
@@ -67,7 +65,6 @@ export class TelegramSubscriberJob {
   }
 
   // this function should register all the middleware and actions to react to the users activity
-  @Timeout(1000)
   private async _initializeBot() {
     this._logger.debug("findNewSubscribers started!!!")
     try {
@@ -84,9 +81,18 @@ export class TelegramSubscriberJob {
       this._bot.start(async (ctx) => {
         // this._logger.debug('Started By', JSON.stringify(ctx));
         try {
+          let keyboard
+          if (this._admins.includes(ctx.update.message.from.id)) {
+            keyboard = [
+              [{ text: 'new airdrop event post 🤑' }],
+              [{ text: 'Get your subscribe airdrop 💵' }],
+            ]
+          } else {
+            keyboard = [[{ text: 'Get your subscribe airdrop 💵' }]]
+          }
           await ctx.sendMessage('welcome', {
             reply_markup: {
-              keyboard: [[{ text: 'new airdrop event post 🤑' }]],
+              keyboard: keyboard,
               resize_keyboard: true,
             },
           });
@@ -100,6 +106,15 @@ export class TelegramSubscriberJob {
         if (!this._admins.includes(ctx.update.message.from.id)) return;
         try {
           (ctx as any).scene.enter('createAirdrop', { user_id: ctx.update.message.from.id });
+        } catch (error) {
+          this._logger.error("We can't enter to the scene in telegram job: ", error)
+        }
+      });
+
+      // Getting subscribe airdrop
+      this._bot.hears('Get your subscribe airdrop 💵', async (ctx) => {
+        try {
+          await this._fetchTelegramSubscribers(ctx)
         } catch (error) {
           this._logger.error("We can't enter to the scene in telegram job: ", error)
         }
@@ -162,6 +177,24 @@ export class TelegramSubscriberJob {
               this._logger.error("We can't get schedule from the database: ", error)
               if (! await this._sendReply(ctx, "TEXT", "failure of getting schedule in telegram", `We can't send reply of entering event post in telegram: ${error}`)) return ctx.scene.leave();
             }
+            return ctx.scene.leave();
+          }
+
+          let activeEvent: SocialEventEntity
+          try {
+            activeEvent = await this._entityManager.getRepository(SocialEventEntity).findOne({
+              where: {
+                isActive: true
+              }
+            })
+          } catch(error) {
+            this._logger.error("We can't get active event from the database: ", error)
+            if (! await this._sendReply(ctx, "TEXT", "failure of getting active event from the database", `We can't get active event from the database: ${error}`)) return ctx.scene.leave();
+            return ctx.scene.leave();
+          }
+
+          if (activeEvent) {
+            if (! await this._sendReply(ctx, "TEXT", "failure of one active event is exists", `We can't have more than 1 event, Current event's id: ${activeEvent.id}`)) return ctx.scene.leave();
             return ctx.scene.leave();
           }
 
@@ -264,6 +297,7 @@ export class TelegramSubscriberJob {
           if (! await this._sendReply(ctx, "QUERY", "the reply of expired schedule", "Failed: The schedule of this event had been expired!")) return;
           return;
         }
+        this._logger.debug("Event clicked:", JSON.stringify(event))
         this._logger.debug('air drop clicked by', sender.id, sender.username);
 
         let socialProfile: SocialProfileEntity
@@ -407,5 +441,132 @@ export class TelegramSubscriberJob {
       return false
     }
     return true
+  }
+
+  private async _fetchTelegramSubscribers(ctx: Context) {
+    try {
+      let memberStatus: 'member' | 'left' | 'not' | 'creator'
+      try {
+        memberStatus = await this._memberInChannelStatus(ctx.from.id);
+      } catch (error) {
+        this._logger.error("We can't get the status of the member: ", error)
+        if (! await this._sendReply(ctx, "TEXT", "failure of member status in telegram", "Sorry we can't check your member status")) return;
+        return
+      }
+      if (memberStatus === "left" || memberStatus === "not") {
+        if (! await this._sendReply(ctx, "TEXT", "failure of member status in telegram", "Failed: You should join the channel first!")) return;
+        return
+      }
+      const sender = { id: ctx.from.id, username: ctx.from.username, status: memberStatus }
+
+      let socialProfile: SocialProfileEntity
+      try {
+        socialProfile = await this._entityManager.getRepository(SocialProfileEntity).findOneOrFail({
+          where: {
+            socialType: SocialType.TELEGRAM,
+            socialId: `${sender.id}`
+          }
+        })
+      } catch (error) {
+        if (error instanceof EntityNotFoundError) {
+          await this._sendReply(ctx, "TEXT", "failure of not registered user", "You must register to our platform first!");
+        } else {
+          this._logger.error("Can't get social profile from the database", error);
+          await this._sendReply(ctx, "TEXT", "failure of getting social profile from the database", "Sorry we can't get your social profile from the database!");
+        }
+        return
+      }
+      let followRule: SocialAirdropRuleEntity
+      try {
+        followRule = await this._entityManager.getRepository(SocialAirdropRuleEntity).findOneOrFail({
+          where: {
+            socialType: SocialType.TELEGRAM,
+            actionType: SocialActionType.FOLLOW,
+          }
+        })
+      } catch (error) {
+        this._logger.error("Can't get the following social airdrop rule from the database", error);
+        await this._sendReply(ctx, "TEXT", "failure of getting telegram follower rule", "Sorry we can't get telegram follow rule from the database!");
+        return
+      }
+      let socialEvent: SocialEventEntity
+      try {
+        socialEvent = await this._entityManager.createQueryBuilder(SocialEventEntity, "socialEvent")
+          .select()
+          .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "socialEvent"."airdropScheduleId"')
+          .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
+          .where('"socialLively"."socialType" = \'TELEGRAM\'')
+          .andWhere('"socialEvent"."isActive" = \'true\'')
+          .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? ("airdropSchedule"."hashtags"->>\'join\')::text')
+          .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
+          .getOneOrFail()
+      } catch (error) {
+        this._logger.error("Can't get the social event from the database:", error);
+        await this._sendReply(ctx, "TEXT", "failure of getting social event from the database", "Sorry we can't get social event from the database!");
+        return
+      }
+      let socialTracker: SocialTrackerEntity
+      try {
+        socialTracker = await this._entityManager.getRepository(SocialTrackerEntity).findOne({
+          relations: {
+            socialEvent: true,
+            socialProfile: true
+          },
+          loadEagerRelations: true,
+          where: {
+            actionType: SocialActionType.FOLLOW,
+            socialEvent: {
+              id: socialEvent.id
+            },
+            socialProfile: {
+              id: socialProfile.id
+            }
+          }
+        })
+      } catch (error) {
+        this._logger.error("Can't get the following social airdrop rule from the database", error);
+        await this._sendReply(ctx, "TEXT", "failure of getting telegram follower rule", "Sorry we can't get telegram follow rule from the database!");
+        return
+      }
+      if (socialTracker) {
+        await this._sendReply(ctx, "TEXT", "failure of submitted before social tracker", "Your subscribe airdrop submitted before!")
+        return
+      }
+      try {
+        await this._entityManager.transaction(async (manager) => {
+          try {
+            socialTracker = await manager.getRepository(SocialTrackerEntity).save({
+              actionType: SocialActionType.FOLLOW,
+              socialEvent: socialEvent,
+              socialProfile: socialProfile
+            })
+          } catch (error) {
+            this._logger.error("We can't insert new telegram social tracker: ", error)
+            if (! await this._sendReply(ctx, "TEXT", "failure of submitting telegram social tracker status", "Failed: We can't submit your action in our database!")) return;
+            return
+          }
+          try {
+            await manager.getRepository(SocialAirdropEntity).save({
+              airdropRule: followRule,
+              socialTracker: socialTracker,
+            })
+          } catch (error) {
+            this._logger.error("We can't insert new telegram airdrop: ", error)
+            if (! await this._sendReply(ctx, "TEXT", "failure of submitting telegram airdrop", "Failed: Sorry we can't insert the airdrop into the database")) return;
+            return
+          }
+        })
+      } catch (error) {
+        this._logger.error("Saving telegram social tracker with transaction failed: ", error)
+        if (! await this._sendReply(ctx, "TEXT", "failure of submitting telegram social tracker with transaction", "Failed: Sorry we can't insert the social tracker into the database")) return;
+        return
+      }
+      this._sendReply(ctx, "TEXT", "success of submitted follow social airdrop", "Your follow airdrop submitted successfully!")
+      return
+    } catch (error) {
+      this._logger.error("We have unexpected error:", error);
+      await this._sendReply(ctx, "TEXT", "unexpected error", "Sorry we an internal error!");
+      return
+    }
   }
 }
