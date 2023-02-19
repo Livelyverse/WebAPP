@@ -6,6 +6,14 @@ import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import { Reflector } from '@nestjs/core';
 import { Timeout } from '@nestjs/schedule';
+import { SocialProfileEntity, SocialType } from '../../../../profile/domain/entity/socialProfile.entity'
+import { SocialEventEntity } from '../../entity/socialEvent.entity';
+import { SocialActionType } from '../../entity/enums';
+import { SocialAirdropScheduleEntity } from '../../entity/socialAirdropSchedule.entity';
+import { SocialTrackerEntity } from '../../entity/socialTracker.entity';
+import { SocialAirdropEntity } from '../../entity/socialAirdrop.entity';
+import { SocialAirdropRuleEntity } from '../../entity/socialAirdropRule.entity';
+import { ContentDto } from '../../dto/content.dto';
 
 @Injectable()
 export class DiscordMemberJob {
@@ -83,9 +91,81 @@ export class DiscordMemberJob {
                     }
                     if (message.content.startsWith("!create")) {
                         const postText = message.content.substring(7).trimStart()
-                        const post = await this._sendReply(message, "success create event", postText, this._eventsChannelId)
-                        await post.react(this._airdropEmojiIdentifier)
-                        if (! post) return;
+                        let schedule: SocialAirdropScheduleEntity
+                        try {
+                            schedule = await this._entityManager.getRepository(SocialAirdropScheduleEntity)
+                                .findOneOrFail({
+                                    relations: {
+                                        socialLively: true
+                                    },
+                                    loadEagerRelations: true,
+                                    where: {
+                                        socialLively: {
+                                            socialType: SocialType.DISCORD,
+                                            isActive: true,
+                                        },
+                                        airdropEndAt: MoreThan(new Date())
+                                    }
+                                })
+                        } catch (error) {
+                            if (error instanceof EntityNotFoundError) {
+                                if (! await this._sendReply(message, "failure of getting schedule in discord", "We are not in any active schedule right now. Make a schedule first.")) return;
+                            } else {
+                                this._logger.error("We can't get schedule from the database: ", error)
+                                if (! await this._sendReply(message, "failure of getting schedule in discord", `We can't send reply of entering event post in discord: ${error}`)) return;
+                            }
+                            return;
+                        }
+
+                        let activeEvent: SocialEventEntity
+                        try {
+                            activeEvent = await this._entityManager.getRepository(SocialEventEntity).findOne({
+                                where: {
+                                    isActive: true
+                                }
+                            })
+                        } catch (error) {
+                            this._logger.error("We can't get active event from the database: ", error)
+                            if (! await this._sendReply(message, "failure of getting active event from the database", `We can't get active event from the database: ${error}`)) return;
+                            return;
+                        }
+
+                        if (activeEvent) {
+                            if (! await this._sendReply(message, "failure of one active event is exists", `We can't have more than 1 event, Current event's id: ${activeEvent.id}`)) return;
+                            return;
+                        }
+
+                        let post: Message
+                        try {
+                            post = await this._sendReply(message, "success create event", postText, this._eventsChannelId)
+                        } catch (error) {
+                            this._logger.error("We can't create an event post in discord: ", error)
+                            if (! await this._sendReply(message, "failure of creating an event post in discord channel", `We can't send created an event post in discord channel: ${error}`)) return;
+                            return;
+                        }
+                        try {
+                            await post.react(this._airdropEmojiIdentifier)
+                        } catch (error) {
+                            this._logger.error("We can't add the post to the post", error)
+                            if (! await this._sendReply(message, "failure of adding the post to the post", `We can't add the post to the post: ${error}`)) return;
+                            return;
+                        }
+
+                        try {
+                            const content = new ContentDto()
+                            await this._entityManager.getRepository(SocialEventEntity).insert({
+                                publishedAt: new Date(),
+                                contentId: `${post.id}`,
+                                content: content,
+                                airdropSchedule: schedule,
+                            })
+                        } catch (error) {
+                            this._logger.error("We can't insert an event in database: ", error)
+                            if (! await this._sendReply(message, "failure of inserting an event in database", `We can't insert an event in database: ${error}`)) return;
+                            return;
+                        }
+
+                        if (! await this._sendReply(message, "result of created post", `The event posted successfully: ${post.url}`)) return;
                         return
                     }
                     return
