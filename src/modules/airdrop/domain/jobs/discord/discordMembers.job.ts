@@ -181,6 +181,123 @@ export class DiscordMemberJob {
             });
             this._bot.on(Events.MessageReactionAdd, async (messageReaction: MessageReaction) => {
                 this._logger.debug("Received messageReaction from:", JSON.stringify(messageReaction.users.cache.last()), messageReaction.emoji.identifier, messageReaction.message)
+                try {
+                    if (messageReaction.users.cache.last().bot) return;
+                    const sender = { id: messageReaction.users.cache.last().id, username: messageReaction.users.cache.last().username }
+
+                    let event: SocialEventEntity
+                    try {
+                        event = await this._entityManager.getRepository(SocialEventEntity)
+                            .findOneOrFail({
+                                relations: {
+                                    airdropSchedule: true
+                                },
+                                loadEagerRelations: true,
+                                where: {
+                                    contentId: `${messageReaction.message.id}`,
+                                    isActive: true
+                                }
+                            })
+                    } catch (error) {
+                        this._logger.error("We can't get the event from the database:", error)
+                        return
+                    }
+                    if (event.airdropSchedule.airdropEndAt <= new Date()) {
+                        return;
+                    }
+                    this._logger.debug('air drop clicked by', sender.id, sender.username);
+
+                    let socialProfile: SocialProfileEntity
+                    try {
+                        socialProfile = await this._entityManager
+                            .getRepository(SocialProfileEntity).findOneOrFail({
+                                where: {
+                                    socialType: SocialType.DISCORD,
+                                    socialId: `${sender.id}`,
+                                }
+                            })
+                    } catch (error) {
+                        if (error instanceof EntityNotFoundError) {
+                        } else {
+                            this._logger.error("We can't get the social profile from the database:", error)
+                        }
+                        return;
+                    }
+
+                    let socialTracker: SocialTrackerEntity
+                    try {
+                        socialTracker = await this._entityManager.getRepository(SocialTrackerEntity)
+                            .findOne({
+                                relations: {
+                                    socialEvent: true,
+                                    socialProfile: true,
+                                },
+                                loadEagerRelations: true,
+                                where: {
+                                    socialEvent: {
+                                        id: event.id
+                                    },
+                                    socialProfile: {
+                                        id: socialProfile.id
+                                    },
+                                }
+                            })
+                    } catch (error) {
+                        if (error! instanceof EntityNotFoundError) {
+                            this._logger.error("We can't get discord social tracker status: ", error)
+                            return;
+                        }
+                    }
+                    if (socialTracker) {
+                        return;
+                    }
+
+                    let likeRule: SocialAirdropRuleEntity
+                    try {
+                        likeRule = await this._entityManager.getRepository(SocialAirdropRuleEntity).findOneOrFail({
+                            where: {
+                                socialType: SocialType.DISCORD,
+                                actionType: SocialActionType.LIKE,
+                            }
+                        })
+                    } catch (error) {
+                        this._logger.error("We can't get discord like rule: ", error)
+                        return;
+                    }
+
+                    try {
+                        await this._entityManager.transaction(async (manager) => {
+                            try {
+                                socialTracker = await manager.getRepository(SocialTrackerEntity).save({
+                                    actionType: SocialActionType.LIKE,
+                                    socialEvent: event,
+                                    socialProfile: socialProfile
+                                })
+                            } catch (error) {
+                                this._logger.error("We can't insert new discord social tracker: ", error)
+                                return
+                            }
+
+                            try {
+                                await manager.getRepository(SocialAirdropEntity).save({
+                                    airdropRule: likeRule,
+                                    socialTracker: socialTracker,
+                                })
+                            } catch (error) {
+                                this._logger.error("We can't insert new discord airdrop: ", error)
+                                return
+                            }
+                        })
+                    } catch (error) {
+                        this._logger.error("Saving discord social tracker with transaction failed: ", error)
+                        return
+                    }
+                    this._logger.debug("New social tracker created:", socialTracker.id)
+                    return
+                } catch (error) {
+                    this._logger.error("Unexpected error on discord action clicked: ", error)
+                }
+                return
             })
             this._bot.on(Events.MessageUpdate, async (oldMessage: Message, newMessage: Message) => {
                 this._logger.debug("Message updated from:", JSON.stringify(oldMessage), "To:", JSON.stringify(newMessage))
