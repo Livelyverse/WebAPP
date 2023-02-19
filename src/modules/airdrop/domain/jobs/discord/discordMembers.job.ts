@@ -183,6 +183,7 @@ export class DiscordMemberJob {
                 this._logger.debug("Received messageReaction from:", JSON.stringify(messageReaction.users.cache.last()), messageReaction.emoji.identifier, messageReaction.message)
                 try {
                     if (messageReaction.users.cache.last().bot) return;
+                    if (messageReaction.emoji.identifier !== this._airdropEmojiIdentifier) return;
                     const sender = { id: messageReaction.users.cache.last().id, username: messageReaction.users.cache.last().username }
 
                     let event: SocialEventEntity
