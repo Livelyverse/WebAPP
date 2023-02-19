@@ -305,6 +305,108 @@ export class DiscordMemberJob {
             })
             this._bot.on(Events.GuildMemberAdd, async (member: GuildMember) => {
                 this._logger.debug("We have a new member:", JSON.stringify(member))
+                try {
+                    const sender = { id: member.user.id, username: member.user.username }
+
+                    let socialProfile: SocialProfileEntity
+                    try {
+                        socialProfile = await this._entityManager.getRepository(SocialProfileEntity).findOneOrFail({
+                            where: {
+                                socialType: SocialType.DISCORD,
+                                socialId: `${sender.id}`
+                            }
+                        })
+                    } catch (error) {
+                        if (error instanceof EntityNotFoundError) {
+                        } else {
+                            this._logger.error("Can't get social profile from the database", error);
+                        }
+                        return
+                    }
+                    let followRule: SocialAirdropRuleEntity
+                    try {
+                        followRule = await this._entityManager.getRepository(SocialAirdropRuleEntity).findOneOrFail({
+                            where: {
+                                socialType: SocialType.DISCORD,
+                                actionType: SocialActionType.FOLLOW,
+                            }
+                        })
+                    } catch (error) {
+                        this._logger.error("Can't get the following social airdrop rule from the database", error);
+                        return
+                    }
+                    let socialEvent: SocialEventEntity
+                    try {
+                        socialEvent = await this._entityManager.createQueryBuilder(SocialEventEntity, "socialEvent")
+                            .select()
+                            .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "socialEvent"."airdropScheduleId"')
+                            .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
+                            .where('"socialLively"."socialType" = \'DISCORD\'')
+                            .andWhere('"socialEvent"."isActive" = \'true\'')
+                            .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? ("airdropSchedule"."hashtags"->>\'join\')::text')
+                            .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
+                            .getOneOrFail()
+                    } catch (error) {
+                        this._logger.error("Can't get the social event from the database:", error);
+                        return
+                    }
+                    let socialTracker: SocialTrackerEntity
+                    try {
+                        socialTracker = await this._entityManager.getRepository(SocialTrackerEntity).findOne({
+                            relations: {
+                                socialEvent: true,
+                                socialProfile: true
+                            },
+                            loadEagerRelations: true,
+                            where: {
+                                actionType: SocialActionType.FOLLOW,
+                                socialEvent: {
+                                    id: socialEvent.id
+                                },
+                                socialProfile: {
+                                    id: socialProfile.id
+                                }
+                            }
+                        })
+                    } catch (error) {
+                        this._logger.error("Can't get the following social airdrop rule from the database", error);
+                        return
+                    }
+                    if (socialTracker) {
+                        return
+                    }
+                    try {
+                        await this._entityManager.transaction(async (manager) => {
+                            try {
+                                socialTracker = await manager.getRepository(SocialTrackerEntity).save({
+                                    actionType: SocialActionType.FOLLOW,
+                                    socialEvent: socialEvent,
+                                    socialProfile: socialProfile
+                                })
+                            } catch (error) {
+                                this._logger.error("We can't insert new discord social tracker: ", error)
+                                return
+                            }
+                            try {
+                                await manager.getRepository(SocialAirdropEntity).save({
+                                    airdropRule: followRule,
+                                    socialTracker: socialTracker,
+                                })
+                            } catch (error) {
+                                this._logger.error("We can't insert new discord airdrop: ", error)
+                                return
+                            }
+                        })
+                    } catch (error) {
+                        this._logger.error("Saving discord social tracker with transaction failed: ", error)
+                        return
+                    }
+                    this._logger.debug("New follow social tracker created:", socialTracker.id)
+                    return
+                } catch (error) {
+                    this._logger.error("We have unexpected error:", error);
+                    return
+                }
             })
             this._bot.on(Events.GuildMemberRemove, async (member: GuildMember) => {
                 this._logger.debug("We have lost a member:", JSON.stringify(member))
