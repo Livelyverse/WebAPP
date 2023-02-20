@@ -77,20 +77,33 @@ export class DiscordMemberJob {
                 this._logger.log(`${this._bot.user.username} is online`);
             });
             this._bot.on(Events.Error, async (error: Error) => {
-                this._logger.error(`We have an error: ${JSON.stringify(error.stack)}`, error)
+                this._logger.error("We have an error:", error)
             })
 
             this._bot.on(Events.MessageCreate, async (message: Message) => {
                 try {
                     if (message.author.bot) return;
                     if (!message.member.roles.cache.has(this._publisherRoleId)) return;
-                    this._logger.debug("Received message:", JSON.stringify(message))
                     if (message.content === "ping") {
                         if (! await this._sendReply(message, "ping (=> Pong!)", "Pong!")) return;
                         return
                     }
-                    if (message.content.startsWith("!create")) {
-                        const postText = message.content.substring(7).trimStart()
+                    //TODO: Add #help command
+                    if (message.content === "#help") {
+                        const helpString = `For creation of the events you should work with "#createPost" command.
+At bottom of the message you should enter related hashtags, exp: #like, #follow
+Like:
+\`\`\`
+#createPost
+This is event post's text
+#like #follow
+\`\`\`
+                        `
+                        if (! await this._sendReply(message, "help command", helpString.trim())) return;
+                        return
+                    }
+                    if (message.content.startsWith("#createPost")) {
+                        let postText = message.content.substring(11).trimStart()
                         let schedule: SocialAirdropScheduleEntity
                         try {
                             schedule = await this._entityManager.getRepository(SocialAirdropScheduleEntity)
@@ -152,7 +165,11 @@ export class DiscordMemberJob {
                         }
 
                         try {
+                            const postLines = post.content.split('\n')
+                            const hashtags = postLines[postLines.length - 1].split(' ')
+                            if (!hashtags.includes("#airdrops")) hashtags.push("#airdrops");
                             const content = new ContentDto()
+                            content.data = { hashtags: hashtags }
                             await this._entityManager.getRepository(SocialEventEntity).insert({
                                 publishedAt: new Date(),
                                 contentId: `${post.id}`,
@@ -162,6 +179,13 @@ export class DiscordMemberJob {
                         } catch (error) {
                             this._logger.error("We can't insert an event in database: ", error)
                             if (! await this._sendReply(message, "failure of inserting an event in database", `We can't insert an event in database: ${error}`)) return;
+                            try {
+                                post.delete()
+                            } catch (error) {
+                                this._logger.error("We can't remove created post at the events after failure of the event creation", error)
+                                if (! await this._sendReply(message, "deleting post at the events after failure of the event creation", `We can't remove created post at the events after failure of the event creation: ${error}`)) return;
+                                return
+                            }
                             return;
                         }
 
@@ -170,7 +194,6 @@ export class DiscordMemberJob {
                     }
                     return
                 } catch (error) {
-                    console.log(JSON.stringify(error))
                     this._logger.error("Unexpected error in messageCreateListener:", error)
                     return
                 }
@@ -180,7 +203,6 @@ export class DiscordMemberJob {
                 this._logger.debug("Received interaction:", JSON.stringify(interaction))
             });
             this._bot.on(Events.MessageReactionAdd, async (messageReaction: MessageReaction) => {
-                this._logger.debug("Received messageReaction from:", JSON.stringify(messageReaction.users.cache.last()), messageReaction.emoji.identifier, messageReaction.message)
                 try {
                     if (messageReaction.users.cache.last().bot) return;
                     if (messageReaction.emoji.identifier !== this._airdropEmojiIdentifier) return;
@@ -268,26 +290,15 @@ export class DiscordMemberJob {
 
                     try {
                         await this._entityManager.transaction(async (manager) => {
-                            try {
-                                socialTracker = await manager.getRepository(SocialTrackerEntity).save({
-                                    actionType: SocialActionType.LIKE,
-                                    socialEvent: event,
-                                    socialProfile: socialProfile
-                                })
-                            } catch (error) {
-                                this._logger.error("We can't insert new discord social tracker: ", error)
-                                return
-                            }
-
-                            try {
-                                await manager.getRepository(SocialAirdropEntity).save({
-                                    airdropRule: likeRule,
-                                    socialTracker: socialTracker,
-                                })
-                            } catch (error) {
-                                this._logger.error("We can't insert new discord airdrop: ", error)
-                                return
-                            }
+                            socialTracker = await manager.getRepository(SocialTrackerEntity).save({
+                                actionType: SocialActionType.LIKE,
+                                socialEvent: event,
+                                socialProfile: socialProfile
+                            })
+                            await manager.getRepository(SocialAirdropEntity).save({
+                                airdropRule: likeRule,
+                                socialTracker: socialTracker,
+                            })
                         })
                     } catch (error) {
                         this._logger.error("Saving discord social tracker with transaction failed: ", error)
@@ -377,25 +388,15 @@ export class DiscordMemberJob {
                     }
                     try {
                         await this._entityManager.transaction(async (manager) => {
-                            try {
-                                socialTracker = await manager.getRepository(SocialTrackerEntity).save({
-                                    actionType: SocialActionType.FOLLOW,
-                                    socialEvent: socialEvent,
-                                    socialProfile: socialProfile
-                                })
-                            } catch (error) {
-                                this._logger.error("We can't insert new discord social tracker: ", error)
-                                return
-                            }
-                            try {
-                                await manager.getRepository(SocialAirdropEntity).save({
-                                    airdropRule: followRule,
-                                    socialTracker: socialTracker,
-                                })
-                            } catch (error) {
-                                this._logger.error("We can't insert new discord airdrop: ", error)
-                                return
-                            }
+                            socialTracker = await manager.getRepository(SocialTrackerEntity).save({
+                                actionType: SocialActionType.FOLLOW,
+                                socialEvent: socialEvent,
+                                socialProfile: socialProfile
+                            })
+                            await manager.getRepository(SocialAirdropEntity).save({
+                                airdropRule: followRule,
+                                socialTracker: socialTracker,
+                            })
                         })
                     } catch (error) {
                         this._logger.error("Saving discord social tracker with transaction failed: ", error)
@@ -414,7 +415,6 @@ export class DiscordMemberJob {
             this._bot.on(Events.GuildCreate, async (guildCreate) => {
                 this._logger.debug("We have a new GuildCreate:", JSON.stringify(guildCreate))
             })
-            await this._bot.login(this._token);
         } catch (error) {
             this._logger.error("Unexpected error in initializeBot:", error)
             return
