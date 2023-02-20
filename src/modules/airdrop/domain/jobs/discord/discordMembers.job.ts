@@ -167,8 +167,7 @@ export class DiscordMemberJob {
                     try {
                         let hashtags: string[] = []
                         hashtags.push(schedule.hashtags.airdrop)
-                        hashtags.push(schedule.hashtags.comment)
-                        hashtags.push(schedule.hashtags.join)
+                        if (schedule.hashtags.join) hashtags.push(schedule.hashtags.join);
                         const content = new ContentDto()
                         content.data = { hashtags: hashtags }
                         await this._entityManager.getRepository(SocialEventEntity).insert({
