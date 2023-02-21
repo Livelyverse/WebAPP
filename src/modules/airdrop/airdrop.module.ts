@@ -24,6 +24,7 @@ import { AirdropScheduleController } from "./controllers/airdropSchedule.control
 import { AirdropScheduleService } from "./services/airdropSchedule.service";
 import { InstagramFollowerJob } from "./domain/jobs/instagram/instagramFollower.job";
 import { TelegramSubscriberJob } from "./domain/jobs/telegram/subscribers.job";
+import { DiscordMemberJob } from "./domain/jobs/discord/discordMembers.job";
 
 
 @Module({
@@ -63,7 +64,8 @@ import { TelegramSubscriberJob } from "./domain/jobs/telegram/subscribers.job";
     SocialAirdropJob,
     InstagramPostTrackerJob,
     InstagramFollowerJob,
-    TelegramSubscriberJob
+    TelegramSubscriberJob,
+    DiscordMemberJob
   ],
 })
 export class AirdropModule {}
