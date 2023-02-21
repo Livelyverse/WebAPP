@@ -187,7 +187,7 @@ export class TelegramSubscriberJob {
                 isActive: true
               }
             })
-          } catch(error) {
+          } catch (error) {
             this._logger.error("We can't get active event from the database: ", error)
             if (! await this._sendReply(ctx, "TEXT", "failure of getting active event from the database", `We can't get active event from the database: ${error}`)) return ctx.scene.leave();
             return ctx.scene.leave();
@@ -209,6 +209,10 @@ export class TelegramSubscriberJob {
 
           try {
             const content = ContentDto.fromMedia(ctx.scene.state.image)
+            let hashtags: string[] = []
+            hashtags.push(schedule.hashtags.airdrop)
+            if (schedule.hashtags.join) hashtags.push(schedule.hashtags.join);
+            content.data = {hashtags: hashtags}
             await this._entityManager.getRepository(SocialEventEntity).insert({
               publishedAt: new Date(),
               contentId: `${post.message_id}`,
@@ -218,6 +222,12 @@ export class TelegramSubscriberJob {
           } catch (error) {
             this._logger.error("We can't insert an event in database: ", error)
             if (! await this._sendReply(ctx, "TEXT", "failure of inserting an event in database", `We can't insert an event in database: ${error}`)) return ctx.scene.leave();
+            try {
+              this._telegram.deleteMessage(this._channelName, post.message_id)
+            } catch (error) {
+              this._logger.error("We can't delete the posted event after failure of event creation in database:", error)
+              if (! await this._sendReply(ctx, "TEXT", "failure of deleting the posted event after failure of event creation in database", `We can't delete the posted event after failure of event creation in database: ${error}`)) return ctx.scene.leave();
+            }
             return ctx.scene.leave();
           }
 
