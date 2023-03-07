@@ -1,5 +1,5 @@
 export enum TokenType {
-  LVL = "LVL"
+  LIV = "LIV"
 }
 
 export class AirdropRequestDto {
