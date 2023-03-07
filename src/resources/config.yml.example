@@ -67,7 +67,7 @@ accounts:
       privateKey: '0x0000000000000000000000000000000000000000'
       address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 tokens:
-    - name: 'LVL'
+    - name: 'LIV'
       address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
 

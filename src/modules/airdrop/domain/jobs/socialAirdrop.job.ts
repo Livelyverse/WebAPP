@@ -51,8 +51,8 @@ export class SocialAirdropJob {
       .andWhere('"users"."walletAddress" IS NOT NULL')
       .getRawMany()).pipe(
         RxJS.tap({
-          next: (queryResult) => this._logger.log(`fetch LVL token airdrops, count: ${queryResult.length}`),
-          error: err => this._logger.error(`fetch LVL token airdrops failed`, err)
+          next: (queryResult) => this._logger.log(`fetch LIV token airdrops, count: ${queryResult.length}`),
+          error: err => this._logger.error(`fetch LIV token airdrops failed`, err)
         }),
         RxJS.mergeMap((queryResult) =>
           RxJS.from(queryResult).pipe(
@@ -106,7 +106,7 @@ export class SocialAirdropJob {
                       amount: BigInt(buffer.total) * (10n ** BigInt(buffer.userAirdrops[0].decimal))})
                     return acc;
                   },
-                  AirdropRequestDto.from(Symbol.for('AirdropRequestId'), TokenType.LVL)
+                  AirdropRequestDto.from(Symbol.for('AirdropRequestId'), TokenType.LIV)
                 ),
                 RxJS.concatMap((airdropRequest) =>
                   RxJS.defer( () => RxJS.from(this._blockchainService.sendAirdropTx(<AirdropRequestDto><unknown>airdropRequest))).pipe(

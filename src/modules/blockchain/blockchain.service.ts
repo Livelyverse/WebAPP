@@ -73,7 +73,7 @@ export class BlockchainService {
     private readonly _configService: ConfigService)
   {
     let airdropAccountConfig = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'airdropaccount');
-    let livelyTokenConfig = this._blockchainOptions.config.tokens.find((token) => token.name.toUpperCase() === 'LVL')
+    let livelyTokenConfig = this._blockchainOptions.config.tokens.find((token) => token.name.toUpperCase() === 'LIV')
     this._jsonRpcProvider = new ethers.providers.JsonRpcProvider(this._blockchainOptions.config.network.url,{
       name: this._blockchainOptions.config.network.name,
       chainId: this._blockchainOptions.config.network.chainId,
@@ -147,7 +147,7 @@ export class BlockchainService {
         RxJS.mergeMap((airdropReq: AirdropRequestDto) =>
           RxJS.merge(
             RxJS.of(airdropReq).pipe(
-              RxJS.filter(request => request.tokenType !== TokenType.LVL),
+              RxJS.filter(request => request.tokenType !== TokenType.LIV),
               RxJS.tap((request) => this._logger.warn(`airdrop token request not supported, id: ${request.id.toString()}`)),
               RxJS.mergeMap((request) => {
                 this._eventEmitter.emit(EventType.ERROR_EVENT, new BlockchainError('Invalid Airdrop Token Request', {code: ErrorCode.INVALID_REQUEST, id: request.id}))
@@ -155,7 +155,7 @@ export class BlockchainService {
               })
             ),
             RxJS.of(airdropReq).pipe(
-              RxJS.filter(request => request.tokenType === TokenType.LVL),
+              RxJS.filter(request => request.tokenType === TokenType.LIV),
               RxJS.identity
             )
           )

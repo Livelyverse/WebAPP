@@ -11,5 +11,5 @@ export enum SocialActionType {
 }
 
 export enum UnitType {
-  LVL_TOKEN = "LVL"
+  LIV_TOKEN = "LIV"
 }
