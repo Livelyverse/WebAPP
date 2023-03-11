@@ -1,0 +1,16 @@
+version: "3"
+services:
+  application:
+    container_name: offchain
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - backend
+    env_file:
+      - .env
+networks:
+  backend:
+  deploy_infra:
+    external: true
