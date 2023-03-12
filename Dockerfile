@@ -1,5 +1,5 @@
 ###################
-# BUILD FOR PRODUCTION
+# BUILD FOR DEVELOPMENT
 ###################
 FROM node:latest As build
 
@@ -7,19 +7,15 @@ WORKDIR /usr/src/app
 
 COPY node_modules ./node_modules
 COPY dist ./dist
-COPY configs ./configs
 
 USER node
 
 ###################
-# PRODUCTION
+# DEVELOPMENT
 ###################
-FROM node:latest As production
+FROM node:latest As development
 
 COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
 COPY --chown=node:node --from=build /usr/src/app/dist ./dist
-COPY --chown=node:node --from=build /usr/src/app/dist/resources/config.yml ./configs/config.yml
-COPY --chown=node:node --from=build /usr/src/app/dist/resources/publicKey.pem ./configs/publicKey.pem
-COPY --chown=node:node --from=build /usr/src/app/dist/resources/privateKey.pem ./configs/privateKey.pem
 
 CMD [ "node", "dist/main.js" ]
