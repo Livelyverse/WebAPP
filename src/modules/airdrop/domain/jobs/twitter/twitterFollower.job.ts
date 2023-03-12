@@ -37,10 +37,10 @@ export class TwitterFollowerJob {
 
     this._isRunning = false;
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
-    // this.fetchTwitterFollowers();
+    this.fetchTwitterFollowers();
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_1AM)
+  @Cron(CronExpression.EVERY_6_HOURS)
   fetchTwitterFollowers() {
 
     if(!this._isRunning) {
