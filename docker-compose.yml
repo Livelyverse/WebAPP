@@ -8,6 +8,7 @@ services:
       dockerfile: Dockerfile
     networks:
       - backend
+      - deploy_infra
     env_file:
       - .env
 networks:
