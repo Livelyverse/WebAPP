@@ -40,7 +40,7 @@ export class TwitterFollowerJob {
     this.fetchTwitterFollowers();
   }
 
-  @Cron(CronExpression.EVERY_6_HOURS)
+  @Cron(CronExpression.EVERY_HOUR)
   fetchTwitterFollowers() {
 
     if(!this._isRunning) {
