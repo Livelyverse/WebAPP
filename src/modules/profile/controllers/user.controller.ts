@@ -77,6 +77,28 @@ export class UserController {
     return UserViewDto.from(user);
   }
 
+  @Post('/update/id/:uuid')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RoleGuard('ADMIN'))
+  @UseGuards(JwtAuthGuard)
+  @ApiParam({
+    name: 'uuid',
+    required: true,
+    description: 'update by uuid',
+    schema: { type: 'string' },
+  })
+  @ApiResponse({ status: 200, description: 'Record updated Successfully.'})
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Record Not Found.' })
+  @ApiResponse({ status: 417, description: 'Auth Token Expired.' })
+  @ApiResponse({ status: 500, description: 'Internal Server Error.' })
+  async updateById(@Param('uuid', new ParseUUIDPipe()) uuid, @Body() userDto: UserUpdateDto): Promise<UserViewDto> {
+    const user = await this._userService.updateById(uuid, userDto);
+    return UserViewDto.from(user);
+  }
+
   @Get('/find/email/:email')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RoleGuard('ADMIN'))
