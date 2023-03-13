@@ -23,7 +23,7 @@ export class SocialProfileService {
 
   private readonly _logger = new Logger(SocialProfileService.name);
 
-  constructor(@InjectEntityManager() private readonly _entityManager: EntityManager) {}
+  constructor(@InjectEntityManager() private readonly _entityManager: EntityManager) { }
 
   findAll(
     offset: number,
@@ -36,28 +36,36 @@ export class SocialProfileService {
       RxJS.of(filterBy).pipe(
         RxJS.filter(filter => !!filter),
         RxJS.switchMap(filter => RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
-            .findAndCount({
-              skip: offset,
-              take: limit,
-              order: {
-                [sortBy]: sortType,
-              },
-              where: { socialType: filter }
-            })
-          )
+          .findAndCount({
+            relations: {
+              user: true
+            },
+            loadEagerRelations: true,
+            skip: offset,
+            take: limit,
+            order: {
+              [sortBy]: sortType,
+            },
+            where: { socialType: filter }
+          })
+        )
         )
       ),
       RxJS.of(filterBy).pipe(
         RxJS.filter(filter => !filter),
         RxJS.switchMap(filter => RxJS.from(this._entityManager.getRepository(SocialProfileEntity)
-            .findAndCount({
-              skip: offset,
-              take: limit,
-              order: {
-                [sortBy]: sortType,
-              },
-            })
-          )
+          .findAndCount({
+            relations: {
+              user: true
+            },
+            loadEagerRelations: true,
+            skip: offset,
+            take: limit,
+            order: {
+              [sortBy]: sortType,
+            },
+          })
+        )
         )
       )
     ).pipe(
@@ -65,7 +73,7 @@ export class SocialProfileService {
         next: result => this._logger.debug(`findAll SocialProfile success, total: ${result[1]}`),
         error: err => this._logger.error(`findAll SocialProfile failed`, err)
       }),
-      RxJS.map(result => ({data: result[0], total: result[1]})),
+      RxJS.map(result => ({ data: result[0], total: result[1] })),
       RxJS.catchError((_) => RxJS.throwError(() => new HttpException(
         {
           statusCode: '500',
@@ -163,15 +171,15 @@ export class SocialProfileService {
 
   findOne(option: FindOneOptions<SocialProfileEntity>): RxJS.Observable<SocialProfileEntity> {
     return RxJS.from(this._entityManager.getRepository(SocialProfileEntity).findOne(option)).pipe(
-        RxJS.tap({
-          error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
-        }),
-        RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
-          {
-            statusCode: '500',
-            message: 'Something Went Wrong',
-            error: 'Internal Server Error'
-          }, HttpStatus.INTERNAL_SERVER_ERROR))
+      RxJS.tap({
+        error: err => this._logger.error(`findOne SocialProfile failed, option: ${JSON.stringify(option)}`, err)
+      }),
+      RxJS.catchError(_ => RxJS.throwError(() => new HttpException(
+        {
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR))
       ),
       RxJS.mergeMap(result =>
         RxJS.merge(
@@ -208,10 +216,10 @@ export class SocialProfileService {
             }
           })
         ).pipe(
-        RxJS.tap({
-          error: err => this._logger.error(`findOne SocialProfile failed, user.email: ${user.email}, social username ${socialProfileDto.username}, Id: ${socialProfileDto.socialType}`, err)
-        }),
-      )),
+          RxJS.tap({
+            error: err => this._logger.error(`findOne SocialProfile failed, user.email: ${user.email}, social username ${socialProfileDto.username}, Id: ${socialProfileDto.socialType}`, err)
+          }),
+        )),
       RxJS.concatMap(socialFind =>
         RxJS.merge(
           RxJS.of(socialFind).pipe(
@@ -282,7 +290,7 @@ export class SocialProfileService {
                           `request: ${JSON.stringify(socialProfileDto)}, id: ${socialFindResult.id}, userId: ${user.id}`
                         ),
                       }),
-                      RxJS.map(socialProfile => {socialProfile.user = user; return socialProfile;}),
+                      RxJS.map(socialProfile => { socialProfile.user = user; return socialProfile; }),
                       RxJS.mergeMap(entity =>
                         RxJS.from(this._entityManager.getRepository(SocialProfileEntity).save(entity)).pipe(
                           RxJS.tap({
@@ -373,49 +381,49 @@ export class SocialProfileService {
           socialType: dto.socialType
         }
       })).pipe(
-          RxJS.tap({
-            error: err => this._logger.error(`findOne SocialProfile failed, user.email: ${user.email}, social username ${dto.username}, Id: ${dto.socialType}`, err)
-          }),
-          RxJS.mergeMap(result =>
-            RxJS.merge(
-              RxJS.of(result).pipe(
-                RxJS.filter(socialFindResult => !!!socialFindResult),
-                RxJS.mergeMap(_ =>
-                  RxJS.throwError(() =>
-                    new HttpException({
-                      statusCode: '404',
-                      message: 'Record Not Found',
-                      error: 'Not Found'
-                    }, HttpStatus.NOT_FOUND)
-                  )
+        RxJS.tap({
+          error: err => this._logger.error(`findOne SocialProfile failed, user.email: ${user.email}, social username ${dto.username}, Id: ${dto.socialType}`, err)
+        }),
+        RxJS.mergeMap(result =>
+          RxJS.merge(
+            RxJS.of(result).pipe(
+              RxJS.filter(socialFindResult => !!!socialFindResult),
+              RxJS.mergeMap(_ =>
+                RxJS.throwError(() =>
+                  new HttpException({
+                    statusCode: '404',
+                    message: 'Record Not Found',
+                    error: 'Not Found'
+                  }, HttpStatus.NOT_FOUND)
                 )
-              ),
-              RxJS.of(result).pipe(
-                RxJS.filter(socialFindResult => !!socialFindResult),
-                RxJS.mergeMap(socialFindResult =>
-                  RxJS.merge(
-                    RxJS.of(socialFindResult).pipe(
-                      RxJS.filter(socialFindResult => socialFindResult.user.id === user.id),
-                      RxJS.map(socialFindResult => [socialProfileDto, socialFindResult])
-                    ),
-                    RxJS.of(socialFindResult).pipe(
-                      RxJS.filter(socialFindResult => socialFindResult.user.id !== user.id),
-                      RxJS.mergeMap(_ =>
-                        RxJS.throwError(() => new HttpException(
-                          {
-                            statusCode: '403',
-                            message: 'Update Forbidden',
-                            error: 'FORBIDDEN'
-                          }, HttpStatus.FORBIDDEN)
-                        )
+              )
+            ),
+            RxJS.of(result).pipe(
+              RxJS.filter(socialFindResult => !!socialFindResult),
+              RxJS.mergeMap(socialFindResult =>
+                RxJS.merge(
+                  RxJS.of(socialFindResult).pipe(
+                    RxJS.filter(socialFindResult => socialFindResult.user.id === user.id),
+                    RxJS.map(socialFindResult => [socialProfileDto, socialFindResult])
+                  ),
+                  RxJS.of(socialFindResult).pipe(
+                    RxJS.filter(socialFindResult => socialFindResult.user.id !== user.id),
+                    RxJS.mergeMap(_ =>
+                      RxJS.throwError(() => new HttpException(
+                        {
+                          statusCode: '403',
+                          message: 'Update Forbidden',
+                          error: 'FORBIDDEN'
+                        }, HttpStatus.FORBIDDEN)
                       )
                     )
                   )
                 )
               )
             )
-          ),
-        )),
+          )
+        ),
+      )),
       RxJS.map(([socialProfileDto, socialProfileEntity]) => {
         socialProfileEntity.website = socialProfileDto?.website ? socialProfileDto.website : socialProfileEntity?.website;
         socialProfileEntity.username = socialProfileDto?.username ? socialProfileDto.username : socialProfileEntity?.username;
@@ -424,7 +432,7 @@ export class SocialProfileService {
         socialProfileEntity.location = socialProfileDto?.location ? socialProfileDto.location : socialProfileDto?.location;
         return socialProfileEntity
       }),
-      RxJS.mergeMap((entity:SocialProfileEntity) =>
+      RxJS.mergeMap((entity: SocialProfileEntity) =>
         RxJS.from(this._entityManager.getRepository(SocialProfileEntity).save(entity)).pipe(
           RxJS.tap({
             next: result => this._logger.debug(`update SocialProfile success, user.email: ${user.email}, username: ${result.username}, socialType: ${result.socialType}`),

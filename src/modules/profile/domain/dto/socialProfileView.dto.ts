@@ -7,7 +7,7 @@ export class SocialProfileViewDto {
       let socialProfile = new SocialProfileViewDto();
       socialProfile.id = entity.id;
       socialProfile.socialType = entity.socialType;
-      socialProfile.userId = entity.user.id;
+      socialProfile.userId = entity.user?.id;
       socialProfile.username = entity.username;
       socialProfile.socialName = entity.socialName;
       socialProfile.profileUrl = entity.profileUrl;

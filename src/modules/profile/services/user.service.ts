@@ -6,12 +6,12 @@ import {
   Logger,
   NotFoundException
 } from "@nestjs/common";
-import { Repository } from 'typeorm';
+import { EntityNotFoundError, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserCreateDto, UserUpdateDto } from '../domain/dto';
 import { validate } from 'class-validator';
 import { FindAllType, IService, SortType } from "./IService";
-import { SocialProfileEntity, UserEntity } from '../domain/entity';
+import { SocialProfileEntity, UserEntity, UserGroupEntity } from '../domain/entity';
 import { UserGroupService } from './userGroup.service';
 import * as argon2 from 'argon2';
 import { PostgresErrorCode } from './postgresErrorCode.enum';
@@ -79,9 +79,8 @@ export class UserService implements IService<UserEntity> {
       );
       throw new HttpException({
         statusCode: '404',
-        message: `Create user ${
-          userDto.email
-        } failed, group ${userDto.userGroup.toUpperCase()} not found`,
+        message: `Create user ${userDto.email
+          } failed, group ${userDto.userGroup.toUpperCase()} not found`,
         error: 'Not Found'
       }, HttpStatus.NOT_FOUND)
     }
@@ -176,7 +175,7 @@ export class UserService implements IService<UserEntity> {
   async removeByEmail(email: string): Promise<void> {
     let user;
     try {
-        user = await this._userRepository.findOne({
+      user = await this._userRepository.findOne({
         relations: {
           userGroup: true
         },
@@ -369,7 +368,7 @@ export class UserService implements IService<UserEntity> {
         }
       }
     }
-    
+
     const profiles = await this._socialProfileRepository.find({
       relations: ['user'],
       where: {
@@ -545,7 +544,7 @@ export class UserService implements IService<UserEntity> {
 
   async update(userDto: UserUpdateDto, entity: UserEntity): Promise<UserEntity> {
 
-    if(userDto?.walletAddress) {
+    if (userDto?.walletAddress) {
       try {
         entity.walletAddress = ethers.utils.getAddress(userDto.walletAddress);
       } catch (err) {
@@ -560,7 +559,7 @@ export class UserService implements IService<UserEntity> {
     try {
       entity.fullName = userDto?.fullName ? userDto.fullName : null;
       await this._userRepository.save(entity);
-      await this._cacheManager.set(`USER.EMAIL:${entity.email}`, entity, {ttl: this._refreshTokenTTL / 1000});
+      await this._cacheManager.set(`USER.EMAIL:${entity.email}`, entity, { ttl: this._refreshTokenTTL / 1000 });
       let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${entity.id}`);
       if (authAccessToken) {
         authAccessToken.authTokenEntity.user = entity;
@@ -600,6 +599,115 @@ export class UserService implements IService<UserEntity> {
     }
   }
 
+  async updateById(uuid: string, userDto: UserUpdateDto): Promise<UserEntity> {
+    let entity: UserEntity
+    try {
+      entity = await this._userRepository.findOneByOrFail({ id: uuid })
+    } catch (error) {
+      if (error instanceof EntityNotFoundError) {
+        throw new HttpException({
+          statusCode: '400',
+          message: 'uuid not found',
+          error: 'Bad Request'
+        }, HttpStatus.BAD_REQUEST)
+      }
+      this._logger.error(`user update by Id failed, uuid: ${uuid}, dto: ${JSON.stringify(userDto)}`, error);
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+    if (userDto?.walletAddress) {
+      try {
+        entity.walletAddress = ethers.utils.getAddress(userDto.walletAddress);
+      } catch (err) {
+        throw new HttpException({
+          statusCode: '400',
+          message: 'invalid wallet address',
+          error: 'Bad Request'
+        }, HttpStatus.BAD_REQUEST)
+      }
+    }
+    if (userDto?.userGroup) {
+      try {
+        entity.userGroup = await this._userGroupService.findByName(
+          userDto.userGroup.toUpperCase(),
+        );
+      } catch (error) {
+        if (error instanceof EntityNotFoundError) {
+          throw new HttpException({
+            statusCode: '400',
+            message: 'user group not found',
+            error: 'Bad Request'
+          }, HttpStatus.BAD_REQUEST)
+        }
+        this._logger.error(`user update by Id failed, uuid: ${uuid}, dto: ${JSON.stringify(userDto)}`, error);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR)
+      }
+    }
+    if (userDto?.password) {
+      try {
+        entity.password = await argon2.hash(userDto.password);
+      } catch (err) {
+        this._logger.error(`argon2.hash failed, userDto: ${userDto}`, err);
+        throw new HttpException({
+          statusCode: '500',
+          message: 'Something Went Wrong',
+          error: 'Internal Server Error'
+        }, HttpStatus.INTERNAL_SERVER_ERROR)
+      }
+    }
+
+    try {
+      entity.fullName = userDto?.fullName ? userDto.fullName : null;
+      entity.isActive = userDto?.isActive ? userDto.isActive : entity.isActive;
+      entity.email = userDto?.email ? userDto.email : entity.email;
+      await this._userRepository.save(entity);
+      await this._cacheManager.set(`USER.EMAIL:${entity.email}`, entity, { ttl: this._refreshTokenTTL / 1000 });
+      let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${entity.id}`);
+      if (authAccessToken) {
+        authAccessToken.authTokenEntity.user = entity;
+        await this._cacheManager.set(
+          `AUTH_ACCESS_TOKEN.USER_ID:${entity.id}`,
+          {
+            accessTokenId: authAccessToken.accessTokenId,
+            accessToken: authAccessToken.accessToken,
+            authTokenEntity: authAccessToken.authTokenEntity
+          },
+          { ttl: this._accessTokenTTL / 1000 }
+        );
+      }
+      let authRefreshToken = await this._cacheManager.get<AuthRefreshToken>(`AUTH_REFRESH_TOKEN.USER_ID:${entity.id}`);
+      if (authRefreshToken) {
+        authRefreshToken.authTokenEntity.user = entity;
+        const refreshTokenExpiredAt = new Date(authRefreshToken.authTokenEntity.refreshTokenExpiredAt);
+        await this._cacheManager.set(`AUTH_REFRESH_TOKEN.USER_ID:${entity.id}`,
+          { refreshToken: authRefreshToken.refreshToken, authTokenEntity: authRefreshToken.authTokenEntity },
+          { ttl: Math.round((refreshTokenExpiredAt.getTime() - Date.now()) / 1000) });
+      }
+      return entity;
+    } catch (err) {
+      this._logger.error(`user update by Id failed, uuid: ${uuid}, dto: ${JSON.stringify(userDto)}`, err);
+      if (err?.code === PostgresErrorCode.UniqueViolation) {
+        throw new HttpException({
+          statusCode: '400',
+          message: 'wallet address already exists',
+          error: 'Bad Request'
+        }, HttpStatus.BAD_REQUEST)
+      }
+      throw new HttpException({
+        statusCode: '500',
+        message: 'Something Went Wrong',
+        error: 'Internal Server Error'
+      }, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+  }
+
   async updateEntity(user: UserEntity): Promise<void> {
     try {
       await this._userRepository.save(user);
@@ -617,7 +725,7 @@ export class UserService implements IService<UserEntity> {
     const user = request.user as UserEntity;
     const fileExtName = path.extname(file.originalname);
     const filename = `profilePhoto_${user.id}_${Date.now()}${fileExtName}`;
-    const newFilePath = path.join(this._uploadPath,filename);
+    const newFilePath = path.join(this._uploadPath, filename);
     const tmpArray = request.url.split('/');
     const absoluteUrl =
       'https://' +
@@ -656,7 +764,7 @@ export class UserService implements IService<UserEntity> {
       user.imageMimeType = file.mimetype;
       user.imageFilename = filename;
       await this._userRepository.save(user);
-      await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, {ttl: this._refreshTokenTTL / 1000});
+      await this._cacheManager.set(`USER.EMAIL:${user.email}`, user, { ttl: this._refreshTokenTTL / 1000 });
       let authAccessToken = await this._cacheManager.get<AuthAccessToken>(`AUTH_ACCESS_TOKEN.USER_ID:${user.id}`);
       if (authAccessToken) {
         authAccessToken.authTokenEntity.user = user;
@@ -690,13 +798,13 @@ export class UserService implements IService<UserEntity> {
     return new URL(absoluteUrl);
   }
 
-  public async getImage(image: string): Promise<{path: string, size: number}> {
+  public async getImage(image: string): Promise<{ path: string, size: number }> {
 
     const imageFile = path.join(this._uploadPath, image);
     try {
-        await fs.promises.access(imageFile)
-        const stat = await fs.promises.stat(imageFile);
-        return { path: imageFile, size: stat.size }
+      await fs.promises.access(imageFile)
+      const stat = await fs.promises.stat(imageFile);
+      return { path: imageFile, size: stat.size }
     } catch (err) {
       this._logger.error(`get file ${imageFile} failed`, err);
       this._logger.debug(`file ${imageFile} not found`);
