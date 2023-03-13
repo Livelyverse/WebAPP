@@ -65,7 +65,7 @@ export class TwitterFollowerJob {
       .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
       .where('"socialLively"."socialType" = \'TWITTER\'')
       .andWhere('"socialEvent"."isActive" = \'true\'')
-      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? ("airdropSchedule"."hashtags"->>\'join\')::text')
+      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower(("airdropSchedule"."hashtags"->>\'join\'))')
       .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
       .getOne())
       .pipe(
