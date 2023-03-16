@@ -25,6 +25,7 @@ export class InstagramFollowerJob {
   private readonly _apiDelay: number;
   private _isRunning: boolean;
   private _followInterval: number;
+  private _isEnable: boolean;
 
   constructor(
     private readonly _httpService: HttpService,
@@ -50,9 +51,16 @@ export class InstagramFollowerJob {
       throw new Error("airdrop.instagram.tracker.followInterval config is empty");
     }
 
-    const interval = setInterval(this.fetchInstagramFollowers.bind(this), this._followInterval);
-    this._schedulerRegistry.addInterval('InstagramPostsTrackerJob', interval);
-    this.fetchInstagramFollowers();
+    this._isEnable = this._configService.get<boolean>("airdrop.instagram.enable");
+    if (this._isEnable === null) {
+      throw new Error("airdrop.instagram.enable config is empty");
+    }
+
+    if (this._isEnable) {
+      const interval = setInterval(this.fetchInstagramFollowers.bind(this), this._followInterval);
+      this._schedulerRegistry.addInterval('InstagramPostsTrackerJob', interval);
+      this.fetchInstagramFollowers();
+    }
 
   }
 

@@ -25,6 +25,7 @@ export class TwitterFollowerJob {
   private readonly _twitterClient: TwitterApiv2ReadOnly;
   private _isRunning: boolean;
   private _followInterval: number;
+  private _isEnable: boolean;
 
   constructor(
     @InjectEntityManager()
@@ -41,11 +42,18 @@ export class TwitterFollowerJob {
       throw new Error("airdrop.twitter.tracker.followInterval config is empty");
     }
 
-    this._isRunning = false;
-    this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
-    const interval = setInterval(this.fetchTwitterFollowers.bind(this), this._followInterval);
-    this._schedulerRegistry.addInterval('TwitterFollowTrackerJob', interval);
-    this.fetchTwitterFollowers();
+    this._isEnable = this._configService.get<boolean>("airdrop.twitter.enable");
+    if (this._isEnable === null) {
+      throw new Error("airdrop.twitter.enable config is empty");
+    }
+
+    if (this._isEnable) {
+      this._isRunning = false;
+      this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
+      const interval = setInterval(this.fetchTwitterFollowers.bind(this), this._followInterval);
+      this._schedulerRegistry.addInterval('TwitterFollowTrackerJob', interval);
+      this.fetchTwitterFollowers();
+    }
   }
 
   fetchTwitterFollowers() {

@@ -23,6 +23,7 @@ export class DiscordMemberJob {
     private readonly _eventsChannelId: string;
     private readonly _airdropEmojiIdentifier: string;
     private readonly _bot: Client;
+    private readonly _isEnable: boolean;
 
 
     constructor(
@@ -52,6 +53,11 @@ export class DiscordMemberJob {
             throw new Error("airdrop.discord.airdropEmojiIdentifier config is empty");
         }
 
+        this._isEnable = this._configService.get<boolean>("airdrop.discord.enable");
+        if (this._isEnable === null) {
+            throw new Error("airdrop.discord.enable config is empty");
+        }
+
         this._bot = new Client({
             intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent,
             GatewayIntentBits.DirectMessages, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.DirectMessageReactions,
@@ -63,7 +69,7 @@ export class DiscordMemberJob {
             }),
         });
 
-        this._initializeBot()
+        if (this._isEnable) this._initializeBot();
     }
 
     private async _initializeBot() {
