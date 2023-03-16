@@ -60,9 +60,9 @@ export class InstagramPostTrackerJob {
     }
 
     this._isRunning = false;
-    this._trackerInterval = this._configService.get<number>('airdrop.instagram.tracker.interval');
+    this._trackerInterval = this._configService.get<number>('airdrop.instagram.tracker.postInterval');
     if (!this._trackerInterval) {
-      throw new Error("airdrop.instagram.tracker.interval config is empty");
+      throw new Error("airdrop.instagram.tracker.postInterval config is empty");
     }
 
     this._apiDelay = this._configService.get<number>('airdrop.instagram.apiDelay');

@@ -45,9 +45,9 @@ export class TweetTrackerJob {
       throw new Error("airdrop.twitter.authToken config is empty");
     }
 
-    this._trackerInterval = this._configService.get<number>('airdrop.twitter.tracker.interval');
+    this._trackerInterval = this._configService.get<number>('airdrop.twitter.tracker.postInterval');
     if (!this._trackerInterval) {
-      throw new Error("airdrop.twitter.tracker.interval config is empty");
+      throw new Error("airdrop.twitter.tracker.postInterval config is empty");
     }
 
     this._twitterClient = new TwitterApi(this._authToken).v2.readOnly;
