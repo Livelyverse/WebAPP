@@ -71,7 +71,7 @@ export class InstagramFollowerJob {
       .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
       .where('"socialLively"."socialType" = \'INSTAGRAM\'')
       .andWhere('"socialEvent"."isActive" = \'true\'')
-      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower("airdropSchedule"."hashtags"->>\'join\'))')
+      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower(("airdropSchedule"."hashtags"->>\'join\'))')
       .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
       .getOne())
       .pipe(

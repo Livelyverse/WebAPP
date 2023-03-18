@@ -5,7 +5,7 @@ export class BaseError extends Error {
   constructor(name: string, message: string, options = {}) {
     super(message);
 
-    if (options && Object.hasOwn(options, 'cause') && Object.hasOwn(options['cause'], 'stack')) {
+    if (options && Object.hasOwn(options, 'cause') && options['cause'] && Object.hasOwn(options['cause'], 'stack')) {
       this.cause = options['cause'];
     }
     this.name = name;

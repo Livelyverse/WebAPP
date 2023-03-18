@@ -23,6 +23,12 @@ export interface BlockchainNetworkConfig {
   provider: string,
   chainId: number,
   url: string,
+  extraGasTip: number,
+  gasStationUrl: string,
+  networkCongest: number,
+  sendTxTimeout: number,
+  sendTxRetry: number,
+  jsonRpcTimeout: number,
   apiKey?: string
 }
 
