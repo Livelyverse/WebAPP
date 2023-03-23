@@ -18,27 +18,29 @@ export interface BlockchainConfig {
 }
 
 export interface BlockchainNetworkConfig {
-  name: string,
-  type: string,
-  provider: string,
-  chainId: number,
-  url: string,
-  extraGasTip: number,
-  gasStationUrl: string,
-  networkCongest: number,
-  sendTxTimeout: number,
-  sendTxRetry: number,
-  jsonRpcTimeout: number,
+  name: string
+  type: string
+  provider: string
+  chainId: number
+  url: string
+  extraGasTip: number
+  gasStationUrl: string
+  networkCongest: number
+  sendTxTimeout: number
+  sendTxRetry: number
+  jsonRpcTimeout: number
+  httpTimeout: number
+  confirmCount: number
   apiKey?: string
 }
 
 export interface BlockchainAccountConfig {
-  name: string,
-  privateKey: string,
-  address: string,
+  name: string
+  privateKey: string
+  address: string
 }
 
 export interface BlockchainTokenConfig {
-  name: string,
+  name: string
   address: string
 }

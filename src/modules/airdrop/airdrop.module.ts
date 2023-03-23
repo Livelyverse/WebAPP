@@ -61,7 +61,7 @@ import { DiscordMemberJob } from "./domain/jobs/discord/discordMembers.job";
     AirdropScheduleService,
     // TwitterFollowerJob,
     // TweetTrackerJob,
-    // SocialAirdropJob,
+    SocialAirdropJob,
     // InstagramPostTrackerJob,
     // InstagramFollowerJob,
     // TelegramSubscriberJob,

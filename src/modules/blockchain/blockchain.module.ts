@@ -13,13 +13,12 @@ import { BlockchainAsyncOptions, BlockchainOptionFactory } from "./blockchainAsy
 @Module({
   imports: [
     ProfileModule,
-    // HttpModule,
     ConfigModule,
     TypeOrmModule.forFeature([ BlockchainTxEntity]),
     HttpModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        timeout: configService.get('blockchain.httpTimeout'),
+        timeout: configService.get('blockchain.network.httpTimeout'),
       }),
       inject: [ConfigService],
     })

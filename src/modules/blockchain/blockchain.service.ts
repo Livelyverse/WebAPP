@@ -19,7 +19,7 @@ import { BlockchainTxViewDto } from "./domain/dto/blockchainTxView.dto";
 import { HttpService } from "@nestjs/axios";
 import { AxiosError } from "axios";
 import { FollowerError } from "../airdrop/domain/error/follower.error";
-import { TransactionResponse } from "@ethersproject/abstract-provider";
+import { TransactionReceipt, TransactionResponse } from "@ethersproject/abstract-provider";
 
 export interface BlockchainFilterType {
   txHash: string;
@@ -113,6 +113,7 @@ export class BlockchainService {
   ) {
     let airdropAccountConfig = this._blockchainOptions.config.accounts.find((account) => account.name.toLowerCase() === 'airdropaccount');
     let livelyTokenConfig = this._blockchainOptions.config.tokens.find((token) => token.name.toUpperCase() === 'LIV')
+    if(!this._blockchainOptions.config.network.url) { throw new Error('blockchain URL provider is empty'); }
     this._jsonRpcProvider = new ethers.providers.JsonRpcProvider({
         url: this._blockchainOptions.config.network.url,
         timeout: this._blockchainOptions.config.network.jsonRpcTimeout
@@ -128,7 +129,8 @@ export class BlockchainService {
     this._eventEmitter = new EventEmitter();
     this._safeMode = false;
     this._isReady = false;
-    this._confirmationCount = this._blockchainOptions.appMode == APP_MODE.DEV ? 0 : this._blockchainOptions.appMode == APP_MODE.TEST ? 3 : 7
+    this._confirmationCount = this._blockchainOptions.config.network.confirmCount
+    if(!this._confirmationCount) { throw new Error('ConfirmCount is zero'); }
     this._airdropSubscription = this._airdropInit();
     this._airdropPreInit();
   }
@@ -137,7 +139,9 @@ export class BlockchainService {
     RxJS.from(this._entityManager.getRepository(BlockchainTxEntity).findAndCount(
       {
         where: {
-          status: TxStatus.PENDING
+          status: TxStatus.PENDING,
+          networkName: this._blockchainOptions.config.network.name,
+          networkChainId: this._blockchainOptions.config.network.chainId
         }
       })).pipe(
       RxJS.tap({
@@ -149,196 +153,237 @@ export class BlockchainService {
       RxJS.concatMap( ({blockchainTx, counter}) =>
         RxJS.defer(() => RxJS.of({blockchainTx, counter})).pipe(
           RxJS.scan((acc) => acc.counter = acc.counter + 1, {blockchainTx, counter}),
-          RxJS.tap(retryCounter => this._logger.debug(`resending airdrop blockchain pending tx, txHash: ${blockchainTx.txHash}, nonce: ${blockchainTx.nonce}, resendCount: ${retryCounter} . . .`)),
+          RxJS.tap(retryCounter => this._logger.debug(`resending airdrop blockchain pending tx, id: ${blockchainTx.id}, txHash: ${blockchainTx.txHash}, nonce: ${blockchainTx.nonce}, resendCount: ${retryCounter} . . .`)),
           RxJS.map(retryCounter => ({retryCounter, blockchainTx})),
 
-          // calculate gas fee
-          RxJS.mergeMap(data =>
-            this._getTxGasFee(data.retryCounter <= this._blockchainOptions.config.network.sendTxRetry / 2 ? GasStationType.STANDARD : GasStationType.FAST,
-              this._blockchainOptions.config.network.extraGasTip > 0  && this._blockchainOptions.config.network.sendTxRetry > 0 ?
-                this._blockchainOptions.config.network.extraGasTip * (data.retryCounter / this._blockchainOptions.config.network.sendTxRetry): 0,
-              this._blockchainOptions.config.network.networkCongest)
-              .pipe(
-                RxJS.map( txGasFeeInfo => ({txGasFeeInfo, ...data}))
-              )
-          ),
-
-          // send tx to blockchain
-          RxJS.switchMap((requestData) =>
-            RxJS.defer(() => RxJS.from(this._airdropAccount.sendTransaction({
-                to: this._livelyToken.address,
-                data: requestData.blockchainTx.data,
-                maxFeePerGas: requestData.txGasFeeInfo.maxFeePerGas.isZero() ? null : requestData.txGasFeeInfo.maxFeePerGas ,
-                maxPriorityFeePerGas: requestData.txGasFeeInfo.maxPriorityFeePerGas.isZero() ? null : requestData.txGasFeeInfo.maxPriorityFeePerGas
-              })).pipe(
-                RxJS.map(airdropTx => ({airdropTx, ...requestData})),
-                RxJS.mergeMap( data =>
-                  RxJS.of(data).pipe(
-                    RxJS.map(airdropData => {
-                      airdropData.blockchainTx.txHash = airdropData.airdropTx.hash;
-                      airdropData.blockchainTx.txType = airdropData.airdropTx.type === 0 ? TxType.LEGACY : TxType.DEFAULT;
-                      // airdropData.blockchainTx.from = airdropData.airdropTx.from;
-                      // airdropData.blockchainTx.to = airdropData.airdropTx.to;
-                      airdropData.blockchainTx.nonce = airdropData.airdropTx.nonce;
-                      airdropData.blockchainTx.gasLimit = airdropData.airdropTx?.gasLimit?.toBigInt();
-                      airdropData.blockchainTx.gasPrice = airdropData.airdropTx?.gasPrice?.toBigInt() ? airdropData.airdropTx.gasPrice.toBigInt() : 0n;
-                      airdropData.blockchainTx.maxFeePerGas = airdropData.airdropTx?.maxFeePerGas?.toBigInt();
-                      airdropData.blockchainTx.maxPriorityFeePerGas = airdropData.airdropTx?.maxPriorityFeePerGas?.toBigInt();
-                      // airdropData.blockchainTx.data = airdropData.airdropTx.data;
-                      airdropData.blockchainTx.value = airdropData.airdropTx.value.toBigInt();
-                      // airdropData.blockchainTx.networkChainId = this._jsonRpcProvider.network.chainId;
-                      // airdropData.blockchainTx.networkName = this._jsonRpcProvider.network.name;
-                      // airdropData.blockchainTx.blockNumber = null;
-                      // airdropData.blockchainTx.blockHash = null;
-                      // airdropData.blockchainTx.gasUsed = null;
-                      // airdropData.blockchainTx.effectiveGasPrice = null;
-                      // airdropData.blockchainTx.isByzantium = null;
-                      // airdropData.blockchainTx.failInfo = null;
-                      // airdropData.blockchainTx.status = TxStatus.PENDING;
-                      return airdropData;
-                    }),
-                    RxJS.switchMap(airdropData =>
-                      RxJS.of(airdropData).pipe(
-                        RxJS.mergeMap(airdropData =>
-                          RxJS.from(this._entityManager.getRepository(BlockchainTxEntity).save(airdropData.blockchainTx)
-                          ).pipe(
-                            RxJS.tap({
-                              next: (_) => this._logger.log(`update blockchainTxEntity success, id: ${airdropData.blockchainTx.id}, txHash: ${airdropData.blockchainTx.txHash}`),
-                              error: err => this._logger.error(`update blockchainTxEntity failed, txHash: ${airdropData.blockchainTx.txHash}`, err)
-                            }),
-                            RxJS.map((blockChainTxEntity) => ({airdropTx: airdropData.airdropTx, blockchainTx: blockChainTxEntity, retryCounter: airdropData.retryCounter, txGasFeeInfo: airdropData.txGasFeeInfo})),
-                          )
-                        ),
-                      )
-                    ),
-                  )
-                ),
-                RxJS.catchError((err) =>
-                  RxJS.merge(
-                    RxJS.of(err).pipe(
-                      // block chain error handling
-                      RxJS.filter((error) => error instanceof Error && (Object.hasOwn(error, 'event') || Object.hasOwn(error, 'code'))),
-                      RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", error))),
-                    ),
-                    RxJS.of(err).pipe(
-                      // general error handling
-                      RxJS.filter((error) => error instanceof Error && !(Object.hasOwn(error, 'event') && Object.hasOwn(error, 'code'))),
-                      RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
-                    )
-                  )
-                ),
-                RxJS.finalize(() => this._logger.debug(`finalize resend transaction call . . . `)),
-                RxJS.retry({
-                  count: 7,
-                  resetOnSuccess: true,
-                  delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
-                    RxJS.mergeMap(([error, retryCount]) =>
-                      RxJS.merge(
-                        RxJS.of([error, retryCount]).pipe(
-                          RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR && count < 7),
-                          RxJS.tap({
-                            error: _ => this._logger.warn(`blockchain network failed . . . `)
-                          }),
-                          RxJS.delay(60000 * retryCount),
-                          RxJS.tap(([_, retryCount]) => this._logger.warn(`sending tx to blockchain, retry ${retryCount} . . . `))
-                        ),
-                        RxJS.of([error, retryCount]).pipe(
-                          RxJS.filter(([err,count]) =>
-                            (err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR && count >= 7) ||
-                            err instanceof BlockchainError && err.code != ErrorCode.NETWORK_ERROR
-                          ),
-                          RxJS.tap({
-                            error: err => this._logger.error(`send blockchain tx failed`, err)
-                          }),
-                          RxJS.mergeMap(([err, _]) => RxJS.throwError(() => err))
-                        ),
-                        RxJS.of([error, retryCount]).pipe(
-                          RxJS.filter(([err,_]) => !(err instanceof BlockchainError) && err instanceof Error),
-                          RxJS.tap({
-                            error: err => this._logger.error(`send blockchain tx failed`, err)
-                          }),
-                          RxJS.mergeMap(([err, _]) => RxJS.throwError(() => new BlockchainError("send blockchain tx failed", err)))
-                        ),
-                      )
-                    )
-                  )
-                }),
-                RxJS.tap({
-                  next: (airdropData) => this._logger.log(`resend airdrop tx to blockchain success, txHash: ${airdropData.airdropTx.hash}`),
-                  error: err => this._logger.error(`resend airdrop tx to blockchain failed\ncause: ${err?.cause?.stack}`, err)
-                }),
-              )
-            ),
-          ),
-
-          // waiting for tx
-          RxJS.mergeMap((airdropData: {airdropTx: TransactionResponse, blockchainTx: BlockchainTxEntity, retryCounter: number, txGasFeeInfo: TxGasFeeInfo}) =>
-            RxJS.of(this._confirmationCount).pipe(
-              RxJS.switchMap((confirmationCount) =>
-                RxJS.from(airdropData.airdropTx.wait(confirmationCount)).pipe(
-                  RxJS.timeout({
-                    each: this._blockchainOptions.config.network.sendTxTimeout,
-                    with: () => RxJS.throwError(() => new BlockchainError("airdrop tx timeout", {code: ErrorCode.TIMER_TIMEOUT}))
-                  }),
-                  RxJS.tap({
-                    next: (airdropReceiptTx: ContractReceipt) => this._logger.debug(`get tx airdrop receipt success, txHash: ${airdropReceiptTx.transactionHash}, txStatus: ${airdropReceiptTx.status}`),
-                    error: (err) => this._logger.error(`get tx airdrop receipt failed, err: ${err.message}, code: ${err?.code}`, err)
-                  }),
-                  RxJS.mergeMap((airdropReceiptTx: ContractReceipt) =>
-                    RxJS.of(airdropReceiptTx).pipe(
-                      RxJS.tap((airdropReceiptTx) => this._logger.log(`get resend airdrop tx receipt success, txHash: ${airdropReceiptTx.transactionHash}, status: ${airdropReceiptTx.status}`)),
-                      RxJS.mergeMap(airdropReceiptTx =>
-                        RxJS.merge(
-                          RxJS.of(airdropReceiptTx).pipe(
-                            RxJS.filter(receiptTx => receiptTx.events.length > 0),
-                            RxJS.mergeMap(receiptTx =>
-                              RxJS.from(receiptTx.events).pipe(
-                                RxJS.filter((txEvent: Event) => txEvent.event === 'BatchTransfer' ),
-                                RxJS.take(1),
-                                RxJS.map(event => ({event, receiptTx}))
-                              )
-                            )
-                          ),
-                          RxJS.of(airdropReceiptTx).pipe(
-                            RxJS.filter(receiptTx => !receiptTx.events.length),
-                            RxJS.mergeMap(_ => RxJS.throwError(() => new BlockchainError("airdrop batchTransfer tx failed", {code: ErrorCode.INVALID_TX_RECEIPT})))
-                          )
+          RxJS.tap(_ => this._logger.debug(`syncing tx status with blockchain, txHash: ${blockchainTx.txHash} . . .`)),
+          RxJS.concatMap(data =>
+            RxJS.from(this._jsonRpcProvider.getTransactionReceipt(data.blockchainTx.txHash)).pipe(
+              RxJS.mergeMap( transactionReceipt =>
+                RxJS.merge(
+                  RxJS.of(transactionReceipt).pipe(
+                    RxJS.filter(transactionReceipt => !transactionReceipt),
+                    RxJS.map(_ => data),
+                    // calculate gas fee
+                    RxJS.mergeMap(data =>
+                      this._getTxGasFee(data.retryCounter <= this._blockchainOptions.config.network.sendTxRetry / 2 ? GasStationType.STANDARD : GasStationType.FAST,
+                        this._blockchainOptions.config.network.extraGasTip > 0  && this._blockchainOptions.config.network.sendTxRetry > 0 ?
+                          this._blockchainOptions.config.network.extraGasTip * (data.retryCounter / this._blockchainOptions.config.network.sendTxRetry): 0,
+                        this._blockchainOptions.config.network.networkCongest)
+                        .pipe(
+                          RxJS.map( txGasFeeInfo => ({txGasFeeInfo, ...data}))
                         )
-                      ),
-                      RxJS.map(({event, receiptTx}) => {
-                        blockchainTx.blockNumber = receiptTx.blockNumber;
-                        blockchainTx.blockHash = receiptTx.blockHash;
-                        blockchainTx.gasUsed = receiptTx.gasUsed.toBigInt();
-                        blockchainTx.effectiveGasPrice = receiptTx.effectiveGasPrice.toBigInt();
-                        blockchainTx.isByzantium = receiptTx.byzantium;
-                        blockchainTx.failInfo = null;
-                        blockchainTx.status = receiptTx.status === 1 ? TxStatus.SUCCESS : TxStatus.FAILED;
-                        return ({event, blockchainTx});
-                      }),
+                    ),
 
-                      // update blockchainTxEntity
-                      RxJS.switchMap(({event, blockchainTx}) =>
-                        RxJS.of({event, blockchainTx}).pipe(
-                          RxJS.mergeMap((info) => RxJS.from(this._entityManager.getRepository(BlockchainTxEntity).save(info.blockchainTx))),
+                    // send tx to blockchain
+                    RxJS.switchMap((requestData) =>
+                      RxJS.defer(() => RxJS.from(this._airdropAccount.sendTransaction({
+                          to: this._livelyToken.address,
+                          data: requestData.blockchainTx.data,
+                          maxFeePerGas: requestData.txGasFeeInfo.maxFeePerGas.isZero() ? null : requestData.txGasFeeInfo.maxFeePerGas ,
+                          maxPriorityFeePerGas: requestData.txGasFeeInfo.maxPriorityFeePerGas.isZero() ? null : requestData.txGasFeeInfo.maxPriorityFeePerGas
+                        })).pipe(
                           RxJS.tap({
-                            next: (updateResult) => this._logger.log(`update blockchainTxEntity success, txHash: ${updateResult.txHash}, status: ${updateResult.status}, blockchainTxId: ${updateResult.id}`),
-                            error: (error) => this._logger.error(`update blockchainTxEntity failed, txHash: ${blockchainTx.txHash}, blockchainTxId: ${blockchainTx.id}`, error)
+                            next: txResponse => this._logger.debug(`get tx response, id: ${blockchainTx.id}, txHash: ${txResponse.hash} `),
+                            error: err => this._logger.error(`get tx response failed, errStack: ${err?.stack}`, err)
                           }),
-                          RxJS.map(_ => ({event, blockchainTx})),
-                          RxJS.catchError((error) =>
-                            RxJS.merge(
-                              RxJS.of(error).pipe(
-                                RxJS.filter(err => err instanceof TypeORMError),
-                                RxJS.mergeMap(_ => RxJS.of(blockchainTx))
+                          RxJS.map(airdropTx => ({airdropTx, ...requestData})),
+                          RxJS.mergeMap( data =>
+                            RxJS.of(data).pipe(
+                              RxJS.map(airdropData => {
+                                airdropData.blockchainTx.txHash = airdropData.airdropTx.hash;
+                                airdropData.blockchainTx.txType = airdropData.airdropTx.type === 0 ? TxType.LEGACY : TxType.DEFAULT;
+                                // airdropData.blockchainTx.from = airdropData.airdropTx.from;
+                                // airdropData.blockchainTx.to = airdropData.airdropTx.to;
+                                airdropData.blockchainTx.nonce = airdropData.airdropTx.nonce;
+                                airdropData.blockchainTx.gasLimit = airdropData.airdropTx?.gasLimit?.toBigInt();
+                                airdropData.blockchainTx.gasPrice = airdropData.airdropTx?.gasPrice?.toBigInt() ? airdropData.airdropTx.gasPrice.toBigInt() : 0n;
+                                airdropData.blockchainTx.maxFeePerGas = airdropData.airdropTx?.maxFeePerGas?.toBigInt();
+                                airdropData.blockchainTx.maxPriorityFeePerGas = airdropData.airdropTx?.maxPriorityFeePerGas?.toBigInt();
+                                // airdropData.blockchainTx.data = airdropData.airdropTx.data;
+                                airdropData.blockchainTx.value = airdropData.airdropTx.value.toBigInt();
+                                // airdropData.blockchainTx.networkChainId = this._jsonRpcProvider.network.chainId;
+                                // airdropData.blockchainTx.networkName = this._jsonRpcProvider.network.name;
+                                // airdropData.blockchainTx.blockNumber = null;
+                                // airdropData.blockchainTx.blockHash = null;
+                                // airdropData.blockchainTx.gasUsed = null;
+                                // airdropData.blockchainTx.effectiveGasPrice = null;
+                                // airdropData.blockchainTx.isByzantium = null;
+                                // airdropData.blockchainTx.failInfo = null;
+                                // airdropData.blockchainTx.status = TxStatus.PENDING;
+                                return airdropData;
+                              }),
+                              RxJS.switchMap(airdropData =>
+                                RxJS.of(airdropData).pipe(
+                                  RxJS.mergeMap(airdropData =>
+                                    RxJS.from(this._entityManager.getRepository(BlockchainTxEntity).save(airdropData.blockchainTx)
+                                    ).pipe(
+                                      RxJS.tap({
+                                        next: (_) => this._logger.log(`update blockchainTxEntity success, id: ${airdropData.blockchainTx.id}, txHash: ${airdropData.blockchainTx.txHash}`),
+                                        error: err => this._logger.error(`update blockchainTxEntity failed, txHash: ${airdropData.blockchainTx.txHash}`, err)
+                                      }),
+                                      RxJS.map((blockChainTxEntity) => ({airdropTx: airdropData.airdropTx, blockchainTx: blockChainTxEntity, retryCounter: airdropData.retryCounter, txGasFeeInfo: airdropData.txGasFeeInfo})),
+                                    )
+                                  ),
+                                )
                               ),
-                              RxJS.of(error).pipe(
-                                RxJS.filter(err => !(err instanceof TypeORMError) && err instanceof Error),
-                                RxJS.mergeMap(err => RxJS.throwError(() => new BlockchainError('update blockchainTx failed', {cause: err, code: ErrorCode.NODE_JS_ERROR})))
+                            )
+                          ),
+                          RxJS.catchError((err) =>
+                            RxJS.merge(
+                              RxJS.of(err).pipe(
+                                // block chain error handling
+                                RxJS.filter((error) => error instanceof Error && (Object.hasOwn(error, 'event') || Object.hasOwn(error, 'code'))),
+                                RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", error))),
+                              ),
+                              RxJS.of(err).pipe(
+                                // general error handling
+                                RxJS.filter((error) => error instanceof Error && !(Object.hasOwn(error, 'event') && Object.hasOwn(error, 'code'))),
+                                RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
+                              )
+                            )
+                          ),
+                          RxJS.finalize(() => this._logger.debug(`finalize resend transaction call . . . `)),
+                          RxJS.retry({
+                            count: 7,
+                            resetOnSuccess: true,
+                            delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
+                              RxJS.mergeMap(([error, retryCount]) =>
+                                RxJS.merge(
+                                  RxJS.of([error, retryCount]).pipe(
+                                    RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR && count < 7),
+                                    RxJS.tap({
+                                      error: _ => this._logger.warn(`blockchain network failed . . . `)
+                                    }),
+                                    RxJS.delay(60000 * retryCount),
+                                    RxJS.tap(([_, retryCount]) => this._logger.warn(`sending tx to blockchain, retry ${retryCount} . . . `))
+                                  ),
+                                  RxJS.of([error, retryCount]).pipe(
+                                    RxJS.filter(([err,count]) =>
+                                      (err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR && count >= 7) ||
+                                      err instanceof BlockchainError && err.code != ErrorCode.NETWORK_ERROR
+                                    ),
+                                    RxJS.tap({
+                                      error: err => this._logger.error(`send blockchain tx failed`, err)
+                                    }),
+                                    RxJS.mergeMap(([err, _]) => RxJS.throwError(() => err))
+                                  ),
+                                  RxJS.of([error, retryCount]).pipe(
+                                    RxJS.filter(([err,_]) => !(err instanceof BlockchainError) && err instanceof Error),
+                                    RxJS.tap({
+                                      error: err => this._logger.error(`send blockchain tx failed`, err)
+                                    }),
+                                    RxJS.mergeMap(([err, _]) => RxJS.throwError(() => new BlockchainError("send blockchain tx failed", err)))
+                                  ),
+                                )
+                              )
+                            )
+                          }),
+                          RxJS.tap({
+                            next: (airdropData) => this._logger.log(`resend airdrop tx to blockchain success, id: ${airdropData.blockchainTx.id}, txHash: ${airdropData.airdropTx.hash}`),
+                            error: err => this._logger.error(`resend airdrop tx to blockchain failed, error: ${err?.stack}\ncause: ${err?.cause?.stack}`, err)
+                          }),
+                        )
+                      ),
+                    ),
+
+                    // waiting for tx
+                    RxJS.mergeMap((airdropData: {airdropTx: TransactionResponse, blockchainTx: BlockchainTxEntity, retryCounter: number, txGasFeeInfo: TxGasFeeInfo}) =>
+                      RxJS.of(this._confirmationCount).pipe(
+                        RxJS.tap(confirmationCount => this._logger.debug(`Waiting ${confirmationCount} blocks until tx persist to blockchain, txHash: ${airdropData.blockchainTx.txHash} . . .`)),
+                        RxJS.switchMap((confirmationCount) =>
+                          RxJS.from(airdropData.airdropTx.wait(confirmationCount)).pipe(
+                            RxJS.timeout({
+                              each: this._blockchainOptions.config.network.sendTxTimeout,
+                              with: () => RxJS.throwError(() => new BlockchainError("airdrop tx timeout", {code: ErrorCode.TIMER_TIMEOUT}))
+                            }),
+                            RxJS.tap({
+                              next: (airdropReceiptTx: ContractReceipt) => this._logger.debug(`get tx airdrop receipt success, txHash: ${airdropReceiptTx.transactionHash}, txStatus: ${airdropReceiptTx.status}`),
+                              error: (err) => this._logger.error(`get tx airdrop receipt failed, err: ${err.message}, code: ${err?.code}`, err)
+                            }),
+                            RxJS.mergeMap((airdropReceiptTx: ContractReceipt) =>
+                              RxJS.of(airdropReceiptTx).pipe(
+                                RxJS.map((receiptTx) => {
+                                  blockchainTx.blockNumber = receiptTx.blockNumber;
+                                  blockchainTx.blockHash = receiptTx.blockHash;
+                                  blockchainTx.gasUsed = receiptTx.gasUsed.toBigInt();
+                                  blockchainTx.effectiveGasPrice = receiptTx.effectiveGasPrice.toBigInt();
+                                  blockchainTx.isByzantium = receiptTx.byzantium;
+                                  blockchainTx.failInfo = null;
+                                  blockchainTx.status = receiptTx.status === 1 ? TxStatus.SUCCESS : TxStatus.FAILED;
+                                  return blockchainTx;
+                                }),
+
+                                // update blockchainTxEntity
+                                RxJS.switchMap((blockchainTx) =>
+                                  RxJS.of(blockchainTx).pipe(
+                                    RxJS.mergeMap((blockchainEntity) => RxJS.from(this._entityManager.getRepository(BlockchainTxEntity).save(blockchainEntity))),
+                                    RxJS.tap({
+                                      next: (updateResult) => this._logger.log(`update blockchainTxEntity success, txHash: ${updateResult.txHash}, status: ${updateResult.status}, blockchainTxId: ${updateResult.id}`),
+                                      error: (error) => this._logger.error(`update blockchainTxEntity failed, txHash: ${blockchainTx.txHash}, blockchainTxId: ${blockchainTx.id}`, error)
+                                    }),
+                                    RxJS.map(_ => (blockchainTx)),
+                                    RxJS.catchError((error) =>
+                                      RxJS.merge(
+                                        RxJS.of(error).pipe(
+                                          RxJS.filter(err => err instanceof TypeORMError),
+                                          RxJS.mergeMap(_ => RxJS.of(blockchainTx))
+                                        ),
+                                        RxJS.of(error).pipe(
+                                          RxJS.filter(err => !(err instanceof TypeORMError) && err instanceof Error),
+                                          RxJS.mergeMap(err => RxJS.throwError(() => new BlockchainError('update blockchainTx failed', {cause: err, code: ErrorCode.NODE_JS_ERROR})))
+                                        )
+                                      )
+                                    )
+                                  )
+                                ),
                               )
                             )
                           )
                         )
-                      ),
+                      )
+                    ),
+                  ),
+                  RxJS.of(transactionReceipt).pipe(
+                    RxJS.filter(transactionReceipt => !!transactionReceipt),
+                    RxJS.tap(transactionReceipt => this._logger.log(`tx already mined in the blockchain, txHash: ${transactionReceipt.transactionHash}, status: ${transactionReceipt.status}`)),
+                    RxJS.mergeMap((transactionReceipt: TransactionReceipt) =>
+                      RxJS.of(transactionReceipt).pipe(
+                        RxJS.map((receiptTx) => {
+                          blockchainTx.blockNumber = receiptTx.blockNumber;
+                          blockchainTx.blockHash = receiptTx.blockHash;
+                          blockchainTx.gasUsed = receiptTx.gasUsed.toBigInt();
+                          blockchainTx.effectiveGasPrice = receiptTx.effectiveGasPrice.toBigInt();
+                          blockchainTx.isByzantium = receiptTx.byzantium;
+                          blockchainTx.failInfo = null;
+                          blockchainTx.status = receiptTx.status === 1 ? TxStatus.SUCCESS : TxStatus.FAILED;
+                          return blockchainTx;
+                        }),
+
+                        // update blockchainTxEntity
+                        RxJS.switchMap((blockchainTx) =>
+                          RxJS.of(blockchainTx).pipe(
+                            RxJS.mergeMap((blockchainEntity) => RxJS.from(this._entityManager.getRepository(BlockchainTxEntity).save(blockchainEntity))),
+                            RxJS.tap({
+                              next: (updateResult) => this._logger.log(`update blockchainTxEntity success, txHash: ${updateResult.txHash}, status: ${updateResult.status}, blockchainTxId: ${updateResult.id}`),
+                              error: (error) => this._logger.error(`update blockchainTxEntity failed, txHash: ${blockchainTx.txHash}, blockchainTxId: ${blockchainTx.id}`, error)
+                            }),
+                            RxJS.map(_ => (blockchainTx)),
+                            RxJS.catchError((error) =>
+                              RxJS.merge(
+                                RxJS.of(error).pipe(
+                                  RxJS.filter(err => err instanceof TypeORMError),
+                                  RxJS.mergeMap(_ => RxJS.of(blockchainTx))
+                                ),
+                                RxJS.of(error).pipe(
+                                  RxJS.filter(err => !(err instanceof TypeORMError) && err instanceof Error),
+                                  RxJS.mergeMap(err => RxJS.throwError(() => new BlockchainError('update blockchainTx failed', {cause: err, code: ErrorCode.NODE_JS_ERROR})))
+                                )
+                              )
+                            )
+                          )
+                        ),
+                      )
                     )
                   )
                 )
@@ -350,12 +395,12 @@ export class BlockchainService {
               RxJS.of(err).pipe(
                 // block chain error handling
                 RxJS.filter((error) => error instanceof Error && (Object.hasOwn(error, 'event') || Object.hasOwn(error, 'code'))),
-                RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", error))),
+                RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", error))),
               ),
               RxJS.of(err).pipe(
                 // general error handling
                 RxJS.filter((error) => error instanceof Error && !(Object.hasOwn(error, 'event') && Object.hasOwn(error, 'code'))),
-                RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
+                RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
               ),
               RxJS.of(err).pipe(
                 RxJS.filter((error) => error instanceof BlockchainError),
@@ -416,10 +461,11 @@ export class BlockchainService {
       )
     ).subscribe({
       next: _ => RxJS.noop(),
-      error: err => this._logger.error(`resending airdrop pend blockchain tx failed`, err),
+      error: err => this._logger.error(`resending airdrop pend blockchain tx failed, error: ${err?.stack},\ncause: ${err?.cause?.stack}`, err),
       complete: () => {
-        this._logger.log(`resending airdrop pend blockchain tx completed . . .`);
+        this._logger.log(`resending airdrop blockchain pending transactions completed . . .`);
         this._isReady = true;
+        this._logger.debug(`airdrop service is ready . . .`);
       },
     })
   }
@@ -691,17 +737,17 @@ export class BlockchainService {
                     RxJS.of(err).pipe(
                       // block chain error handling
                       RxJS.filter((error) => error instanceof Error && (Object.hasOwn(error, 'event') || Object.hasOwn(error, 'code'))),
-                      RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", error))),
+                      RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", error))),
                     ),
                     RxJS.of(err).pipe(
                       // general nodejs error handling
                       RxJS.filter((error) => error instanceof Error && !(Object.hasOwn(error, 'event') && Object.hasOwn(error, 'code'))),
-                      RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
+                      RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
                     ),
                     RxJS.of(err).pipe(
                       // general error handling
                       RxJS.filter((error) => !(error instanceof Error)),
-                      RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", {cause: error, code: ErrorCode.UNKNOWN_ERROR})))
+                      RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", {cause: error, code: ErrorCode.UNKNOWN_ERROR})))
                     )
                   )
                 ),
@@ -743,7 +789,7 @@ export class BlockchainService {
                 }),
                 RxJS.tap({
                   next: ({airdropReq, airdropTx, blockchainTx, retryCounter}) => this._logger.log(`send airdrop tx to blockchain success, token: ${airdropReq.tokenType}, txHash: ${airdropTx.hash}`),
-                  error: err => this._logger.error(`send airdrop tx to blockchain failed\ncause: ${err?.cause?.stack}`, err)
+                  error: err => this._logger.error(`send airdrop tx to blockchain failed, error: ${err?.stack}\ncause: ${err?.cause?.stack}`, err)
                 }),
               )
             ),
@@ -751,6 +797,7 @@ export class BlockchainService {
             // wait for tx
             RxJS.mergeMap(({airdropReq, airdropTx, blockchainTx, retryCounter}) =>
               RxJS.of(this._confirmationCount).pipe(
+                RxJS.tap(confirmationCount => this._logger.debug(`Waiting ${confirmationCount} blocks until tx persist to blockchain, txHash: ${blockchainTx.txHash} . . .`)),
                 RxJS.switchMap((confirmationCount) =>
                   RxJS.from(airdropTx.wait(confirmationCount)).pipe(
                     RxJS.timeout({
@@ -796,7 +843,6 @@ export class BlockchainService {
                                 )
                               ),
                               RxJS.map(({event, receiptTx}) => {
-                                // let blockchainTx = tuple[2];
                                 blockchainTx.blockNumber = receiptTx.blockNumber;
                                 blockchainTx.blockHash = receiptTx.blockHash;
                                 blockchainTx.gasUsed = receiptTx.gasUsed.toBigInt();
@@ -855,7 +901,7 @@ export class BlockchainService {
                           RxJS.tap({
                             next: response => this._logger.log(`airdrop tx token completed, reqId: ${response.id.toString()}, txHash: ${response.txHash}, amount: ${response.totalAmount.toString()}, recordId: ${response.recordId}`),
                             error: err => {
-                              this._logger.error(`airdrop tx token failed, txHash: ${airdropReceiptTx.transactionHash}\ncause: ${err?.cause?.stack}`, err)
+                              this._logger.error(`airdrop tx token failed, txHash: ${airdropReceiptTx.transactionHash}, error: ${err?.stack},\ncause: ${err?.cause?.stack}`, err)
                               this._eventEmitter.emit(EventType.ERROR_EVENT, err)
                             }
                           }),
@@ -873,12 +919,12 @@ export class BlockchainService {
                 RxJS.of(err).pipe(
                   // block chain error handling
                   RxJS.filter((error) => error instanceof Error && (Object.hasOwn(error, 'event') || Object.hasOwn(error, 'code'))),
-                  RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", error))),
+                  RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", error))),
                 ),
                 RxJS.of(err).pipe(
                   // general error handling
                   RxJS.filter((error) => error instanceof Error && !(Object.hasOwn(error, 'event') && Object.hasOwn(error, 'code'))),
-                  RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
+                  RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
                 ),
                 RxJS.of(err).pipe(
                   RxJS.filter((error) => error instanceof BlockchainError),
@@ -946,7 +992,7 @@ export class BlockchainService {
             }),
             RxJS.tap({
               // next: (response) => this._logger.log(`get airdrop tx receipt from blockchain success, token: ${response.tokenType}, txHash: ${response.txHash}, txStatus: ${response.status}`),
-              error: err => this._logger.error(`get airdrop tx receipt from blockchain failed\ncause: ${err?.cause?.stack}`, err)
+              error: err => this._logger.error(`get airdrop tx receipt from blockchain failed, error: ${err?.stack}\ncause: ${err?.cause?.stack}`, err)
             }),
           )
         ),
@@ -983,13 +1029,13 @@ export class BlockchainService {
       RxJS.retry({
          delay: error => RxJS.of(error).pipe(
            RxJS.filter(err => err instanceof BlockchainError),
-           RxJS.tap((err) => this._logger.warn(`recreate airdrop pipeline and register again of event handler\n${err.stack}\n${err?.cause?.stack}`)),
+           RxJS.tap((err) => this._logger.warn(`recreate airdrop pipeline and register again of event handler, error: ${err?.stack}\n${err?.cause?.stack}`)),
            RxJS.identity
          )
        })
     ).subscribe({
       next: RxJS.noop,
-      error: err => this._logger.error(`blockchain airdrop pipeline failed,\ncause: ${err?.cause?.stack}`, err),
+      error: err => this._logger.error(`blockchain airdrop pipeline failed, error: ${err?.stack},\ncause: ${err?.cause?.stack}`, err),
       complete: () => this._logger.debug(`blockchain airdrop pipeline completed`),
     })
   }
@@ -1123,12 +1169,12 @@ export class BlockchainService {
   //                   RxJS.of(err).pipe(
   //                     // block chain error handling
   //                     RxJS.filter((error) => error instanceof Error && (Object.hasOwn(error, 'event') || Object.hasOwn(error, 'code'))),
-  //                     RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", error))),
+  //                     RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", error))),
   //                   ),
   //                   RxJS.of(err).pipe(
   //                     // general error handling
   //                     RxJS.filter((error) => error instanceof Error && !(Object.hasOwn(error, 'event') && Object.hasOwn(error, 'code'))),
-  //                     RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("lively token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
+  //                     RxJS.mergeMap((error) => RxJS.throwError(() => new BlockchainError("airdrop token batchTransfer failed", {cause: error, code: ErrorCode.NODE_JS_ERROR})))
   //                   )
   //                 )
   //               ),
@@ -1540,7 +1586,7 @@ export class BlockchainService {
         next: (axiosResponse) => this._logger.debug(`gasStation Response status: ${axiosResponse.status}, data: ${JSON.stringify(axiosResponse.data)}, station: ${this._blockchainOptions.config.network.gasStationUrl}`),
         error: err => this._logger.warn(`httpClient get gasStation failed, station: ${this._blockchainOptions.config.network.gasStationUrl}, message: ${err.message}, code: ${err.code}`)
       }),
-      RxJS.map(axiosResponse => JSON.parse(axiosResponse.data)),
+      RxJS.map(axiosResponse => axiosResponse.data),
       RxJS.mergeMap((gasStationData: GasStationFeeData) =>
         RxJS.merge(
           RxJS.of(gasType).pipe(
