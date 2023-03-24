@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { InjectEntityManager } from "@nestjs/typeorm";
-import { Brackets, EntityManager, MoreThan } from "typeorm";
+import { Brackets, EntityManager, LessThan, MoreThan } from "typeorm";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import * as RxJS from "rxjs";
 import { InstagramPostDto } from "../../dto/instagramPost.dto";
@@ -38,6 +38,7 @@ export class InstagramPostTrackerJob {
   private readonly _apiKey: string;
   private readonly _apiHost: string;
   private readonly _trackerInterval: number;
+  private readonly _lastInterval: number;
   private readonly _FETCH_COUNT = 50;
   private readonly _apiDelay: number;
   private _isRunning: boolean;
@@ -66,6 +67,11 @@ export class InstagramPostTrackerJob {
       throw new Error("airdrop.instagram.tracker.postInterval config is empty");
     }
 
+    this._lastInterval = this._configService.get<number>('airdrop.instagram.tracker.lastInterval');
+    if (!this._lastInterval) {
+      throw new Error("airdrop.instagram.tracker.lastInterval config is empty");
+    }
+
     this._apiDelay = this._configService.get<number>('airdrop.instagram.apiDelay');
 
     this._isEnable = this._configService.get<boolean>("airdrop.instagram.enable");
@@ -77,6 +83,9 @@ export class InstagramPostTrackerJob {
       const interval = setInterval(this.fetchInstagramPosts.bind(this), this._trackerInterval);
       this._schedulerRegistry.addInterval('InstagramPostsTrackerJob', interval);
       this.fetchInstagramPosts();
+      const lastInterval = setInterval(this._lastFetchInstagramPosts.bind(this), this._lastInterval);
+      this._schedulerRegistry.addInterval('LastTwitterTweetTrackerJob', lastInterval);
+      this._lastFetchInstagramPosts(this._lastInterval);
     }
   }
 
@@ -827,5 +836,34 @@ export class InstagramPostTrackerJob {
       ),
       RxJS.map(response => response.data),
     )
+  }
+
+  private _lastFetchInstagramPosts(lastIntervalTime: number): void {
+    const now = new Date();
+    const nowPlusFiveMin = new Date(now.getTime() + lastIntervalTime);
+
+    RxJS.from(this._entityManager.getRepository(SocialAirdropScheduleEntity)
+      .findOneOrFail({
+        relations: {
+          socialLively: true
+        },
+        loadEagerRelations: true,
+        where: {
+          socialLively: {
+            socialType: SocialType.INSTAGRAM,
+            isActive: true,
+          },
+          airdropEndAt: MoreThan(now) && LessThan(nowPlusFiveMin),
+        }
+      }))
+      .pipe(
+        RxJS.catchError(err => {
+          this._logger.error(`find last airdrop schedule tweeter failed`, err);
+          return RxJS.empty();
+        }),
+        RxJS.filter(schedule => !!schedule?.id),
+        RxJS.tap(() => this.fetchInstagramPosts())
+      )
+      .subscribe();
   }
 }

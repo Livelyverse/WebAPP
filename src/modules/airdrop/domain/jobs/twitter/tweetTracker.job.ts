@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Brackets, EntityManager, MoreThan } from "typeorm";
+import { Brackets, EntityManager, LessThan, MoreThan } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import TwitterApiv2ReadOnly from "twitter-api-v2/dist/v2/client.v2.read";
 import { InjectEntityManager } from "@nestjs/typeorm";
@@ -32,6 +32,7 @@ export class TweetTrackerJob {
   private readonly _authToken: string;
   private readonly _twitterClient: TwitterApiv2ReadOnly;
   private readonly _trackerInterval: number;
+  private readonly _lastInterval: number;
   private _isRunning: boolean;
   private _isEnable: boolean;
 
@@ -51,6 +52,11 @@ export class TweetTrackerJob {
       throw new Error("airdrop.twitter.tracker.postInterval config is empty");
     }
 
+    this._lastInterval = this._configService.get<number>('airdrop.twitter.tracker.lastInterval');
+    if (!this._lastInterval) {
+      throw new Error("airdrop.twitter.tracker.lastInterval config is empty");
+    }
+
     this._isEnable = this._configService.get<boolean>("airdrop.twitter.enable");
     if (this._isEnable === null) {
       throw new Error("airdrop.twitter.enable config is empty");
@@ -62,6 +68,9 @@ export class TweetTrackerJob {
       const interval = setInterval(this.fetchTweetsFromPage.bind(this), this._trackerInterval);
       this._schedulerRegistry.addInterval('TwitterTweetTrackerJob', interval);
       this.fetchTweetsFromPage();
+      const lastInterval = setInterval(this._lastFetchTweetsFromPage.bind(this), this._lastInterval);
+      this._schedulerRegistry.addInterval('LastTwitterTweetTrackerJob', lastInterval);
+      this._lastFetchTweetsFromPage(this._lastInterval);
     }
   }
 
@@ -960,5 +969,34 @@ export class TweetTrackerJob {
           )
         )
       );
+  }
+
+  private _lastFetchTweetsFromPage(lastIntervalTime: number): void {
+    const now = new Date();
+    const nowPlusFiveMin = new Date(now.getTime() + lastIntervalTime);
+
+    RxJS.from(this._entityManager.getRepository(SocialAirdropScheduleEntity)
+      .findOne({
+        relations: {
+          socialLively: true
+        },
+        loadEagerRelations: true,
+        where: {
+          socialLively: {
+            socialType: SocialType.TWITTER,
+            isActive: true,
+          },
+          airdropEndAt: MoreThan(now) && LessThan(nowPlusFiveMin),
+        }
+      }))
+      .pipe(
+        RxJS.catchError(err => {
+          this._logger.error(`find last airdrop schedule tweeter failed`, err);
+          return RxJS.empty();
+        }),
+        RxJS.filter(schedule => !!schedule?.id),
+        RxJS.tap(() => this.fetchTweetsFromPage())
+      )
+      .subscribe();
   }
 }

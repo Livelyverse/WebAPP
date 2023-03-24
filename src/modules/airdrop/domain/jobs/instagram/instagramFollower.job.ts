@@ -25,6 +25,7 @@ export class InstagramFollowerJob {
   private readonly _apiDelay: number;
   private _isRunning: boolean;
   private _followInterval: number;
+  private readonly _lastInterval: number;
   private _isEnable: boolean;
 
   constructor(
@@ -51,6 +52,11 @@ export class InstagramFollowerJob {
       throw new Error("airdrop.instagram.tracker.followInterval config is empty");
     }
 
+    this._lastInterval = this._configService.get<number>('airdrop.instagram.tracker.lastInterval');
+    if (!this._lastInterval) {
+      throw new Error("airdrop.instagram.tracker.lastInterval config is empty");
+    }
+
     this._isEnable = this._configService.get<boolean>("airdrop.instagram.enable");
     if (this._isEnable === null) {
       throw new Error("airdrop.instagram.enable config is empty");
@@ -60,6 +66,9 @@ export class InstagramFollowerJob {
       const interval = setInterval(this.fetchInstagramFollowers.bind(this), this._followInterval);
       this._schedulerRegistry.addInterval('InstagramPostsTrackerJob', interval);
       this.fetchInstagramFollowers();
+      const lastInterval = setInterval(this._lastFetchInstagramFollowers.bind(this), this._lastInterval);
+      this._schedulerRegistry.addInterval('LastTwitterTweetTrackerJob', lastInterval);
+      this._lastFetchInstagramFollowers(this._lastInterval);
     }
 
   }
@@ -392,5 +401,27 @@ export class InstagramFollowerJob {
       ),
       RxJS.identity,
     )
+  }
+
+  private async _lastFetchInstagramFollowers(lastIntervalTime: number) {
+    RxJS.from(this._entityManager.createQueryBuilder(SocialEventEntity, "socialEvent")
+      .select()
+      .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "socialEvent"."airdropScheduleId"')
+      .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
+      .where('"socialLively"."socialType" = \'INSTAGRAM\'')
+      .andWhere('"socialEvent"."isActive" = \'true\'')
+      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower("airdropSchedule"."hashtags"->>\'join\'))')
+      .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
+      .andWhere('"airdropSchedule"."airdropEndAt" < NOW() + :lastIntervalTime', { lastIntervalTime: lastIntervalTime })
+      .getOne())
+      .pipe(
+        RxJS.catchError(err => {
+          this._logger.error(`find last airdrop schedule tweeter failed`, err);
+          return RxJS.empty();
+        }),
+        RxJS.filter(schedule => !!schedule?.id),
+        RxJS.tap(() => this.fetchInstagramFollowers())
+      )
+      .subscribe();
   }
 }

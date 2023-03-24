@@ -17,6 +17,7 @@ import { SocialAirdropRuleEntity } from "../../entity/socialAirdropRule.entity";
 import { SocialAirdropEntity } from "../../entity/socialAirdrop.entity";
 import { FollowerError } from "../../error/follower.error";
 import { SocialEventEntity } from "../../entity/socialEvent.entity";
+import { SocialAirdropScheduleEntity } from "../../entity/socialAirdropSchedule.entity";
 
 @Injectable()
 export class TwitterFollowerJob {
@@ -25,6 +26,7 @@ export class TwitterFollowerJob {
   private readonly _twitterClient: TwitterApiv2ReadOnly;
   private _isRunning: boolean;
   private _followInterval: number;
+  private _lastInterval: number;
   private _isEnable: boolean;
 
   constructor(
@@ -42,6 +44,11 @@ export class TwitterFollowerJob {
       throw new Error("airdrop.twitter.tracker.followInterval config is empty");
     }
 
+    this._lastInterval = this._configService.get<number>('airdrop.twitter.tracker.lastInterval');
+    if (!this._lastInterval) {
+      throw new Error("airdrop.twitter.tracker.lastInterval config is empty");
+    }
+
     this._isEnable = this._configService.get<boolean>("airdrop.twitter.enable");
     if (this._isEnable === null) {
       throw new Error("airdrop.twitter.enable config is empty");
@@ -53,6 +60,9 @@ export class TwitterFollowerJob {
       const interval = setInterval(this.fetchTwitterFollowers.bind(this), this._followInterval);
       this._schedulerRegistry.addInterval('TwitterFollowTrackerJob', interval);
       this.fetchTwitterFollowers();
+      const lastInterval = setInterval(this._lastFetchTwitterFollowers.bind(this), this._lastInterval);
+      this._schedulerRegistry.addInterval('LastTwitterTweetTrackerJob', lastInterval);
+      this._lastFetchTwitterFollowers(this._lastInterval);
     }
   }
 
@@ -379,6 +389,28 @@ export class TwitterFollowerJob {
           )
         )
       );
+  }
+  private async _lastFetchTwitterFollowers(lastIntervalTime: number) {
+    RxJS.from(this._entityManager.createQueryBuilder(SocialEventEntity, "socialEvent")
+      .select()
+      .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "socialEvent"."airdropScheduleId"')
+      .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
+      .where('"socialLively"."socialType" = \'TWITTER\'')
+      .andWhere('"socialEvent"."isActive" = \'true\'')
+      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower(("airdropSchedule"."hashtags"->>\'join\'))')
+      .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
+      .andWhere('"airdropSchedule"."airdropEndAt" < NOW() + :lastIntervalTime', { lastIntervalTime: lastIntervalTime })
+      .getOne()
+    )
+      .pipe(
+        RxJS.catchError(err => {
+          this._logger.error(`find last airdrop schedule tweeter failed`, err);
+          return RxJS.empty();
+        }),
+        RxJS.filter(schedule => !!schedule?.id),
+        RxJS.tap(() => this.fetchTwitterFollowers())
+      )
+      .subscribe();
   }
 }
 
