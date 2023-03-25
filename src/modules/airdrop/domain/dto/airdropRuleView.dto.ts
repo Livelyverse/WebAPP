@@ -11,7 +11,7 @@ export class AirdropRuleViewDto {
       airdropRuleDto.socialType = entity.socialType;
       airdropRuleDto.socialAction = entity.actionType;
       airdropRuleDto.unit = entity.unit;
-      airdropRuleDto.amount = entity.amount.toString();
+      airdropRuleDto.amount = entity.amount;
       airdropRuleDto.decimal = entity.decimal;
       airdropRuleDto.createdAt = entity.createdAt;
       airdropRuleDto.updatedAt = entity.updatedAt;

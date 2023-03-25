@@ -10,6 +10,8 @@ import { AirdropRequestDto, TokenType } from "../../../blockchain/domain/dto/air
 import { SocialAirdropEntity } from "../entity/socialAirdrop.entity";
 import { BlockchainTxEntity } from "../../../blockchain/domain/entity/blockchainTx.entity";
 import { BlockchainError, ErrorCode } from "../../../blockchain/domain/error/blockchainError";
+import { BigNumber } from "ethers";
+import Decimal from "decimal.js";
 
 @Injectable()
 export class SocialAirdropJob {
@@ -81,8 +83,8 @@ export class SocialAirdropJob {
             RxJS.mergeMap(group => group.pipe(RxJS.toArray())),
             RxJS.mergeMap(userAirdrops =>
               RxJS.from(userAirdrops).pipe(
-                RxJS.reduce((acc, airdrop) => acc + BigInt(airdrop.amount), 0n),
-                RxJS.map((total) => ({userAirdrops, total}))
+                RxJS.reduce((acc, airdrop) =>  acc.add(new Decimal(airdrop.amount).mul(10 ** airdrop.decimal)), new Decimal(0)),
+                RxJS.map((total) => ({userAirdrops, total: BigNumber.from(total.toString())}))
               )
             ),
             RxJS.tap(data => {
@@ -96,8 +98,7 @@ export class SocialAirdropJob {
             RxJS.concatMap(buffers =>
               RxJS.from(buffers).pipe(
                 RxJS.reduce((acc, buffer) => {
-                    acc['data'].push({ destination: buffer.userAirdrops[0].walletAddress,
-                      amount: BigInt(buffer.total) * (10n ** BigInt(buffer.userAirdrops[0].decimal))})
+                    acc['data'].push({ destination: buffer.userAirdrops[0].walletAddress, amount: buffer.total})
                     return acc;
                   },
                   AirdropRequestDto.from(Symbol.for('AirdropRequestId'), TokenType.LIV)
@@ -209,7 +210,7 @@ export class SocialAirdropJob {
     ).subscribe({
       next: RxJS.noop,
       error: err => {
-        this._logger.error(`airdropToken job failed`, err);
+        this._logger.error(`airdropToken job failed, error: ${err?.stack}`, err);
         this._isRunning = false;
       },
       complete: () => {

@@ -1,3 +1,5 @@
+import { BigNumber } from "ethers";
+
 export enum TokenType {
   LIV = "LIV"
 }
@@ -14,6 +16,6 @@ export class AirdropRequestDto {
 
   public id: symbol;
   public tokenType: TokenType;
-  public data: Array<{destination: string, amount: bigint}>
+  public data: Array<{destination: string, amount: BigNumber}>
   public signer?: string
 }

@@ -14,8 +14,8 @@ export class SocialAirdropRuleEntity extends BaseEntity {
   @Column({ type: 'text', nullable: false})
   unit: UnitType
 
-  @Column({ type: 'bigint', nullable: false})
-  amount: bigint
+  @Column({ type: 'varchar', length: 48, nullable: false})
+  amount: string
 
   @Column({ type: 'integer', nullable: false})
   decimal: number
