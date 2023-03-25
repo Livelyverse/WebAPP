@@ -7,6 +7,8 @@ export class BaseError extends Error {
 
     if (options && Object.hasOwn(options, 'cause') && options['cause'] && Object.hasOwn(options['cause'], 'stack')) {
       this.cause = options['cause'];
+    } else if (options && Object.hasOwn(options, 'stack') && options['stack']) {
+      this.cause = options;
     }
     this.name = name;
   }

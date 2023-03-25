@@ -79,12 +79,6 @@ export class SocialAirdropJob {
           RxJS.from(airdropQueryResultObservable).pipe(
             RxJS.groupBy((data) => data.email),
             RxJS.mergeMap(group => group.pipe(RxJS.toArray())),
-            // RxJS.mergeMap(userDataArray =>
-            //   RxJS.from(userDataArray).pipe(
-            //     RxJS.groupBy(data => data.socialType),
-            //     RxJS.mergeMap(group => group.pipe(RxJS.toArray()))
-            //   )
-            // ),
             RxJS.mergeMap(userAirdrops =>
               RxJS.from(userAirdrops).pipe(
                 RxJS.reduce((acc, airdrop) => acc + BigInt(airdrop.amount), 0n),
@@ -142,16 +136,27 @@ export class SocialAirdropJob {
                     ),
                     RxJS.finalize(() => this._logger.debug(`finalize blockchainService.sendAirdropTx . . . `)),
                     RxJS.retry({
-                      count:7,
+                      count:37,
+                      resetOnSuccess: true,
                       delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
                         RxJS.mergeMap(([error, retryCount]) =>
                           RxJS.merge(
                             RxJS.of([error, retryCount]).pipe(
-                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR || err.code === ErrorCode.SERVICE_NOT_READY && count <= 7),
+                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.SERVICE_NOT_READY && count < 30),
+                              RxJS.tap(([error, _]) => this._logger.warn(`airdrop request failed, error: ${error.message}, code: ${error.code}, waiting retry: 60000 . . .`)),
+                              RxJS.delay(60000)
+                            ),
+                            RxJS.of([error, retryCount]).pipe(
+                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.SERVICE_NOT_READY && count >= 30),
+                              RxJS.mergeMap(([err,_]) => RxJS.throwError(err))
+                            ),
+                            RxJS.of([error, retryCount]).pipe(
+                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR && count < 7),
+                              RxJS.tap(([error, retryCount]) => this._logger.warn(`airdrop request failed, error: ${error.message}, code: ${error.code}, waiting retry: ${60000 * retryCount} . . .`)),
                               RxJS.delay(60000 * retryCount)
                             ),
                             RxJS.of([error, retryCount]).pipe(
-                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR || err.code === ErrorCode.SERVICE_NOT_READY && count > 7),
+                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR && count >= 7),
                               RxJS.mergeMap(([err,_]) => RxJS.throwError(err))
                             ),
                             RxJS.of([error, retryCount]).pipe(
@@ -160,7 +165,7 @@ export class SocialAirdropJob {
                             )
                           )
                         ),
-                        RxJS.tap(([error, retryCount]) => this._logger.warn(`airdrop request failed, err.message: ${error.message}, err.code: ${error.code}, retry ${retryCount} . . . `))
+                        RxJS.tap(([_, retryCount]) => this._logger.warn(`airdrop request retry ${retryCount} . . . `))
                       )
                     })
                   )
