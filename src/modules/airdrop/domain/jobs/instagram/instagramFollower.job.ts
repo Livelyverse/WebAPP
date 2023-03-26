@@ -439,12 +439,31 @@ export class InstagramFollowerJob {
       .getOne())
       .pipe(
         RxJS.catchError(err => {
-          this._logger.error(`find last airdrop schedule tweeter failed`, err);
+          this._logger.error(`find last airdrop schedule Instagram failed`, err);
           return RxJS.empty();
         }),
         RxJS.filter(schedule => !!schedule?.id),
-        RxJS.tap(() => this.fetchInstagramFollowers())
+        RxJS.concatMap(() =>
+          RxJS.of(this.fetchInstagramFollowers()).pipe(
+            RxJS.catchError(err => {
+              this._logger.error(`fetch Instagram followers failed`, err);
+              return RxJS.throwError(`Fetching Instagram followers failed: ${err}`);
+            }),
+            RxJS.tap(() => this._logger.log('Instagram followers Fetched!')),
+          )
+        ),
+        RxJS.catchError(err => {
+          this._logger.error(`Error fetching Instagram followers:`, err);
+          return RxJS.empty();
+        })
       )
-      .subscribe();
+      .subscribe({
+        error: err => {
+          this._logger.error('An error occurred at _lastFetchInstagramFollowers:', err);
+        },
+        complete: () => {
+          this._logger.log('_lastFetchInstagramFollowers completed successfully');
+        }
+      });
   }
 }

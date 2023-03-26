@@ -403,15 +403,34 @@ export class TwitterFollowerJob {
       .andWhere('"airdropSchedule"."airdropEndAt" < NOW() + :lastIntervalTime', { lastIntervalTime: lastIntervalTime })
       .getOne()
     )
-      .pipe(
-        RxJS.catchError(err => {
-          this._logger.error(`find last airdrop schedule tweeter failed`, err);
-          return RxJS.empty();
-        }),
-        RxJS.filter(schedule => !!schedule?.id),
-        RxJS.tap(() => this.fetchTwitterFollowers())
-      )
-      .subscribe();
+    .pipe(
+      RxJS.catchError(err => {
+        this._logger.error(`find last airdrop schedule Instagram failed`, err);
+        return RxJS.empty();
+      }),
+      RxJS.filter(schedule => !!schedule?.id),
+      RxJS.concatMap(() =>
+        RxJS.of(this.fetchTwitterFollowers()).pipe(
+          RxJS.catchError(err => {
+            this._logger.error(`fetch Twitter followers failed`, err);
+            return RxJS.throwError(`Fetching Twitter followers failed: ${err}`);
+          }),
+          RxJS.tap(() => this._logger.log('Twitter followers Fetched!')),
+        )
+      ),
+      RxJS.catchError(err => {
+        this._logger.error(`Error fetching Twitter followers:`, err);
+        return RxJS.empty();
+      })
+    )
+    .subscribe({
+      error: err => {
+        this._logger.error('An error occurred at _lastFetchTwitterFollowers:', err);
+      },
+      complete: () => {
+        this._logger.log('_lastFetchTwitterFollowers completed successfully');
+      }
+    });
   }
 }
 

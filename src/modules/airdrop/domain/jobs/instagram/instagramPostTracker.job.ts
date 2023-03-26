@@ -876,7 +876,7 @@ export class InstagramPostTrackerJob {
     const nowPlusFiveMin = new Date(now.getTime() + lastIntervalTime);
 
     RxJS.from(this._entityManager.getRepository(SocialAirdropScheduleEntity)
-      .findOneOrFail({
+      .findOne({
         relations: {
           socialLively: true
         },
@@ -891,12 +891,31 @@ export class InstagramPostTrackerJob {
       }))
       .pipe(
         RxJS.catchError(err => {
-          this._logger.error(`find last airdrop schedule tweeter failed`, err);
+          this._logger.error(`find last airdrop schedule Instagram failed`, err);
           return RxJS.empty();
         }),
         RxJS.filter(schedule => !!schedule?.id),
-        RxJS.tap(() => this.fetchInstagramPosts())
+        RxJS.concatMap(() =>
+          RxJS.of(this.fetchInstagramPosts()).pipe(
+            RxJS.catchError(err => {
+              this._logger.error(`fetch Instagram posts failed`, err);
+              return RxJS.throwError(`Fetching Instagram posts failed: ${err}`);
+            }),
+            RxJS.tap(() => this._logger.log('Instagram Posts Fetched!')),
+          )
+        ),
+        RxJS.catchError(err => {
+          this._logger.error(`Error fetching Instagram posts:`, err);
+          return RxJS.empty();
+        })
       )
-      .subscribe();
+      .subscribe({
+        error: err => {
+          this._logger.error('An error occurred at _lastFetchInstagramPosts:', err);
+        },
+        complete: () => {
+          this._logger.log('_lastFetchInstagramPosts completed successfully');
+        }
+      });
   }
 }

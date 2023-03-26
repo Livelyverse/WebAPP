@@ -996,12 +996,31 @@ export class TweetTrackerJob {
       }))
       .pipe(
         RxJS.catchError(err => {
-          this._logger.error(`find last airdrop schedule tweeter failed`, err);
+          this._logger.error(`find last airdrop schedule Instagram failed`, err);
           return RxJS.empty();
         }),
         RxJS.filter(schedule => !!schedule?.id),
-        RxJS.tap(() => this.fetchTweetsFromPage())
+        RxJS.concatMap(() =>
+          RxJS.of(this.fetchTweetsFromPage()).pipe(
+            RxJS.catchError(err => {
+              this._logger.error(`fetch Twitter tweets failed`, err);
+              return RxJS.throwError(`Fetching Twitter tweets failed: ${err}`);
+            }),
+            RxJS.tap(() => this._logger.log('Twitter tweets Fetched!')),
+          )
+        ),
+        RxJS.catchError(err => {
+          this._logger.error(`Error fetching Twitter tweets:`, err);
+          return RxJS.empty();
+        })
       )
-      .subscribe();
+      .subscribe({
+        error: err => {
+          this._logger.error('An error occurred at _lastFetchTweetsFromPage:', err);
+        },
+        complete: () => {
+          this._logger.log('_lastFetchTweetsFromPage completed successfully');
+        }
+      });
   }
 }
