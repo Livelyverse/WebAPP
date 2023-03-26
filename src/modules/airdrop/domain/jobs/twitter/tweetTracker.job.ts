@@ -261,6 +261,7 @@ export class TweetTrackerJob {
                                 )
                               ),
                               RxJS.retry({
+                                resetOnSuccess: true,
                                 delay: (error) =>
                                   RxJS.merge(
                                     RxJS.of(error).pipe(
@@ -361,6 +362,7 @@ export class TweetTrackerJob {
                                 )
                               ),
                               RxJS.retry({
+                                resetOnSuccess: true,
                                 delay: (error) =>
                                   RxJS.merge(
                                     RxJS.of(error).pipe(
@@ -493,6 +495,7 @@ export class TweetTrackerJob {
                             )
                           ),
                           RxJS.retry({
+                            resetOnSuccess: true,
                             delay: (error) =>
                               RxJS.merge(
                                 RxJS.of(error).pipe(
@@ -691,6 +694,7 @@ export class TweetTrackerJob {
                     )
                   ),
                   RxJS.retry({
+                    resetOnSuccess: true,
                     delay: (error) =>
                       RxJS.merge(
                         RxJS.of(error).pipe(
@@ -879,6 +883,7 @@ export class TweetTrackerJob {
                   )
                 ),
                 RxJS.retry({
+                  resetOnSuccess: true,
                   delay: (error) =>
                     RxJS.merge(
                       RxJS.of(error).pipe(

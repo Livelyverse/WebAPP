@@ -153,6 +153,7 @@ export class TwitterFollowerJob {
             )
           ),
           RxJS.retry({
+            resetOnSuccess: true,
             delay: (error) =>
               RxJS.merge(
                 RxJS.of(error).pipe(

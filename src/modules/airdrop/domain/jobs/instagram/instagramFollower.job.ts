@@ -88,7 +88,7 @@ export class InstagramFollowerJob {
       .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
       .where('"socialLively"."socialType" = \'INSTAGRAM\'')
       .andWhere('"socialEvent"."isActive" = \'true\'')
-      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower("airdropSchedule"."hashtags"->>\'join\'))')
+      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? ("airdropSchedule"."hashtags"->>\'join\')::text')
       .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
       .getOne())
       .pipe(
@@ -129,21 +129,22 @@ export class InstagramFollowerJob {
       RxJS.concatMap(([socialLively, socialEvent, airdropRule]: [SocialLivelyEntity, SocialEventEntity, SocialAirdropRuleEntity]) =>
         RxJS.defer(() => RxJS.from(this._fetchFollowers(socialLively.userId))).pipe(
           RxJS.tap({
-            next: (followers) => this._logger.log(`fetch instagram followers count: ${followers.data.data.user.length}`),
+            next: (followers) => this._logger.log(`fetch instagram followers count: ${followers.data.data.user.edge_followed_by.count}`),
           }),
           RxJS.concatMap((followers) =>
-            RxJS.from(followers.data.data.user).pipe(
+            RxJS.from(followers.data.data.user.edge_followed_by.edges).pipe(
               RxJS.map((follower) => [socialLively, socialEvent, airdropRule, follower]),
             )
           ),
           RxJS.retry({
             count: 3,
+            resetOnSuccess: true,
             delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
               RxJS.mergeMap(([error, retryCount]) =>
                 RxJS.merge(
                   RxJS.of([error, retryCount]).pipe(
                     RxJS.filter(([err, count]) => err instanceof AxiosError &&
-                      (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                      (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT || err.code === "ECONNRESET" || err.code === "EAI_AGAIN") &&
                       count <= 3
                     ),
                     RxJS.tap({
@@ -153,7 +154,7 @@ export class InstagramFollowerJob {
                   ),
                   RxJS.of([error, retryCount]).pipe(
                     RxJS.filter(([err, count]) => err instanceof AxiosError &&
-                      (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                      (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT || err.code === "ECONNRESET" || err.code === "EAI_AGAIN") &&
                       count > 3
                     ),
                     RxJS.mergeMap(([err, _]) => RxJS.throwError(() => new TrackerError('instagram get followers failed', err)))
@@ -178,7 +179,7 @@ export class InstagramFollowerJob {
               ),
               RxJS.of(error).pipe(
                 RxJS.filter(err => !(err instanceof FollowerError && err instanceof AxiosError)),
-                RxJS.mergeMap(err => RxJS.throwError(() => new FollowerError('instagram fetch post like failed', err)))
+                RxJS.mergeMap(err => RxJS.throwError(() => new FollowerError('instagram fetch followers failed', err)))
               )
             )
           ),
@@ -192,7 +193,7 @@ export class InstagramFollowerJob {
           .leftJoin("user", "users", '"users"."id" = "socialProfile"."userId"')
           .leftJoin("social_tracker", "socialTracker",
             '"socialTracker"."socialProfileId" = "socialProfile"."id" and "socialTracker"."actionType" = :type', { type: SocialActionType.FOLLOW })
-          .where('"socialProfile"."username" = :username', { username: follower.username })
+          .where('"socialProfile"."username" = :username', { username: follower.node.username })
           .andWhere('"socialProfile"."socialType" = :socialType', { socialType: socialLively.socialType })
           .getRawOne()
         ).pipe(
@@ -239,10 +240,10 @@ export class InstagramFollowerJob {
             RxJS.filter((data) => !data.socialProfile),
             RxJS.map((data) => {
               data.socialProfile = new SocialProfileEntity();
-              data.socialProfile.username = data.follower.username;
+              data.socialProfile.username = data.follower.node.username;
               data.socialProfile.socialType = data.socialLively.socialType;
-              data.socialProfile.socialId = data.follower.pk_id;
-              data.socialProfile.socialName = data.follower.full_name;
+              data.socialProfile.socialId = data.follower.node.id;
+              data.socialProfile.socialName = data.follower.node.full_name;
               data.socialProfile.profileUrl = "https://www.instagram.com/" + data.socialProfile.username;
               data.socialProfile.location = null;
               data.socialProfile.website = null;
@@ -269,8 +270,8 @@ export class InstagramFollowerJob {
           RxJS.of(inputData).pipe(
             RxJS.filter((data) => !data.trackerId && data.socialProfile?.userId),
             RxJS.map((data) => {
-              data.socialProfile.socialId = data.follower.pk_id;
-              data.socialProfile.socialName = data.follower.full_name;
+              data.socialProfile.socialId = data.follower.node.id;
+              data.socialProfile.socialName = data.follower.node.full_name;
               data.socialProfile.profileUrl = "https://www.instagram.com/" + data.socialProfile.username;
               data.socialProfile.location = null;
               data.socialProfile.website = null;
@@ -326,12 +327,12 @@ export class InstagramFollowerJob {
           RxJS.of(inputData).pipe(
             RxJS.filter((data) => !data.trackerId && !data.socialProfile?.userId),
             RxJS.map((data) => { data.socialProfile }),
-            RxJS.tap((_) => this._logger.debug(`instagram follower hasn't still verified by user, username: ${inputData.follower.username}`))
+            RxJS.tap((_) => this._logger.debug(`instagram follower hasn't still verified by user, username: ${inputData.follower.node.username}`))
           ),
           RxJS.of(inputData).pipe(
             RxJS.filter((data) => data.trackerId),
             RxJS.map((data) => { data.socialProfile }),
-            RxJS.tap((_) => this._logger.debug(`instagram follower already has registered, username: ${inputData.follower.username}`))
+            RxJS.tap((_) => this._logger.debug(`instagram follower already has registered, username: ${inputData.follower.node.username}`))
           )
         )
       ),
@@ -353,10 +354,15 @@ export class InstagramFollowerJob {
   }
 
   private _fetchFollowers(socialLivelyUserId: string): RxJS.Observable<any> {
-    return this._httpService.get(`https://instagram188.p.rapidapi.com/userfollowers/${socialLivelyUserId}/${this._FETCH_COUNT}/%7Bend_cursor%7D`, {
+    return this._httpService.get("https://instagram28.p.rapidapi.com/followers", {
       headers: {
         'X-RapidAPI-Key': this._apiKey,
         'X-RapidAPI-Host': this._apiHost
+      },
+      params: {
+        "user_id": socialLivelyUserId,
+        "batch_size": this._FETCH_COUNT,
+        "next_cursor": "QVFBUkZ3aXVHSjlSdmFqd29XUkEyYWZ1WmgyRmt0LTRtVHBMenQzcXNDRDhZVzJzdkhJeHV3Z2pmU2taNlJ0ekp0bXVrRkh5UGpwcUlSeTBJNE1aOVZDdQ=="
       }
     }).pipe(
       RxJS.expand(response =>
@@ -364,26 +370,38 @@ export class InstagramFollowerJob {
           RxJS.of(response).pipe(
             RxJS.filter(axiosResponse =>
               axiosResponse?.data?.success &&
-              axiosResponse?.data?.data?.end_cursor
+              axiosResponse?.data?.data?.user?.page_info?.end_cursor
             ),
             RxJS.delay(this._apiDelay),
             RxJS.mergeMap(axiosResponse =>
-              this._httpService.get(`https://instagram188.p.rapidapi.com/userfollowers/${socialLivelyUserId}/${this._FETCH_COUNT}/${axiosResponse.data.data.end_cursor}`, {
+              this._httpService.get(`https://instagram28.p.rapidapi.com/followers`, {
                 headers: {
                   'X-RapidAPI-Key': this._apiKey,
                   'X-RapidAPI-Host': this._apiHost
+                },
+                params: {
+                  "user_id": socialLivelyUserId,
+                  "batch_size": this._FETCH_COUNT,
+                  "next_cursor": axiosResponse.data.data.user.page_info.end_cursor
                 }
-              })
+              }).pipe(
+                RxJS.catchError(error => {
+                  // Handle the error here
+                  this._logger.error(`An error occurred while fetching data: ${error.message}`);
+                  return RxJS.EMPTY;
+                })
+              )
             ),
           ),
           RxJS.of(response).pipe(
             RxJS.filter(axiosResponse =>
               !axiosResponse?.data?.success ||
-              !axiosResponse?.data?.data?.end_cursor
+              !axiosResponse?.data?.data?.user?.page_info?.end_cursor
             ),
             RxJS.tap({
-              next: response => this._logger.debug('_fetchPostComments call api complete,' +
-                `data.success: ${response?.data?.success}`)
+              next: response => this._logger.debug('_fetchFollowers call api complete,' +
+                `data.success: ${response?.data?.success}`),
+              error: err => this._logger.debug("_fetchFollowers call api failed:", err)
             }),
             RxJS.mergeMap(_ => RxJS.EMPTY)
           )
@@ -391,6 +409,11 @@ export class InstagramFollowerJob {
         1
       ),
       RxJS.identity,
+      RxJS.catchError(error => {
+        // Handle the error here
+        this._logger.error(`An error occurred: ${error.message}`);
+        return RxJS.throwError(error);
+      })
     )
   }
 }
