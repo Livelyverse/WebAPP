@@ -64,10 +64,10 @@ export class InstagramFollowerJob {
 
     if (this._isEnable) {
       const interval = setInterval(this.fetchInstagramFollowers.bind(this), this._followInterval);
-      this._schedulerRegistry.addInterval('InstagramPostsTrackerJob', interval);
+      this._schedulerRegistry.addInterval('InstagramPostsFollowersJob', interval);
       this.fetchInstagramFollowers();
       const lastInterval = setInterval(this._lastFetchInstagramFollowers.bind(this), this._lastInterval);
-      this._schedulerRegistry.addInterval('LastTwitterTweetTrackerJob', lastInterval);
+      this._schedulerRegistry.addInterval('LastFetchInstagramFollowersJob', lastInterval);
       this._lastFetchInstagramFollowers(this._lastInterval);
     }
 

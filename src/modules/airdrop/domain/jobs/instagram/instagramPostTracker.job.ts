@@ -84,7 +84,7 @@ export class InstagramPostTrackerJob {
       this._schedulerRegistry.addInterval('InstagramPostsTrackerJob', interval);
       this.fetchInstagramPosts();
       const lastInterval = setInterval(this._lastFetchInstagramPosts.bind(this), this._lastInterval);
-      this._schedulerRegistry.addInterval('LastTwitterTweetTrackerJob', lastInterval);
+      this._schedulerRegistry.addInterval('LastFetchInstagramPostsJob', lastInterval);
       this._lastFetchInstagramPosts(this._lastInterval);
     }
   }
