@@ -59,13 +59,13 @@ import { DiscordMemberJob } from "./domain/jobs/discord/discordMembers.job";
     AirdropRuleService,
     AirdropService,
     AirdropScheduleService,
-    // TwitterFollowerJob,
-    // TweetTrackerJob,
+    TwitterFollowerJob,
+    TweetTrackerJob,
     SocialAirdropJob,
-    // InstagramPostTrackerJob,
-    // InstagramFollowerJob,
-    // TelegramSubscriberJob,
-    // DiscordMemberJob
+    InstagramPostTrackerJob,
+    InstagramFollowerJob,
+    TelegramSubscriberJob,
+    DiscordMemberJob
   ],
 })
 export class AirdropModule {}
