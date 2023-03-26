@@ -66,7 +66,7 @@ export class TelegramSubscriberJob {
 
   // this function should register all the middleware and actions to react to the users activity
   private async _initializeBot() {
-    this._logger.debug("findNewSubscribers started!!!")
+    this._logger.debug("findNewSubscribers started!")
     try {
       // create stage from all scenes
       const stage = new Scenes.Stage<Scenes.SceneContext>([this._createAirdropScene()]);

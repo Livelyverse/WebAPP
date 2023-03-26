@@ -387,7 +387,7 @@ export class SocialProfileService {
         RxJS.mergeMap(result =>
           RxJS.merge(
             RxJS.of(result).pipe(
-              RxJS.filter(socialFindResult => !!!socialFindResult),
+              RxJS.filter(socialFindResult => !socialFindResult),
               RxJS.mergeMap(_ =>
                 RxJS.throwError(() =>
                   new HttpException({

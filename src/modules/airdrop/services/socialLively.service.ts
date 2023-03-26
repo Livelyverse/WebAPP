@@ -198,7 +198,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
               )
             ),
             RxJS.of(result).pipe(
-              RxJS.filter(socialFindResult => !!!socialFindResult),
+              RxJS.filter(socialFindResult => !socialFindResult),
               RxJS.map(_ => socialLivelyDto),
               RxJS.map(socialLivelyDto => {
                 const entity = new SocialLivelyEntity();
@@ -259,7 +259,7 @@ export class SocialLivelyService implements IAirdropService<SocialLivelyEntity>{
           RxJS.mergeMap(result =>
             RxJS.merge(
               RxJS.of(result).pipe(
-                RxJS.filter(socialFindResult => !!!socialFindResult),
+                RxJS.filter(socialFindResult => !socialFindResult),
                 RxJS.mergeMap(_ =>
                   RxJS.throwError(() =>
                     new HttpException({

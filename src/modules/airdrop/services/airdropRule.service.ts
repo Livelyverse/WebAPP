@@ -199,7 +199,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
               )
             ),
             RxJS.of(result).pipe(
-              RxJS.filter(socialAirdropFindResult => !!!socialAirdropFindResult),
+              RxJS.filter(socialAirdropFindResult => !socialAirdropFindResult),
               RxJS.map(_ => airdropRuleDto),
               RxJS.map(socialAirdropRuleDto => {
                 const entity = new SocialAirdropRuleEntity();

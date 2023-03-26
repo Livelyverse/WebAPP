@@ -608,7 +608,7 @@ export class TweetTrackerJob {
                               RxJS.mergeMap((queryResult) =>
                                 RxJS.merge(
                                   RxJS.of(queryResult).pipe(
-                                    RxJS.filter((queryResult) => !!!queryResult ),
+                                    RxJS.filter((queryResult) => !queryResult ),
                                     RxJS.tap( {
                                       next: (_) => this._logger.debug(`pipe(3-1): socialProfile and socialTracker not found, tweet.Id: ${data.socialEvent.contentId}, username: ${tweetLiked.username}`),
                                     }),
