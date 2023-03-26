@@ -58,7 +58,7 @@ export class InstagramFollowerJob {
 
     if (this._isEnable) {
       const interval = setInterval(this.fetchInstagramFollowers.bind(this), this._followInterval);
-      this._schedulerRegistry.addInterval('InstagramPostsTrackerJob', interval);
+      this._schedulerRegistry.addInterval('InstagramPostsFollowersJob', interval);
       this.fetchInstagramFollowers();
     }
 
