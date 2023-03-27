@@ -68,7 +68,7 @@ export class InstagramFollowerJob {
       this.fetchInstagramFollowers();
       const lastInterval = setInterval(this._lastFetchInstagramFollowers.bind(this), this._lastInterval);
       this._schedulerRegistry.addInterval('LastFetchInstagramFollowersJob', lastInterval);
-      this._lastFetchInstagramFollowers(this._lastInterval);
+      this._lastFetchInstagramFollowers();
     }
 
   }
@@ -426,16 +426,18 @@ export class InstagramFollowerJob {
     )
   }
 
-  private async _lastFetchInstagramFollowers(lastIntervalTime: number) {
+  private _lastFetchInstagramFollowers() {
+    const now = new Date();
+    const nowPlusFiveMin = new Date(now.getTime() + this._lastInterval);
     RxJS.from(this._entityManager.createQueryBuilder(SocialEventEntity, "socialEvent")
       .select()
       .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "socialEvent"."airdropScheduleId"')
       .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
       .where('"socialLively"."socialType" = \'INSTAGRAM\'')
       .andWhere('"socialEvent"."isActive" = \'true\'')
-      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower("airdropSchedule"."hashtags"->>\'join\'))')
+      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower("airdropSchedule"."hashtags"->>\'join\')')
       .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
-      .andWhere('"airdropSchedule"."airdropEndAt" < NOW() + :lastIntervalTime', { lastIntervalTime: lastIntervalTime })
+      .andWhere('"airdropSchedule"."airdropEndAt" < :nowPlusFiveMin', { nowPlusFiveMin: nowPlusFiveMin })
       .getOne())
       .pipe(
         RxJS.catchError(err => {

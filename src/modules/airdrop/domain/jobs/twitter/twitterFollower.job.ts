@@ -62,7 +62,7 @@ export class TwitterFollowerJob {
       this.fetchTwitterFollowers();
       const lastInterval = setInterval(this._lastFetchTwitterFollowers.bind(this), this._lastInterval);
       this._schedulerRegistry.addInterval('LastFetchTwitterFollowersJob', lastInterval);
-      this._lastFetchTwitterFollowers(this._lastInterval);
+      this._lastFetchTwitterFollowers();
     }
   }
 
@@ -391,46 +391,48 @@ export class TwitterFollowerJob {
         )
       );
   }
-  private async _lastFetchTwitterFollowers(lastIntervalTime: number) {
+  private _lastFetchTwitterFollowers() {
+    const now = new Date();
+    const nowPlusFiveMin = new Date(now.getTime() + this._lastInterval);
     RxJS.from(this._entityManager.createQueryBuilder(SocialEventEntity, "socialEvent")
       .select()
       .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "socialEvent"."airdropScheduleId"')
       .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
       .where('"socialLively"."socialType" = \'TWITTER\'')
       .andWhere('"socialEvent"."isActive" = \'true\'')
-      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower(("airdropSchedule"."hashtags"->>\'join\'))')
+      .andWhere('("socialEvent"."content"->\'data\'->>\'hashtags\')::jsonb ? lower("airdropSchedule"."hashtags"->>\'join\')')
       .andWhere('"airdropSchedule"."airdropEndAt" > NOW()')
-      .andWhere('"airdropSchedule"."airdropEndAt" < NOW() + :lastIntervalTime', { lastIntervalTime: lastIntervalTime })
+      .andWhere('"airdropSchedule"."airdropEndAt" < :nowPlusFiveMin', { nowPlusFiveMin: nowPlusFiveMin })
       .getOne()
     )
-    .pipe(
-      RxJS.catchError(err => {
-        this._logger.error(`find last airdrop schedule Instagram failed`, err);
-        return RxJS.empty();
-      }),
-      RxJS.filter(schedule => !!schedule?.id),
-      RxJS.concatMap(() =>
-        RxJS.of(this.fetchTwitterFollowers()).pipe(
-          RxJS.catchError(err => {
-            this._logger.error(`fetch Twitter followers failed`, err);
-            return RxJS.throwError(`Fetching Twitter followers failed: ${err}`);
-          }),
-          RxJS.tap(() => this._logger.log('Twitter followers Fetched!')),
-        )
-      ),
-      RxJS.catchError(err => {
-        this._logger.error(`Error fetching Twitter followers:`, err);
-        return RxJS.empty();
-      })
-    )
-    .subscribe({
-      error: err => {
-        this._logger.error('An error occurred at _lastFetchTwitterFollowers:', err);
-      },
-      complete: () => {
-        this._logger.log('_lastFetchTwitterFollowers completed successfully');
-      }
-    });
+      .pipe(
+        RxJS.catchError(err => {
+          this._logger.error(`find last airdrop schedule Instagram failed`, err);
+          return RxJS.empty();
+        }),
+        RxJS.filter(schedule => !!schedule?.id),
+        RxJS.concatMap(() =>
+          RxJS.of(this.fetchTwitterFollowers()).pipe(
+            RxJS.catchError(err => {
+              this._logger.error(`fetch Twitter followers failed`, err);
+              return RxJS.throwError(`Fetching Twitter followers failed: ${err}`);
+            }),
+            RxJS.tap(() => this._logger.log('Twitter followers Fetched!')),
+          )
+        ),
+        RxJS.catchError(err => {
+          this._logger.error(`Error fetching Twitter followers:`, err);
+          return RxJS.empty();
+        })
+      )
+      .subscribe({
+        error: err => {
+          this._logger.error('An error occurred at _lastFetchTwitterFollowers:', err);
+        },
+        complete: () => {
+          this._logger.log('_lastFetchTwitterFollowers completed successfully');
+        }
+      });
   }
 }
 

@@ -70,7 +70,7 @@ export class TweetTrackerJob {
       this.fetchTweetsFromPage();
       const lastInterval = setInterval(this._lastFetchTweetsFromPage.bind(this), this._lastInterval);
       this._schedulerRegistry.addInterval('LastTwitterTweetTrackerJob', lastInterval);
-      this._lastFetchTweetsFromPage(this._lastInterval);
+      this._lastFetchTweetsFromPage();
     }
   }
 
@@ -976,9 +976,9 @@ export class TweetTrackerJob {
       );
   }
 
-  private _lastFetchTweetsFromPage(lastIntervalTime: number): void {
+  private _lastFetchTweetsFromPage(): void {
     const now = new Date();
-    const nowPlusFiveMin = new Date(now.getTime() + lastIntervalTime);
+    const nowPlusFiveMin = new Date(now.getTime() + this._lastInterval);
 
     RxJS.from(this._entityManager.getRepository(SocialAirdropScheduleEntity)
       .findOne({

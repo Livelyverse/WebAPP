@@ -85,7 +85,7 @@ export class InstagramPostTrackerJob {
       this.fetchInstagramPosts();
       const lastInterval = setInterval(this._lastFetchInstagramPosts.bind(this), this._lastInterval);
       this._schedulerRegistry.addInterval('LastFetchInstagramPostsJob', lastInterval);
-      this._lastFetchInstagramPosts(this._lastInterval);
+      this._lastFetchInstagramPosts();
     }
   }
   private fetchInstagramPosts() {
@@ -871,9 +871,9 @@ export class InstagramPostTrackerJob {
     )
   }
 
-  private _lastFetchInstagramPosts(lastIntervalTime: number): void {
+  private _lastFetchInstagramPosts(): void {
     const now = new Date();
-    const nowPlusFiveMin = new Date(now.getTime() + lastIntervalTime);
+    const nowPlusFiveMin = new Date(now.getTime() + this._lastInterval);
 
     RxJS.from(this._entityManager.getRepository(SocialAirdropScheduleEntity)
       .findOne({
