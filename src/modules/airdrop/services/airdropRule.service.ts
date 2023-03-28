@@ -9,6 +9,7 @@ import { SocialAirdropRuleEntity } from "../domain/entity/socialAirdropRule.enti
 import { AirdropRuleUpdateDto } from "../domain/dto/airdropRuleUpdate.dto";
 import { FindManyOptions } from "typeorm/find-options/FindManyOptions";
 import { FindOneOptions } from "typeorm/find-options/FindOneOptions";
+import { BigNumber } from "ethers";
 
 export enum AirdropRuleSortBy {
   TIMESTAMP = 'createdAt',
@@ -198,14 +199,14 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
               )
             ),
             RxJS.of(result).pipe(
-              RxJS.filter(socialAirdropFindResult => !!!socialAirdropFindResult),
+              RxJS.filter(socialAirdropFindResult => !socialAirdropFindResult),
               RxJS.map(_ => airdropRuleDto),
               RxJS.map(socialAirdropRuleDto => {
                 const entity = new SocialAirdropRuleEntity();
                 entity.socialType = socialAirdropRuleDto.socialType;
                 entity.actionType = socialAirdropRuleDto.actionType;
                 entity.unit = socialAirdropRuleDto.unit;
-                entity.amount = BigInt(socialAirdropRuleDto.amount);
+                entity.amount = socialAirdropRuleDto.amount;
                 entity.decimal = socialAirdropRuleDto.decimal;
                 return entity
               }),
@@ -259,7 +260,7 @@ export class AirdropRuleService implements IAirdropService<SocialAirdropRuleEnti
           RxJS.mergeMap(result =>
             RxJS.merge(
               RxJS.of(result).pipe(
-                RxJS.filter(socialFindResult => !!!socialFindResult),
+                RxJS.filter(socialFindResult => !socialFindResult),
                 RxJS.mergeMap(_ =>
                   RxJS.throwError(() =>
                     new HttpException({

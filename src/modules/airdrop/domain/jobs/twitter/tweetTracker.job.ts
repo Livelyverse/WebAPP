@@ -621,32 +621,31 @@ export class TweetTrackerJob {
                                 .where('"socialProfile"."username" = :username', { username: tweetLiked.username })
                                 .andWhere('"socialProfile"."socialType" = :socialType', { socialType: data.airdropSchedule.socialLively.socialType })
                                 .getRawOne()
-                              ).pipe(
-                                RxJS.tap({
-                                  error: (error) => this._logger.error(`pipe(3-1): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}`, error),
-                                }),
-                                RxJS.mergeMap((queryResult) =>
-                                  RxJS.merge(
-                                    RxJS.of(queryResult).pipe(
-                                      RxJS.filter((queryResult) => !!!queryResult),
-                                      RxJS.tap({
-                                        next: (_) => this._logger.debug(`pipe(3-1): socialProfile and socialTracker not found, tweet.Id: ${data.socialEvent.contentId}, username: ${tweetLiked.username}`),
-                                      }),
-                                      RxJS.mergeMap((_) => RxJS.EMPTY)
-                                    ),
-                                    RxJS.of(queryResult).pipe(
-                                      RxJS.filter((queryResult) => !!queryResult && queryResult.trackerId && queryResult.eventId),
-                                      RxJS.tap({
-                                        next: (queryResult) => this._logger.debug(`pipe(3-1): socialTracker already exists, tweet.Id: ${data.socialEvent.contentId}, socialTracker.id: ${queryResult.trackerId}, socialProfile.username: ${queryResult.profileUsername}`),
-                                      }),
-                                      RxJS.mergeMap((_) => RxJS.EMPTY)
-                                    ),
-                                    RxJS.of(queryResult).pipe(
-                                      RxJS.filter((queryResult) => !!queryResult && !queryResult.eventId && queryResult.profileId),
-                                      RxJS.tap({
-                                        next: (queryResult) => this._logger.debug(`pipe(3-1): socialProfile found, tweet.Id: ${data.socialEvent.contentId}, socialProfile.username: ${queryResult.profileUsername}`),
-                                      }),
-                                    )
+                            ).pipe(
+                              RxJS.tap( {
+                                error: (error) => this._logger.error(`pipe(3-1): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}`, error),
+                              }),
+                              RxJS.mergeMap((queryResult) =>
+                                RxJS.merge(
+                                  RxJS.of(queryResult).pipe(
+                                    RxJS.filter((queryResult) => !queryResult ),
+                                    RxJS.tap( {
+                                      next: (_) => this._logger.debug(`pipe(3-1): socialProfile and socialTracker not found, tweet.Id: ${data.socialEvent.contentId}, username: ${tweetLiked.username}`),
+                                    }),
+                                    RxJS.mergeMap((_) => RxJS.EMPTY)
+                                  ),
+                                  RxJS.of(queryResult).pipe(
+                                    RxJS.filter((queryResult) => !!queryResult && queryResult.trackerId && queryResult.eventId),
+                                    RxJS.tap( {
+                                      next: (queryResult) => this._logger.debug(`pipe(3-1): socialTracker already exists, tweet.Id: ${data.socialEvent.contentId}, socialTracker.id: ${queryResult.trackerId}, socialProfile.username: ${queryResult.profileUsername}`),
+                                    }),
+                                    RxJS.mergeMap((_) => RxJS.EMPTY)
+                                  ),
+                                  RxJS.of(queryResult).pipe(
+                                    RxJS.filter((queryResult) => !!queryResult && !queryResult.eventId && queryResult.profileId),
+                                    RxJS.tap( {
+                                      next: (queryResult) => this._logger.debug(`pipe(3-1): socialProfile found, tweet.Id: ${data.socialEvent.contentId}, socialProfile.username: ${queryResult.profileUsername}`),
+                                    }),
                                   )
                                 ),
                                 RxJS.map((queryResult) => {

@@ -34,8 +34,14 @@ export enum ErrorCode {
   // Some sort of bad response from the server
   SERVER_ERROR = "SERVER_ERROR",
 
-  // Timeout
-  TIMEOUT = "TIMEOUT",
+  // Some sort of bad response from the server
+  SERVICE_NOT_READY = "SERVICE_NOT_READY",
+
+  // Network Timeout
+  NETWORK_TIMEOUT = "TIMEOUT",
+
+  // Timer Timeout
+  TIMER_TIMEOUT = "TIMER_TIMEOUT",
 
   ///////////////////
   // Operational  Errors

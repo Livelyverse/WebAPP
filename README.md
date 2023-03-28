@@ -69,9 +69,20 @@ After launch, it, checks API with swagger with address http://localhost:3001/api
 
   159     readonly provider: JsonRpcProvider;
   ```
-  go to node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts file and add declare to first of line 159 as follow
+  go to node_modules/@ethersproject/providers/src.ts/json-rpc-provider.ts file and add declare to first of line 159 as follows
   ```
   declare readonly provider: JsonRpcProvider;
+  ```
+  ```
+  node_modules/@ethersproject/providers/src.ts/ankr-provider.ts:37:14 - error TS2612: Property 'apiKey' will overwrite 
+  the base property in 'UrlJsonRpcProvider'. If this is intentional, add an initializer. Otherwise, add a 'declare' 
+  modifier or remove the redundant declaration.
+
+  37     readonly apiKey: string;
+  ```
+  go to node_modules/@ethersproject/providers/src.ts/ankr-provider.ts file and add declare to first of line 37 as follows
+  ```
+  declare readonly apiKey: string;
   ```
 
 ## Contributing
@@ -92,6 +103,8 @@ Don't forget to give the project a star! Thanks again!
 Sina Tadayon https://github.com/SinaTadayon
 
 Mansour Farabi https://github.com/MFarabi
+
+Ali Shokoohi https://github.com/ali-shokoohi
 
 <!--
 ## Version History

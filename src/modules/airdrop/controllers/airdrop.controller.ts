@@ -658,7 +658,7 @@ export class AirdropController {
               ),
             ),
             RxJS.of(filter).pipe(
-              RxJS.filter(filterVal => !!!filterVal),
+              RxJS.filter(filterVal => !filterVal),
               RxJS.mergeMap(_ => this._airdropService.findAllBalance(
                 (page - 1) * offset, offset, sortType, sortBy, filterBy, null)),
               RxJS.mergeMap((result: FindAllBalanceType) =>
@@ -723,7 +723,7 @@ export class AirdropController {
               ),
             ),
             RxJS.of(filter).pipe(
-              RxJS.filter(filterVal => !!!filterVal),
+              RxJS.filter(filterVal => !filterVal),
               RxJS.mergeMap(_ => this._airdropService.findAllBalance(
                 (page - 1) * offset, offset, sortType, sortBy, filterBy, null)),
               RxJS.mergeMap((result: FindAllBalanceType) =>
@@ -824,7 +824,7 @@ export class AirdropController {
         )
       ),
       RxJS.of(filterBy).pipe(
-        RxJS.filter(filterType => !!!filterType),
+        RxJS.filter(filterType => !filterType),
         RxJS.mergeMap(_ => this._airdropService.findAllBalance(
           (page - 1) * offset, offset, sortType, sortBy, null, null)),
         RxJS.mergeMap((result: FindAllBalanceType) =>

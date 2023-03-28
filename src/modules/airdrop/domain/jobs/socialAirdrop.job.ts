@@ -10,6 +10,8 @@ import { AirdropRequestDto, TokenType } from "../../../blockchain/domain/dto/air
 import { SocialAirdropEntity } from "../entity/socialAirdrop.entity";
 import { BlockchainTxEntity } from "../../../blockchain/domain/entity/blockchainTx.entity";
 import { BlockchainError, ErrorCode } from "../../../blockchain/domain/error/blockchainError";
+import { BigNumber } from "ethers";
+import Decimal from "decimal.js";
 
 @Injectable()
 export class SocialAirdropJob {
@@ -79,16 +81,10 @@ export class SocialAirdropJob {
           RxJS.from(airdropQueryResultObservable).pipe(
             RxJS.groupBy((data) => data.email),
             RxJS.mergeMap(group => group.pipe(RxJS.toArray())),
-            // RxJS.mergeMap(userDataArray =>
-            //   RxJS.from(userDataArray).pipe(
-            //     RxJS.groupBy(data => data.socialType),
-            //     RxJS.mergeMap(group => group.pipe(RxJS.toArray()))
-            //   )
-            // ),
             RxJS.mergeMap(userAirdrops =>
               RxJS.from(userAirdrops).pipe(
-                RxJS.reduce((acc, airdrop) => acc + BigInt(airdrop.amount), 0n),
-                RxJS.map((total) => ({userAirdrops, total}))
+                RxJS.reduce((acc, airdrop) =>  acc.add(new Decimal(airdrop.amount).mul(10 ** airdrop.decimal)), new Decimal(0)),
+                RxJS.map((total) => ({userAirdrops, total: BigNumber.from(total.toString())}))
               )
             ),
             RxJS.tap(data => {
@@ -102,8 +98,7 @@ export class SocialAirdropJob {
             RxJS.concatMap(buffers =>
               RxJS.from(buffers).pipe(
                 RxJS.reduce((acc, buffer) => {
-                    acc['data'].push({ destination: buffer.userAirdrops[0].walletAddress,
-                      amount: BigInt(buffer.total) * (10n ** BigInt(buffer.userAirdrops[0].decimal))})
+                    acc['data'].push({ destination: buffer.userAirdrops[0].walletAddress, amount: buffer.total})
                     return acc;
                   },
                   AirdropRequestDto.from(Symbol.for('AirdropRequestId'), TokenType.LIV)
@@ -113,11 +108,11 @@ export class SocialAirdropJob {
                     RxJS.catchError(error =>
                       RxJS.merge(
                         RxJS.of(error).pipe(
-                          RxJS.filter(err => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR),
+                          RxJS.filter(err => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR || err.code === ErrorCode.SERVICE_NOT_READY),
                           RxJS.mergeMap((err) => RxJS.throwError(err)),
                         ),
                         RxJS.of(error).pipe(
-                          RxJS.filter(err => err instanceof BlockchainError && err.code !== ErrorCode.NETWORK_ERROR),
+                          RxJS.filter(err => err instanceof BlockchainError && err.code !== ErrorCode.NETWORK_ERROR || err.code !== ErrorCode.SERVICE_NOT_READY),
                           RxJS.tap({
                             next: err => {
                               this._safeMode = true
@@ -142,16 +137,27 @@ export class SocialAirdropJob {
                     ),
                     RxJS.finalize(() => this._logger.debug(`finalize blockchainService.sendAirdropTx . . . `)),
                     RxJS.retry({
-                      count:3,
+                      count:37,
+                      resetOnSuccess: true,
                       delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
                         RxJS.mergeMap(([error, retryCount]) =>
                           RxJS.merge(
                             RxJS.of([error, retryCount]).pipe(
-                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code == ErrorCode.NETWORK_ERROR && count <= 3),
-                              RxJS.delay(30000)
+                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.SERVICE_NOT_READY && count < 30),
+                              RxJS.tap(([error, _]) => this._logger.warn(`airdrop request failed, error: ${error.message}, code: ${error.code}, waiting retry: 60000 . . .`)),
+                              RxJS.delay(60000)
                             ),
                             RxJS.of([error, retryCount]).pipe(
-                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code == ErrorCode.NETWORK_ERROR && count > 3),
+                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.SERVICE_NOT_READY && count >= 30),
+                              RxJS.mergeMap(([err,_]) => RxJS.throwError(err))
+                            ),
+                            RxJS.of([error, retryCount]).pipe(
+                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR && count < 7),
+                              RxJS.tap(([error, retryCount]) => this._logger.warn(`airdrop request failed, error: ${error.message}, code: ${error.code}, waiting retry: ${60000 * retryCount} . . .`)),
+                              RxJS.delay(60000 * retryCount)
+                            ),
+                            RxJS.of([error, retryCount]).pipe(
+                              RxJS.filter(([err,count]) => err instanceof BlockchainError && err.code === ErrorCode.NETWORK_ERROR && count >= 7),
                               RxJS.mergeMap(([err,_]) => RxJS.throwError(err))
                             ),
                             RxJS.of([error, retryCount]).pipe(
@@ -160,7 +166,7 @@ export class SocialAirdropJob {
                             )
                           )
                         ),
-                        RxJS.tap(([_, retryCount]) => this._logger.warn(`airdrop request failed, retry ${retryCount} . . . `))
+                        RxJS.tap(([_, retryCount]) => this._logger.warn(`airdrop request retry ${retryCount} . . . `))
                       )
                     })
                   )
@@ -204,7 +210,7 @@ export class SocialAirdropJob {
     ).subscribe({
       next: RxJS.noop,
       error: err => {
-        this._logger.error(`airdropToken job failed`, err);
+        this._logger.error(`airdropToken job failed, error: ${err?.stack}`, err);
         this._isRunning = false;
       },
       complete: () => {
