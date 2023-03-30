@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@discordjs/opus": "^0.9.0",
-    "@livelyverse/lively-core-onchain": "^3.0.4",
+    "@livelyversenpm/lively-core-onchain": "^3.0.5",
     "@nestjs-modules/mailer": "^1.8.1",
     "@nestjs/axios": "^0.1.0",
     "@nestjs/common": "^9.0.11",
