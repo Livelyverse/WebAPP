@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { InjectEntityManager } from "@nestjs/typeorm";
-import { Brackets, EntityManager, MoreThan } from "typeorm";
+import { Brackets, EntityManager, LessThan, MoreThan } from "typeorm";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import * as RxJS from "rxjs";
 import { InstagramPostDto } from "../../dto/instagramPost.dto";
@@ -38,9 +38,11 @@ export class InstagramPostTrackerJob {
   private readonly _apiKey: string;
   private readonly _apiHost: string;
   private readonly _trackerInterval: number;
+  private readonly _lastInterval: number;
   private readonly _FETCH_COUNT = 50;
   private readonly _apiDelay: number;
   private _isRunning: boolean;
+  private _isEnable: boolean;
 
   constructor(
     private readonly _httpService: HttpService,
@@ -60,20 +62,34 @@ export class InstagramPostTrackerJob {
     }
 
     this._isRunning = false;
-    this._trackerInterval = this._configService.get<number>('airdrop.instagram.tracker.interval');
+    this._trackerInterval = this._configService.get<number>('airdrop.instagram.tracker.postInterval');
     if (!this._trackerInterval) {
-      throw new Error("airdrop.instagram.tracker.interval config is empty");
+      throw new Error("airdrop.instagram.tracker.postInterval config is empty");
+    }
+
+    this._lastInterval = this._configService.get<number>('airdrop.instagram.tracker.lastInterval');
+    if (!this._lastInterval) {
+      throw new Error("airdrop.instagram.tracker.lastInterval config is empty");
     }
 
     this._apiDelay = this._configService.get<number>('airdrop.instagram.apiDelay');
 
-    const interval = setInterval(this.fetchInstagramPosts.bind(this), this._trackerInterval);
-    this._schedulerRegistry.addInterval('InstagramPostsTrackerJob', interval);
-    this.fetchInstagramPosts();
-  }
+    this._isEnable = this._configService.get<boolean>("airdrop.instagram.enable");
+    if (this._isEnable === null) {
+      throw new Error("airdrop.instagram.enable config is empty");
+    }
 
+    if (this._isEnable) {
+      const interval = setInterval(this.fetchInstagramPosts.bind(this), this._trackerInterval);
+      this._schedulerRegistry.addInterval('InstagramPostsTrackerJob', interval);
+      this.fetchInstagramPosts();
+      const lastInterval = setInterval(this._lastFetchInstagramPosts.bind(this), this._lastInterval);
+      this._schedulerRegistry.addInterval('LastFetchInstagramPostsJob', lastInterval);
+      this._lastFetchInstagramPosts();
+    }
+  }
   private fetchInstagramPosts() {
-    if(!this._isRunning) {
+    if (!this._isRunning) {
       this._isRunning = true;
     } else {
       this._logger.warn("fetchInstagramPost is already running . . .");
@@ -105,7 +121,7 @@ export class InstagramPostTrackerJob {
           joinRegex: airdropSchedule.hashtags?.join ? new RegExp(airdropSchedule.hashtags.join, 'g') : null,
           commentRegex: airdropSchedule.hashtags?.comment ? new RegExp(airdropSchedule.hashtags.comment, 'g') : null,
         }
-        return {airdropSchedule, filterRegexes}
+        return { airdropSchedule, filterRegexes }
       }),
       RxJS.catchError(err => RxJS.throwError(() => new TrackerError('fetch instagram airdrop schedule failed', err)))
     )
@@ -119,9 +135,9 @@ export class InstagramPostTrackerJob {
           .select()
           .where('"airdropRule"."socialType" = \'INSTAGRAM\'')
           .andWhere(new Brackets((qb) => {
-              qb.where('"airdropRule"."actionType" = \'LIKE\'').
+            qb.where('"airdropRule"."actionType" = \'LIKE\'').
               orWhere('"airdropRule"."actionType" = \'COMMENT\'')
-            }),
+          }),
           )
           .getMany()
         ).pipe(
@@ -137,11 +153,11 @@ export class InstagramPostTrackerJob {
                   RxJS.merge(
                     RxJS.of(airdropRules).pipe(
                       RxJS.filter((airdropRules) => airdropRules[0].actionType == SocialActionType.LIKE),
-                      RxJS.map((airdropRules) => ({airdropLikeRule: airdropRules[0], airdropCommentRule: airdropRules[1], ...airdropScheduleInfo}))
+                      RxJS.map((airdropRules) => ({ airdropLikeRule: airdropRules[0], airdropCommentRule: airdropRules[1], ...airdropScheduleInfo }))
                     ),
                     RxJS.of(airdropRules).pipe(
                       RxJS.filter((airdropRules) => airdropRules[1].actionType == SocialActionType.LIKE),
-                      RxJS.map((airdropRules) => ({airdropLikeRule: airdropRules[1], airdropCommentRule: airdropRules[0], ...airdropScheduleInfo}))
+                      RxJS.map((airdropRules) => ({ airdropLikeRule: airdropRules[1], airdropCommentRule: airdropRules[0], ...airdropScheduleInfo }))
                     )
                   )
                 )
@@ -195,14 +211,14 @@ export class InstagramPostTrackerJob {
                   // fetch instagram posts
                   RxJS.defer(() =>
                     RxJS.from(this._fetchLivelyPosts(airdropInfo.airdropSchedule)).pipe(
-                      RxJS.map((postData:any) => ({ postData, ...airdropInfo}))
+                      RxJS.map((postData: any) => ({ postData, ...airdropInfo }))
                     )
                   ).pipe(
                     RxJS.tap({
-                      next: objInfo => this._logger.debug(`pipe(1-0): fetch instagram posts success, count: ${objInfo?.postData?.data?.edges?.length}`),
+                      next: objInfo => this._logger.debug(`pipe(1-0): fetch instagram posts success, count: ${objInfo?.postData?.data?.user?.edge_owner_to_timeline_media?.count}`),
                     }),
                     RxJS.concatMap(objInfo =>
-                      RxJS.from(objInfo.postData.data.edges).pipe(
+                      RxJS.from(objInfo.postData.data.user?.edge_owner_to_timeline_media?.edges).pipe(
                         RxJS.filter((edge: any) => (edge.node.taken_at_timestamp > airdropInfo.airdropSchedule.airdropStartAt.getTime() / 1000) &&
                           edge?.node?.edge_media_to_caption?.edges[0]?.node?.text?.match(objInfo.filterRegexes.airdropRegex)),
                         RxJS.mergeMap(edge =>
@@ -243,7 +259,7 @@ export class InstagramPostTrackerJob {
                                     socialEvent.content = ContentDto.from(postDto);
                                     socialEvent.lang = null;
                                     socialEvent.publishedAt = postDto?.createdAt ? new Date(postDto.createdAt * 1000) : new Date();
-                                    socialEvent.contentUrl = 'https://www.instagram.com/p/' +  postDto.shortcode;
+                                    socialEvent.contentUrl = 'https://www.instagram.com/p/' + postDto.shortcode;
                                     socialEvent.airdropSchedule = objInfo.airdropSchedule;
                                     return socialEvent;
                                   }),
@@ -255,10 +271,10 @@ export class InstagramPostTrackerJob {
                                       .execute()
                                     ).pipe(
                                       RxJS.tap({
-                                        next: (_)=> this._logger.log(`pipe(1-0), save instagram SocialEvent success, post.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}`),
+                                        next: (_) => this._logger.log(`pipe(1-0), save instagram SocialEvent success, post.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}`),
                                         error: err => this._logger.error(`pipe(1-0), save instagram SocialEvent failed, post.Id: ${socialEvent.contentId}, socialEvent.Id: ${socialEvent.id}`, err),
                                       }),
-                                      RxJS.map((_) => ({socialEvent, ...objInfo})),
+                                      RxJS.map((_) => ({ socialEvent, ...objInfo })),
                                       RxJS.catchError(error => RxJS.throwError(() => new TrackerError('save instagram SocialEvent failed', error)))
                                     )
                                   )
@@ -277,13 +293,14 @@ export class InstagramPostTrackerJob {
                       )
                     ),
                     RxJS.retry({
-                      count:3,
+                      count: 3,
+                      resetOnSuccess: true,
                       delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
                         RxJS.mergeMap(([error, retryCount]) =>
                           RxJS.merge(
                             RxJS.of([error, retryCount]).pipe(
-                              RxJS.filter(([err,count]) => err instanceof AxiosError &&
-                                (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                              RxJS.filter(([err, count]) => err instanceof AxiosError &&
+                                (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT || err.code === "ECONNRESET" || err.code === "EAI_AGAIN") &&
                                 count <= 3
                               ),
                               RxJS.tap({
@@ -292,15 +309,15 @@ export class InstagramPostTrackerJob {
                               RxJS.delay(60000)
                             ),
                             RxJS.of([error, retryCount]).pipe(
-                              RxJS.filter(([err,count]) => err instanceof AxiosError &&
-                                (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                              RxJS.filter(([err, count]) => err instanceof AxiosError &&
+                                (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT || err.code === "ECONNRESET" || err.code === "EAI_AGAIN") &&
                                 count > 3
                               ),
-                              RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('fetch instagram posts failed', err))),
+                              RxJS.mergeMap(([err, _]) => RxJS.throwError(() => new TrackerError('fetch instagram posts failed', err))),
                             ),
                             RxJS.of([error, retryCount]).pipe(
-                              RxJS.filter(([err,_]) => err instanceof Error),
-                              RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('fetch instagram posts failed', err))),
+                              RxJS.filter(([err, _]) => err instanceof Error),
+                              RxJS.mergeMap(([err, _]) => RxJS.throwError(() => new TrackerError('fetch instagram posts failed', err))),
                             ),
                           )
                         ),
@@ -329,7 +346,7 @@ export class InstagramPostTrackerJob {
               RxJS.of(queryResult).pipe(
                 RxJS.filter((queryResult) => !!queryResult),
                 RxJS.tap((_) => this._logger.log(`pipe(2-0): SocialEvent with active schedule found . . .`)),
-                RxJS.map(socialEvent => ({socialEvent, postData: null, ...airdropInfo}))
+                RxJS.map(socialEvent => ({ socialEvent, postData: null, ...airdropInfo }))
               )
             )
           )
@@ -341,18 +358,18 @@ export class InstagramPostTrackerJob {
           // fetch post likes
           RxJS.defer(() =>
             RxJS.from(this._fetchPostLikes((<InstagramPostDto>objInfo.socialEvent.content.data).shortcode).pipe(
-              RxJS.map(postLikes => ({postLikes, ...objInfo}))
+              RxJS.map(postLikes => ({ postLikes, ...objInfo }))
             ))
           ).pipe(
             RxJS.tap({
-              next: (data) => this._logger.debug(`pipe(3-0): instagram httpClient post Likes count: ${data.postLikes?.has_next_page?.data?.length}`),
+              next: (data) => this._logger.debug(`pipe(3-0): instagram httpClient post Likes count: ${data.postLikes?.data?.shortcode_media?.edge_liked_by?.count}`),
             }),
             RxJS.mergeMap(data =>
               RxJS.merge(
                 RxJS.of(data).pipe(
-                  RxJS.filter(data => !!data?.postLikes?.has_next_page?.data && data?.postLikes?.has_next_page?.data?.length > 0),
-                  RxJS.concatMap((data:any) =>
-                    RxJS.from(data.postLikes.has_next_page.data).pipe(
+                  RxJS.filter(data => !!data?.postLikes?.data?.shortcode_media?.edge_liked_by?.count && data?.postLikes?.data?.shortcode_media?.edge_liked_by?.count > 0),
+                  RxJS.concatMap((data: any) =>
+                    RxJS.from(data.postLikes.data.shortcode_media.edge_liked_by.edges).pipe(
                       RxJS.concatMap((nodeIndo: any) =>
                         RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity, "socialProfile")
                           .select('"socialProfile"."id" as "profileId", "socialProfile"."username" as "profileUsername"')
@@ -361,44 +378,44 @@ export class InstagramPostTrackerJob {
                           .addSelect('"users"."email"')
                           .innerJoin("user", "users", '"users"."id" = "socialProfile"."userId"')
                           .leftJoin(qb =>
-                              qb.select('"profile"."id" as "pid", "tracker"."id" as "tid", "event"."id" as "eid"')
-                                .from(SocialProfileEntity, "profile")
-                                .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
-                                .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
-                                .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "event"."airdropScheduleId"')
-                                .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
-                                .where('"event"."contentId" = :contentId', {contentId: data.socialEvent.contentId})
-                                .andWhere('"tracker"."actionType" = \'LIKE\'')
-                                .andWhere('"profile"."username" = :username', {username: nodeIndo.node.username})
-                                .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
-                                .andWhere('"socialLively"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
+                            qb.select('"profile"."id" as "pid", "tracker"."id" as "tid", "event"."id" as "eid"')
+                              .from(SocialProfileEntity, "profile")
+                              .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
+                              .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
+                              .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "event"."airdropScheduleId"')
+                              .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
+                              .where('"event"."contentId" = :contentId', { contentId: data.socialEvent.contentId })
+                              .andWhere('"tracker"."actionType" = \'LIKE\'')
+                              .andWhere('"profile"."username" = :username', { username: nodeIndo.node.username })
+                              .andWhere('"profile"."socialType" = :socialType', { socialType: data.airdropSchedule.socialLively.socialType })
+                              .andWhere('"socialLively"."socialType" = :socialType', { socialType: data.airdropSchedule.socialLively.socialType }),
                             "sub", '"sub"."pid" = "socialProfile"."id"')
-                          .where('"socialProfile"."username" = :username', {username: nodeIndo.node.username})
-                          .andWhere('"socialProfile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
+                          .where('"socialProfile"."username" = :username', { username: nodeIndo.node.username })
+                          .andWhere('"socialProfile"."socialType" = :socialType', { socialType: data.airdropSchedule.socialLively.socialType })
                           .getRawOne()
                         ).pipe(
-                          RxJS.tap( {
+                          RxJS.tap({
                             error: (error) => this._logger.error(`pipe(3-0): find socialProfile and socialTracker failed, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}`, error),
                           }),
                           RxJS.mergeMap((queryResult) =>
                             RxJS.merge(
                               RxJS.of(queryResult).pipe(
                                 RxJS.filter((queryResult) => !queryResult),
-                                RxJS.tap( {
+                                RxJS.tap({
                                   next: (_) => this._logger.debug(`pipe(3-0): socialProfile and socialTracker not found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, username: ${nodeIndo.node.username}`),
                                 }),
                                 RxJS.mergeMap((_) => RxJS.EMPTY)
                               ),
                               RxJS.of(queryResult).pipe(
                                 RxJS.filter((queryResult) => !!queryResult && queryResult.trackerId && queryResult.eventId),
-                                RxJS.tap( {
+                                RxJS.tap({
                                   next: (queryResult) => this._logger.debug(`pipe(3-0): socialTracker already exists, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, socialTracker.id: ${queryResult.trackerId}, socialProfile.username: ${queryResult.profileUsername}`),
                                 }),
                                 RxJS.mergeMap((_) => RxJS.EMPTY)
                               ),
                               RxJS.of(queryResult).pipe(
                                 RxJS.filter((queryResult) => !!queryResult && !queryResult.eventId && queryResult.profileId),
-                                RxJS.tap( {
+                                RxJS.tap({
                                   next: (queryResult) => this._logger.debug(`pipe(3-0): socialProfile found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, socialProfile.username: ${queryResult.profileUsername}`),
                                 }),
                               )
@@ -418,7 +435,7 @@ export class InstagramPostTrackerJob {
                             socialLikeAirdrop.airdropRule = data.airdropLikeRule;
                             socialLikeAirdrop.socialTracker = socialTracker;
 
-                            return { socialTracker, socialLikeAirdrop, ...data};
+                            return { socialTracker, socialLikeAirdrop, ...data };
                           }),
                           RxJS.concatMap((pipeResult) =>
                             RxJS.from(
@@ -436,9 +453,9 @@ export class InstagramPostTrackerJob {
                                   .execute();
                               })
                             ).pipe(RxJS.tap({
-                                next: (_) => this._logger.log(`pipe(3-0): save socialTracker success, trackerId: ${pipeResult.socialTracker.id}, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`),
-                                error: (error) => this._logger.error(`pipe(3-0): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`, error),
-                              }),
+                              next: (_) => this._logger.log(`pipe(3-0): save socialTracker success, trackerId: ${pipeResult.socialTracker.id}, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`),
+                              error: (error) => this._logger.error(`pipe(3-0): save socialTracker failed, tweet.Id: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>objInfo.socialEvent.content.data).shortcode}, action: ${pipeResult.socialTracker.actionType}, user: ${pipeResult.socialTracker.socialProfile.username}`, error),
+                            }),
                             )
                           ),
                           RxJS.tap({
@@ -459,13 +476,14 @@ export class InstagramPostTrackerJob {
               )
             ),
             RxJS.retry({
-              count:3,
+              count: 3,
+              resetOnSuccess: true,
               delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
                 RxJS.mergeMap(([error, retryCount]) =>
                   RxJS.merge(
                     RxJS.of([error, retryCount]).pipe(
-                      RxJS.filter(([err,count]) => err instanceof AxiosError &&
-                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                      RxJS.filter(([err, count]) => err instanceof AxiosError &&
+                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT || err.code === "ECONNRESET" || err.code === "EAI_AGAIN") &&
                         count <= 3
                       ),
                       RxJS.tap({
@@ -474,15 +492,15 @@ export class InstagramPostTrackerJob {
                       RxJS.delay(60000)
                     ),
                     RxJS.of([error, retryCount]).pipe(
-                      RxJS.filter(([err,count]) => err instanceof AxiosError &&
-                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                      RxJS.filter(([err, count]) => err instanceof AxiosError &&
+                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT || err.code === "ECONNRESET" || err.code === "EAI_AGAIN") &&
                         count > 3
                       ),
-                      RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('instagram fetch post like failed', err))),
+                      RxJS.mergeMap(([err, _]) => RxJS.throwError(() => new TrackerError('instagram fetch post like failed', err))),
                     ),
                     RxJS.of([error, retryCount]).pipe(
-                      RxJS.filter(([err,_]) => err instanceof Error),
-                      RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('instagram fetch post like failed', err))),
+                      RxJS.filter(([err, _]) => err instanceof Error),
+                      RxJS.mergeMap(([err, _]) => RxJS.throwError(() => new TrackerError('instagram fetch post like failed', err))),
                     ),
                   )
                 ),
@@ -509,20 +527,20 @@ export class InstagramPostTrackerJob {
           // fetch instagram post comments
           RxJS.defer(() =>
             RxJS.from(this._fetchPostComments((<InstagramPostDto>objInfo.socialEvent.content.data).shortcode).pipe(
-              RxJS.map(postComments => ({postComments, ...objInfo}))
+              RxJS.map(postComments => ({ postComments, ...objInfo }))
             ))
           ).pipe(
             RxJS.tap({
-              next: (data) => this._logger.debug(`pipe(4-0): instagram httpClient post comments count: ${data?.postComments?.data?.comments?.length}`),
+              next: (data) => this._logger.debug(`pipe(4-0): instagram httpClient post comments count: ${data?.postComments?.data?.shortcode_media?.edge_media_to_parent_comment?.count}`),
             }),
             RxJS.mergeMap(data =>
               RxJS.merge(
                 RxJS.of(data).pipe(
-                  RxJS.filter(data => !!data?.postComments?.data?.comments?.length && data.postComments.data.comments.length > 0),
+                  RxJS.filter(data => !!data?.postComments?.data?.shortcode_media?.edge_media_to_parent_comment?.count && data?.postComments?.data?.shortcode_media?.edge_media_to_parent_comment?.count > 0),
                   RxJS.concatMap((data) =>
-                    RxJS.from(data.postComments.data.comments).pipe(
-                      RxJS.filter((comment: any) => comment.text.match(objInfo.filterRegexes.commentRegex)),
-                      RxJS.concatMap((comment:any) =>
+                    RxJS.from(data.postComments.data.shortcode_media.edge_media_to_parent_comment.edges).pipe(
+                      RxJS.filter((comment: any) => comment.node.text.match(objInfo.filterRegexes.commentRegex)),
+                      RxJS.concatMap((comment: any) =>
                         RxJS.from(this._entityManager.createQueryBuilder(SocialProfileEntity, "socialProfile")
                           .select('"socialProfile"."id" as "profileId", "socialProfile"."username" as "profileUsername"')
                           .addSelect('"sub"."tid" as "trackerId"')
@@ -530,44 +548,44 @@ export class InstagramPostTrackerJob {
                           .addSelect('"users"."email"')
                           .innerJoin("user", "users", '"users"."id" = "socialProfile"."userId"')
                           .leftJoin(qb =>
-                              qb.select('"profile"."id" as "pid", "tracker"."id" as "tid", "event"."id" as "eid"')
-                                .from(SocialProfileEntity, "profile")
-                                .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
-                                .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
-                                .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "event"."airdropScheduleId"')
-                                .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
-                                .where('"event"."contentId" = :contentId', {contentId: data.socialEvent.contentId})
-                                .andWhere('"tracker"."actionType" = \'COMMENT\'')
-                                .andWhere('"profile"."username" = :username', {username: comment.user.username})
-                                .andWhere('"profile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
-                                .andWhere('"socialLively"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType}),
+                            qb.select('"profile"."id" as "pid", "tracker"."id" as "tid", "event"."id" as "eid"')
+                              .from(SocialProfileEntity, "profile")
+                              .leftJoin("social_tracker", "tracker", '"profile"."id" = "tracker"."socialProfileId"')
+                              .innerJoin("social_event", "event", '"tracker"."socialEventId" = "event"."id"')
+                              .innerJoin("social_airdrop_schedule", "airdropSchedule", '"airdropSchedule"."id" = "event"."airdropScheduleId"')
+                              .innerJoin("social_lively", "socialLively", '"socialLively"."id" = "airdropSchedule"."socialLivelyId"')
+                              .where('"event"."contentId" = :contentId', { contentId: data.socialEvent.contentId })
+                              .andWhere('"tracker"."actionType" = \'COMMENT\'')
+                              .andWhere('"profile"."username" = :username', { username: comment.node.owner.username })
+                              .andWhere('"profile"."socialType" = :socialType', { socialType: data.airdropSchedule.socialLively.socialType })
+                              .andWhere('"socialLively"."socialType" = :socialType', { socialType: data.airdropSchedule.socialLively.socialType }),
                             "sub", '"sub"."pid" = "socialProfile"."id"')
-                          .where('"socialProfile"."username" = :username', {username: comment.user.username})
-                          .andWhere('"socialProfile"."socialType" = :socialType', {socialType: data.airdropSchedule.socialLively.socialType})
+                          .where('"socialProfile"."username" = :username', { username: comment.node.owner.username })
+                          .andWhere('"socialProfile"."socialType" = :socialType', { socialType: data.airdropSchedule.socialLively.socialType })
                           .getRawOne()
                         ).pipe(
-                          RxJS.tap( {
+                          RxJS.tap({
                             error: (error) => this._logger.error(`pipe(4-0): find socialProfile and socialTracker failed, tweet.Id: ${data.socialEvent.contentId}`, error),
                           }),
                           RxJS.mergeMap((queryResult) =>
                             RxJS.merge(
                               RxJS.of(queryResult).pipe(
-                                RxJS.filter((queryResult) => !queryResult ),
-                                RxJS.tap( {
+                                RxJS.filter((queryResult) => !queryResult),
+                                RxJS.tap({
                                   next: (_) => this._logger.log(`pipe(4-0): socialProfile and socialTracker not found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, username: ${data.postComments.user.username}`),
                                 }),
                                 RxJS.mergeMap((_) => RxJS.EMPTY)
                               ),
                               RxJS.of(queryResult).pipe(
                                 RxJS.filter((queryResult) => !!queryResult && queryResult.trackerId && queryResult.eventId),
-                                RxJS.tap( {
+                                RxJS.tap({
                                   next: (queryResult) => this._logger.log(`pipe(4-0): socialTracker already exists, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, socialTracker.id: ${queryResult.trackerId}, socialProfile.username: ${queryResult.profileUsername}`),
                                 }),
                                 RxJS.mergeMap((_) => RxJS.EMPTY)
                               ),
                               RxJS.of(queryResult).pipe(
                                 RxJS.filter((queryResult) => !!queryResult && !queryResult.eventId && queryResult.profileId),
-                                RxJS.tap( {
+                                RxJS.tap({
                                   next: (queryResult) => this._logger.log(`pipe(4-0): socialProfile found, postId: ${data.socialEvent.contentId}, shortcode: ${(<InstagramPostDto>data.socialEvent.content.data).shortcode}, socialProfile.username: ${queryResult.profileUsername}`),
                                 }),
                               )
@@ -586,7 +604,7 @@ export class InstagramPostTrackerJob {
                             socialCommentAirdrop.airdropRule = data.airdropCommentRule;
                             socialCommentAirdrop.socialTracker = socialTracker;
 
-                            return { socialTracker, socialCommentAirdrop: socialCommentAirdrop, ...data};
+                            return { socialTracker, socialCommentAirdrop: socialCommentAirdrop, ...data };
                           }),
                           RxJS.concatMap((pipeResult) =>
                             RxJS.from(
@@ -628,13 +646,14 @@ export class InstagramPostTrackerJob {
               )
             ),
             RxJS.retry({
-              count:3,
+              count: 3,
+              resetOnSuccess: true,
               delay: (error, retryCount) => RxJS.of([error, retryCount]).pipe(
                 RxJS.mergeMap(([error, retryCount]) =>
                   RxJS.merge(
                     RxJS.of([error, retryCount]).pipe(
-                      RxJS.filter(([err,count]) => err instanceof AxiosError &&
-                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                      RxJS.filter(([err, count]) => err instanceof AxiosError &&
+                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT || err.code === "ECONNRESET" || err.code === "EAI_AGAIN") &&
                         count <= 3
                       ),
                       RxJS.tap({
@@ -643,15 +662,15 @@ export class InstagramPostTrackerJob {
                       RxJS.delay(60000)
                     ),
                     RxJS.of([error, retryCount]).pipe(
-                      RxJS.filter(([err,count]) => err instanceof AxiosError &&
-                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT) &&
+                      RxJS.filter(([err, count]) => err instanceof AxiosError &&
+                        (err.code === AxiosError.ECONNABORTED || err.code === AxiosError.ERR_NETWORK || err.code === AxiosError.ETIMEDOUT || err.code === "ECONNRESET" || err.code === "EAI_AGAIN") &&
                         count > 3
                       ),
-                      RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('fetch instagram post comments failed', err))),
+                      RxJS.mergeMap(([err, _]) => RxJS.throwError(() => new TrackerError('fetch instagram post comments failed', err))),
                     ),
                     RxJS.of([error, retryCount]).pipe(
-                       RxJS.filter(([err,_]) => err instanceof Error),
-                       RxJS.mergeMap(([err,_]) => RxJS.throwError(() => new TrackerError('fetch instagram post comments failed', err))),
+                      RxJS.filter(([err, _]) => err instanceof Error),
+                      RxJS.mergeMap(([err, _]) => RxJS.throwError(() => new TrackerError('fetch instagram post comments failed', err))),
                     ),
                   )
                 ),
@@ -690,10 +709,15 @@ export class InstagramPostTrackerJob {
   }
 
   private _fetchLivelyPosts(airdropSchedule: SocialAirdropScheduleEntity): RxJS.Observable<any> {
-    return this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${airdropSchedule.socialLively.userId}/${this._FETCH_COUNT}/%7Bend_cursor%7D`, {
+    return this._httpService.get("https://instagram28.p.rapidapi.com/medias", {
       headers: {
         'X-RapidAPI-Key': this._apiKey,
-        'X-RapidAPI-Host': this._apiHost
+        'X-RapidAPI-Host': this._apiHost,
+      },
+      params: {
+        "user_id": airdropSchedule.socialLively.userId,
+        "batch_size": 20,
+        "next_cursor": "QVFBdEhCb08yNUxLZ0tmRVVPWkJBQ2oyRjN0dmJxTVlkMEhSVllPOFJKWlB3RzY3Z3RsaEFkSlQzM0g4eVVwbS1yRm5SaHVCdnFrNFJfcjFrdkt4MFFENg=="
       }
     }).pipe(
       RxJS.expand(response =>
@@ -701,15 +725,20 @@ export class InstagramPostTrackerJob {
           RxJS.of(response).pipe(
             RxJS.filter(axiosResponse =>
               axiosResponse?.data?.success &&
-              axiosResponse?.data?.data?.has_next_page &&
-              axiosResponse?.data?.data?.end_cursor
+              axiosResponse?.data?.data?.user?.edge_owner_to_timeline_media?.page_info?.has_next_page &&
+              axiosResponse?.data?.data?.user?.edge_owner_to_timeline_media?.page_info?.end_cursor
             ),
             RxJS.delay(this._apiDelay),
             RxJS.mergeMap(axiosResponse =>
-              this._httpService.get(`https://instagram188.p.rapidapi.com/userpost/${airdropSchedule.socialLively.userId}/${this._FETCH_COUNT}/${axiosResponse.data.data.end_cursor}`, {
+              this._httpService.get("https://instagram28.p.rapidapi.com/medias", {
                 headers: {
                   'X-RapidAPI-Key': this._apiKey,
-                  'X-RapidAPI-Host': this._apiHost
+                  'X-RapidAPI-Host': this._apiHost,
+                },
+                params: {
+                  "user_id": airdropSchedule.socialLively.userId,
+                  "batch_size": 20,
+                  "next_cursor": axiosResponse.data.data.user.edge_owner_to_timeline_media.page_info.end_cursor
                 }
               })
             ),
@@ -717,12 +746,12 @@ export class InstagramPostTrackerJob {
           RxJS.of(response).pipe(
             RxJS.filter(axiosResponse =>
               !axiosResponse?.data?.success ||
-              !axiosResponse?.data?.data?.has_next_page ||
-              !axiosResponse?.data?.data?.end_cursor
+              !axiosResponse?.data?.data?.user?.edge_owner_to_timeline_media?.page_info?.has_next_page ||
+              !axiosResponse?.data?.data?.user?.edge_owner_to_timeline_media?.page_info?.end_cursor
             ),
             RxJS.tap({
               next: response => this._logger.debug('_fetchLivelyPosts call api complete,' +
-                `data.success: ${response?.data?.success}, hasNextPage: ${response?.data?.data?.has_next_page} `)
+                `data.success: ${response?.data?.success}, hasNextPage: ${response?.data?.data?.user?.edge_owner_to_timeline_media?.page_info?.has_next_page} `)
             }),
             RxJS.mergeMap(_ => RxJS.EMPTY)
           )
@@ -734,43 +763,53 @@ export class InstagramPostTrackerJob {
   }
 
   private _fetchPostLikes(shortcode: string): RxJS.Observable<any> {
-    return this._httpService.get(`https://instagram188.p.rapidapi.com/postlike/${shortcode}/${this._FETCH_COUNT}/%7Bend_cursor%7D`, {
+    return this._httpService.get("https://instagram28.p.rapidapi.com/media_likers", {
       headers: {
         'X-RapidAPI-Key': this._apiKey,
         'X-RapidAPI-Host': this._apiHost
+      },
+      params: {
+        "batch_size": 20,
+        "next_cursor": "QVFDTE5NVThZVEdVX3gzLUg3ajBiYnZ0RUdSNTljQTZNQ3ExRy1vcTJEWU12ZG9QMEtUeUI3dXFRYThqVC1aamtGa0N2dWJ2ZDNPeWxsdWFVOS1JRV91LQ==",
+        "short_code": shortcode
       }
     }).pipe(
       RxJS.expand(response =>
-          RxJS.merge(
-            RxJS.of(response).pipe(
-              RxJS.filter(axiosResponse =>
-                axiosResponse?.data?.success &&
-                axiosResponse?.data?.data?.has_next_page &&
-                axiosResponse?.data?.data?.end_cursor
-              ),
-              RxJS.delay(this._apiDelay),
-              RxJS.mergeMap(axiosResponse =>
-                this._httpService.get(`https://instagram188.p.rapidapi.com/postlike/${shortcode}/${this._FETCH_COUNT}/${axiosResponse.data.data.end_cursor}`, {
-                  headers: {
-                    'X-RapidAPI-Key': this._apiKey,
-                    'X-RapidAPI-Host': this._apiHost
-                  }
-                })
-              ),
+        RxJS.merge(
+          RxJS.of(response).pipe(
+            RxJS.filter(axiosResponse =>
+              axiosResponse?.data?.success &&
+              axiosResponse?.data?.data?.shortcode_media?.edge_liked_by?.page_info?.has_next_page &&
+              axiosResponse?.data?.data?.shortcode_media?.edge_liked_by?.page_info?.end_cursor
             ),
-            RxJS.of(response).pipe(
-              RxJS.filter(axiosResponse =>
-                !axiosResponse?.data?.success ||
-                !axiosResponse?.data?.data?.has_next_page ||
-                !axiosResponse?.data?.data?.end_cursor
-              ),
-              RxJS.tap({
-                next: response => this._logger.debug('_fetchPostLikes call api complete,' +
-                  `data.success: ${response?.data?.success}, hasNextPage: ${response?.data?.data?.has_next_page} `)
-              }),
-              RxJS.mergeMap(_ => RxJS.EMPTY)
-            )
+            RxJS.delay(this._apiDelay),
+            RxJS.mergeMap(axiosResponse =>
+              this._httpService.get("https://instagram28.p.rapidapi.com/media_likers", {
+                headers: {
+                  'X-RapidAPI-Key': this._apiKey,
+                  'X-RapidAPI-Host': this._apiHost
+                },
+                params: {
+                  "batch_size": 20,
+                  "next_cursor": axiosResponse.data.data.shortcode_media.edge_liked_by.page_info.end_cursor,
+                  "short_code": shortcode
+                }
+              })
+            ),
           ),
+          RxJS.of(response).pipe(
+            RxJS.filter(axiosResponse =>
+              !axiosResponse?.data?.success ||
+              !axiosResponse?.data?.data?.shortcode_media?.edge_liked_by?.page_info?.has_next_page ||
+              !axiosResponse?.data?.data?.shortcode_media?.edge_liked_by?.page_info?.end_cursor
+            ),
+            RxJS.tap({
+              next: response => this._logger.debug('_fetchPostLikes call api complete,' +
+                `data.success: ${response?.data?.success}, hasNextPage: ${response?.data?.data?.shortcode_media?.edge_liked_by?.page_info?.has_next_page}`)
+            }),
+            RxJS.mergeMap(_ => RxJS.EMPTY)
+          )
+        ),
         1
       ),
       RxJS.map(response => response.data),
@@ -778,46 +817,105 @@ export class InstagramPostTrackerJob {
   }
 
   private _fetchPostComments(shortcode: string): RxJS.Observable<any> {
-    return this._httpService.get(`https://instagram188.p.rapidapi.com/postcomment/${shortcode}/%7Bend_cursor%7D`, {
+    return this._httpService.get("https://instagram28.p.rapidapi.com/media_comments", {
       headers: {
         'X-RapidAPI-Key': this._apiKey,
         'X-RapidAPI-Host': this._apiHost
+      },
+      params: {
+        "batch_size": 20,
+        "next_cursor": "QVFBelU3blhuRmlBbmFVeWlyOUtvcFhqcW1VTTZFVzBteXJQVUZYS2RySlRsU09NUGg3Z0k2dUJ4LV92cktuSnltbGlQSTJpa3I2MVl1Z3F5bXdKNFlNMw==",
+        "short_code": shortcode
       }
     }).pipe(
       RxJS.expand(response =>
-          RxJS.merge(
-            RxJS.of(response).pipe(
-              RxJS.filter(axiosResponse =>
-                axiosResponse?.data?.status &&
-                axiosResponse?.data?.data?.has_more_headload_comments &&
-                axiosResponse?.data?.data?.end_cursor
-              ),
-              RxJS.delay(this._apiDelay),
-              RxJS.mergeMap(axiosResponse =>
-                this._httpService.get(`https://instagram188.p.rapidapi.com/postcomment/${shortcode}/${axiosResponse.data.data.end_cursor}`, {
-                  headers: {
-                    'X-RapidAPI-Key': this._apiKey,
-                    'X-RapidAPI-Host': this._apiHost
-                  }
-                })
-              ),
+        RxJS.merge(
+          RxJS.of(response).pipe(
+            RxJS.filter(axiosResponse =>
+              axiosResponse?.data?.success &&
+              axiosResponse?.data?.data?.shortcode_media?.edge_media_to_parent_comment?.page_info?.has_next_page &&
+              axiosResponse?.data?.data?.shortcode_media?.edge_media_to_parent_comment?.page_info?.end_cursor
             ),
-            RxJS.of(response).pipe(
-              RxJS.filter(axiosResponse =>
-                !axiosResponse?.data?.status ||
-                !axiosResponse?.data?.data?.has_more_headload_comments ||
-                !axiosResponse?.data?.data?.end_cursor
-              ),
-              RxJS.tap({
-                next: response => this._logger.debug('_fetchPostComments call api complete,' +
-                  `data.success: ${response?.data?.success}, headLoadComments: ${response?.data?.data?.has_more_headload_comments} `)
-              }),
-              RxJS.mergeMap(_ => RxJS.EMPTY)
-            )
+            RxJS.delay(this._apiDelay),
+            RxJS.mergeMap(axiosResponse =>
+              this._httpService.get("https://instagram28.p.rapidapi.com/media_comments", {
+                headers: {
+                  'X-RapidAPI-Key': this._apiKey,
+                  'X-RapidAPI-Host': this._apiHost
+                },
+                params: {
+                  "batch_size": 20,
+                  "next_cursor": axiosResponse.data.data.shortcode_media.edge_media_to_parent_comment.page_info.end_cursor,
+                  "short_code": shortcode
+                }
+
+              })
+            ),
           ),
+          RxJS.of(response).pipe(
+            RxJS.filter(axiosResponse =>
+              !axiosResponse?.data?.success ||
+              !axiosResponse?.data?.data?.shortcode_media?.edge_media_to_parent_comment?.page_info?.has_next_page ||
+              !axiosResponse?.data?.data?.shortcode_media?.edge_media_to_parent_comment?.page_info?.end_cursor
+            ),
+            RxJS.tap({
+              next: response => this._logger.debug('_fetchPostComments call api complete,' +
+                `data.success: ${response?.data?.success}, headLoadComments: ${response?.data?.data?.shortcode_media?.edge_media_to_parent_comment?.page_info?.has_next_page} `)
+            }),
+            RxJS.mergeMap(_ => RxJS.EMPTY)
+          )
+        ),
         1
       ),
       RxJS.map(response => response.data),
     )
+  }
+
+  private _lastFetchInstagramPosts(): void {
+    const now = new Date();
+    const nowPlusFiveMin = new Date(now.getTime() + this._lastInterval);
+
+    RxJS.from(this._entityManager.getRepository(SocialAirdropScheduleEntity)
+      .findOne({
+        relations: {
+          socialLively: true
+        },
+        loadEagerRelations: true,
+        where: {
+          socialLively: {
+            socialType: SocialType.INSTAGRAM,
+            isActive: true,
+          },
+          airdropEndAt: MoreThan(now) && LessThan(nowPlusFiveMin),
+        }
+      }))
+      .pipe(
+        RxJS.catchError(err => {
+          this._logger.error(`find last airdrop schedule Instagram failed`, err);
+          return RxJS.empty();
+        }),
+        RxJS.filter(schedule => !!schedule?.id),
+        RxJS.concatMap(() =>
+          RxJS.of(this.fetchInstagramPosts()).pipe(
+            RxJS.catchError(err => {
+              this._logger.error(`fetch Instagram posts failed`, err);
+              return RxJS.throwError(`Fetching Instagram posts failed: ${err}`);
+            }),
+            RxJS.tap(() => this._logger.log('Instagram Posts Fetched!')),
+          )
+        ),
+        RxJS.catchError(err => {
+          this._logger.error(`Error fetching Instagram posts:`, err);
+          return RxJS.empty();
+        })
+      )
+      .subscribe({
+        error: err => {
+          this._logger.error('An error occurred at _lastFetchInstagramPosts:', err);
+        },
+        complete: () => {
+          this._logger.log('_lastFetchInstagramPosts completed successfully');
+        }
+      });
   }
 }

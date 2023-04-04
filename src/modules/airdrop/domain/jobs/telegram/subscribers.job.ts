@@ -23,9 +23,10 @@ export class TelegramSubscriberJob {
   private readonly _channelName: string;
   private readonly _bot: Telegraf;
   private readonly _telegram: Telegram;
-  private readonly _owner;
-  private readonly _admins;
+  private readonly _owner: string;
+  private readonly _admins: number[];
   private readonly _numTrackerInterval;
+  private _isEnable: boolean;
 
   constructor(
     @InjectEntityManager()
@@ -57,11 +58,16 @@ export class TelegramSubscriberJob {
       throw new Error("airdrop.telegram.tracker.interval config is empty");
     }
 
+    this._isEnable = this._configService.get<boolean>("airdrop.telegram.enable");
+    if (this._isEnable === null) {
+      throw new Error("airdrop.telegram.enable config is empty");
+    }
+
     // creating bot with the token
     this._bot = new Telegraf(this._token)
     // initializing telegram sdk with the the token
     this._telegram = new Telegram(this._token)
-    this._initializeBot();
+    if (this._isEnable) this._initializeBot();
   }
 
   // this function should register all the middleware and actions to react to the users activity
@@ -212,7 +218,7 @@ export class TelegramSubscriberJob {
             let hashtags: string[] = []
             hashtags.push(schedule.hashtags.airdrop)
             if (schedule.hashtags.join) hashtags.push(schedule.hashtags.join);
-            content.data = {hashtags: hashtags}
+            content.data = { hashtags: hashtags }
             await this._entityManager.getRepository(SocialEventEntity).insert({
               publishedAt: new Date(),
               contentId: `${post.message_id}`,
