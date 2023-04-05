@@ -554,7 +554,7 @@ export class AuthenticationService {
 
     if (authMailEntity) {
       this._logger.warn(`already sent forget password email, 
-      email: ${email}, date: ${authMailEntity.mailSentAt} `);
+      email: ${email}, date: ${authMailEntity.createdAt} `);
       throw new HttpException({
         statusCode: '400',
         message: 'Already Sent Forget Password Email',
