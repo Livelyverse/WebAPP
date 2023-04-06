@@ -24,6 +24,7 @@ export class DiscordMemberJob {
     private readonly _airdropEmojiIdentifier: string;
     private readonly _bot: Client;
     private readonly _isEnable: boolean;
+    private readonly _failuresTimeout: number
 
 
     constructor(
@@ -56,6 +57,11 @@ export class DiscordMemberJob {
         this._isEnable = this._configService.get<boolean>("airdrop.discord.enable");
         if (this._isEnable === null) {
             throw new Error("airdrop.discord.enable config is empty");
+        }
+
+        this._failuresTimeout = this._configService.get<number>("airdrop.discord.failuresTimeout");
+        if (this._failuresTimeout === null) {
+            throw new Error("airdrop.discord.failuresTimeout config is empty");
         }
 
         this._bot = new Client({
@@ -411,7 +417,27 @@ export class DiscordMemberJob {
             this._bot.on(Events.GuildCreate, async (guildCreate) => {
                 this._logger.debug("We have a new GuildCreate:", JSON.stringify(guildCreate))
             })
-            await this._bot.login(this._token);
+            let failuresCount: number = 0
+            while (failuresCount < 5) {
+                try {
+                    this._logger.log('Trying to connect..., Count:', failuresCount);
+                    await this._bot.login(this._token);
+                    break
+                } catch (error) {
+                    this._logger.error("We can't launch the telegram bot: ", error)
+                }
+                try {
+                    await new Promise<void>(resolve => {
+                        setTimeout(() => {
+                            this._logger.log('Waiting..., Count:', failuresCount);
+                            resolve();
+                        }, this._failuresTimeout);
+                    });
+                } catch (e) {
+                    this._logger.error("We can't wait retry the telegram bot connection: ", e)
+                }
+                failuresCount++;
+            }
         } catch (error) {
             this._logger.error("Unexpected error in initializeBot:", error)
             return

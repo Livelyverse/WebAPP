@@ -27,6 +27,7 @@ export class TelegramSubscriberJob {
   private readonly _admins: number[];
   private readonly _numTrackerInterval;
   private _isEnable: boolean;
+  private readonly _failuresTimeout: number;
 
   constructor(
     @InjectEntityManager()
@@ -61,6 +62,11 @@ export class TelegramSubscriberJob {
     this._isEnable = this._configService.get<boolean>("airdrop.telegram.enable");
     if (this._isEnable === null) {
       throw new Error("airdrop.telegram.enable config is empty");
+    }
+
+    this._failuresTimeout = this._configService.get<number>('airdrop.telegram.failuresTimeout');
+    if (!this._numTrackerInterval) {
+      throw new Error("airdrop.telegram.failuresTimeout config is empty");
     }
 
     // creating bot with the token
@@ -129,10 +135,26 @@ export class TelegramSubscriberJob {
       // listening to the airdrop post click
       this._registerOnAirdropPostClicked()
 
-      try {
-        await this._bot.launch();
-      } catch (error) {
-        this._logger.error("We can't launch the telegram bot: ", error)
+      let failuresCount: number = 0
+      while (failuresCount < 5) {
+        try {
+          this._logger.log('Trying to connect..., Count:', failuresCount);
+          await this._bot.launch();
+          break
+        } catch (error) {
+          this._logger.error("We can't launch the telegram bot: ", error)
+        }
+        try {
+          await new Promise<void>(resolve => {
+            setTimeout(() => {
+              this._logger.log('Waiting..., Count:', failuresCount);
+              resolve();
+            }, this._failuresTimeout);
+          });
+        } catch (e) {
+          this._logger.error("We can't wait retry the telegram bot connection: ", e)
+        }
+        failuresCount++;
       }
     } catch (error) {
       this._logger.error('error on telegram: ', error);
