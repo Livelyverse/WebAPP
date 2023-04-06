@@ -126,7 +126,7 @@ export class TelegramSubscriberJob {
       // Getting subscribe airdrop
       this._bot.hears('Get your subscribe airdrop 💵', async (ctx) => {
         try {
-          await this._fetchTelegramSubscribers(ctx)
+          await this._fetchTelegramSubscribers(ctx, { id: ctx.from.id, username: ctx.from.username }, "TEXT")
         } catch (error) {
           this._logger.error("We can't enter to the scene in telegram job: ", error)
         }
@@ -357,6 +357,14 @@ export class TelegramSubscriberJob {
           return;
         }
 
+        try {
+          await this._fetchTelegramSubscribers(ctx, sender, "QUERY")
+        } catch (error) {
+          this._logger.error("We can't call this._fetchTelegramSubscribers ", error)
+          if (! await this._sendReply(ctx, "QUERY", "failure of calling follow action register", "Failed: Sorry we have some problems of calling follow action register")) return;
+          return;
+        }
+
         let socialTracker: SocialTrackerEntity
         try {
           socialTracker = await this._entityManager.getRepository(SocialTrackerEntity)
@@ -367,6 +375,7 @@ export class TelegramSubscriberJob {
               },
               loadEagerRelations: true,
               where: {
+                actionType: SocialActionType.LIKE,
                 socialEvent: {
                   id: event.id
                 },
@@ -383,7 +392,7 @@ export class TelegramSubscriberJob {
           }
         }
         if (socialTracker) {
-          if (! await this._sendReply(ctx, "QUERY", "social tracker was submitted before", "Success: You'r action submitted before!")) return;
+          if (! await this._sendReply(ctx, "QUERY", "like social tracker already submitted", "Success: You'r like action already submitted!")) return;
           return;
         }
 
@@ -432,7 +441,7 @@ export class TelegramSubscriberJob {
           return
         }
 
-        if (! await this._sendReply(ctx, "QUERY", "reply of submitted action", "Success: You'r action submitted successfully!")) return;
+        if (! await this._sendReply(ctx, "QUERY", "reply of submitted action", "Success: You'r like action submitted successfully!")) return;
         return
       } catch (error) {
         this._logger.error("Unexpected error on telegram action clicked: ", error)
@@ -481,21 +490,19 @@ export class TelegramSubscriberJob {
     return true
   }
 
-  private async _fetchTelegramSubscribers(ctx: Context) {
+  private async _fetchTelegramSubscribers(ctx: Context, sender: { id: number, username: string, status?: 'member' | 'left' | 'not' | 'creator' }, replyType: "TEXT" | "QUERY") {
     try {
-      let memberStatus: 'member' | 'left' | 'not' | 'creator'
       try {
-        memberStatus = await this._memberInChannelStatus(ctx.from.id);
+        sender.status = await this._memberInChannelStatus(ctx.from.id);
       } catch (error) {
         this._logger.error("We can't get the status of the member: ", error)
-        if (! await this._sendReply(ctx, "TEXT", "failure of member status in telegram", "Sorry we can't check your member status")) return;
+        if (! await this._sendReply(ctx, replyType, "failure of member status in telegram", "Sorry we can't check your member status")) return;
         return
       }
-      if (memberStatus === "left" || memberStatus === "not") {
-        if (! await this._sendReply(ctx, "TEXT", "failure of member status in telegram", "Failed: You should join the channel first!")) return;
+      if (sender.status === "left" || sender.status === "not") {
+        if (! await this._sendReply(ctx, replyType, "failure of member status in telegram", "Failed: You should join the channel first!")) return;
         return
       }
-      const sender = { id: ctx.from.id, username: ctx.from.username, status: memberStatus }
 
       let socialProfile: SocialProfileEntity
       try {
@@ -507,10 +514,10 @@ export class TelegramSubscriberJob {
         })
       } catch (error) {
         if (error instanceof EntityNotFoundError) {
-          await this._sendReply(ctx, "TEXT", "failure of not registered user", "You must register to our platform first!");
+          await this._sendReply(ctx, replyType, "failure of not registered user", "You must register to our platform first!");
         } else {
           this._logger.error("Can't get social profile from the database", error);
-          await this._sendReply(ctx, "TEXT", "failure of getting social profile from the database", "Sorry we can't get your social profile from the database!");
+          await this._sendReply(ctx, replyType, "failure of getting social profile from the database", "Sorry we can't get your social profile from the database!");
         }
         return
       }
@@ -524,7 +531,7 @@ export class TelegramSubscriberJob {
         })
       } catch (error) {
         this._logger.error("Can't get the following social airdrop rule from the database", error);
-        await this._sendReply(ctx, "TEXT", "failure of getting telegram follower rule", "Sorry we can't get telegram follow rule from the database!");
+        await this._sendReply(ctx, replyType, "failure of getting telegram follower rule", "Sorry we can't get telegram follow rule from the database!");
         return
       }
       let socialEvent: SocialEventEntity
@@ -540,7 +547,7 @@ export class TelegramSubscriberJob {
           .getOneOrFail()
       } catch (error) {
         this._logger.error("Can't get the social event from the database:", error);
-        await this._sendReply(ctx, "TEXT", "failure of getting social event from the database", "Sorry we can't get social event from the database!");
+        await this._sendReply(ctx, replyType, "failure of getting social event from the database", "Sorry we can't get social event from the database!");
         return
       }
       let socialTracker: SocialTrackerEntity
@@ -563,11 +570,11 @@ export class TelegramSubscriberJob {
         })
       } catch (error) {
         this._logger.error("Can't get the following social airdrop rule from the database", error);
-        await this._sendReply(ctx, "TEXT", "failure of getting telegram follower rule", "Sorry we can't get telegram follow rule from the database!");
+        await this._sendReply(ctx, replyType, "failure of getting telegram follower rule", "Sorry we can't get telegram follow rule from the database!");
         return
       }
       if (socialTracker) {
-        await this._sendReply(ctx, "TEXT", "failure of submitted before social tracker", "Your subscribe airdrop submitted before!")
+        await this._sendReply(ctx, replyType, "failure of already submitted social tracker", "Your subscribe airdrop already submitted!")
         return
       }
       try {
@@ -580,7 +587,7 @@ export class TelegramSubscriberJob {
             })
           } catch (error) {
             this._logger.error("We can't insert new telegram social tracker: ", error)
-            if (! await this._sendReply(ctx, "TEXT", "failure of submitting telegram social tracker status", "Failed: We can't submit your action in our database!")) return;
+            if (! await this._sendReply(ctx, replyType, "failure of submitting telegram social tracker status", "Failed: We can't submit your action in our database!")) return;
             return
           }
           try {
@@ -590,20 +597,20 @@ export class TelegramSubscriberJob {
             })
           } catch (error) {
             this._logger.error("We can't insert new telegram airdrop: ", error)
-            if (! await this._sendReply(ctx, "TEXT", "failure of submitting telegram airdrop", "Failed: Sorry we can't insert the airdrop into the database")) return;
+            if (! await this._sendReply(ctx, replyType, "failure of submitting telegram airdrop", "Failed: Sorry we can't insert the airdrop into the database")) return;
             return
           }
         })
       } catch (error) {
         this._logger.error("Saving telegram social tracker with transaction failed: ", error)
-        if (! await this._sendReply(ctx, "TEXT", "failure of submitting telegram social tracker with transaction", "Failed: Sorry we can't insert the social tracker into the database")) return;
+        if (! await this._sendReply(ctx, replyType, "failure of submitting telegram social tracker with transaction", "Failed: Sorry we can't insert the social tracker into the database")) return;
         return
       }
-      this._sendReply(ctx, "TEXT", "success of submitted follow social airdrop", "Your follow airdrop submitted successfully!")
+      this._sendReply(ctx, replyType, "success of submitted follow social airdrop", "Your follow airdrop submitted successfully!")
       return
     } catch (error) {
       this._logger.error("We have unexpected error:", error);
-      await this._sendReply(ctx, "TEXT", "unexpected error", "Sorry we an internal error!");
+      await this._sendReply(ctx, replyType, "unexpected error", "Sorry we an internal error!");
       return
     }
   }
